@@ -187,6 +187,13 @@ window.CQ = window.CQ || {};
   function crestSVG(club, cls) {
     const custom = CQ.state && CQ.state.game && CQ.state.game.customLogos && CQ.state.game.customLogos[club.id];
     if (custom) return `<span class="crest ${cls || ""}"><img src="${esc(custom)}" alt=""></span>`;
+    const realId = CQ.DATA && CQ.DATA.CREST_MAP && CQ.DATA.CREST_MAP[club.id];
+    if (realId) return `<span class="crest ${cls || ""}"><img src="https://media.api-sports.io/football/teams/${realId}.png" alt="" loading="lazy" onerror="this.parentElement.outerHTML=CQ.util.crestSVGFallback('${esc(club.id)}','${esc(cls || "")}')"></span>`;
+    return crestSVGProcedural(club, cls);
+  }
+  // brasão vetorial procedural (sem depender de imagem externa) — usado quando o clube
+  // não tem escudo real mapeado, ou como fallback se a imagem real falhar ao carregar.
+  function crestSVGProcedural(club, cls) {
     const c1 = club.c1 || "#888", c2 = club.c2 || "#fff";
     const uid = "cr" + hashStr(club.id);
     let fillDef = "", body = `fill="${c1}"`;
@@ -211,6 +218,13 @@ window.CQ = window.CQ || {};
       <path d="M3 4 Q12 1 20 1 Q28 1 37 4 L37 12 L3 12 Z" fill="#1b1812" opacity=".88"/>
       <text x="20" y="10" text-anchor="middle" font-family="'Barlow Condensed','Arial Narrow',sans-serif" font-weight="700" font-size="8.4" fill="${txtFill}" letter-spacing=".6">${ini}</text>
     </svg></span>`;
+  }
+  // usado só pelo onerror do <img> do escudo real — busca o clube pelo id e vai
+  // direto pro vetor procedural, sem tentar a imagem real de novo (evita loop).
+  function crestSVGFallback(clubId, cls) {
+    const club = CQ.DATA && CQ.DATA.CLUBS && CQ.DATA.CLUBS[clubId];
+    if (!club) return `<span class="crest ${cls || ""}"></span>`;
+    return crestSVGProcedural(club, cls);
   }
 
   function flagImg(nat, cls) {
@@ -251,6 +265,6 @@ window.CQ = window.CQ || {};
   CQ.util = {
     hashStr, mulberry32, rngFor, ri, rf, choice, chance, shuffle, poisson, clamp,
     esc, cleanInput, fmtBRL, fmtNota, plural,
-    nameGen, portraitSVG, crestSVG, flagImg, natAvatar, I
+    nameGen, portraitSVG, crestSVG, crestSVGFallback, flagImg, natAvatar, I
   };
 })();

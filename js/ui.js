@@ -932,9 +932,12 @@ window.CQ = window.CQ || {};
     const rows = b.top.slice(3, 6).map(function (r, i) {
       return `<div class="flex-b" style="padding:3px 0"><span class="small"><span class="tnum" style="display:inline-block;width:22px">${i + 4}º</span> ${esc(r.name)}${r.me ? ' <span class="badge badge-gold">você</span>' : ""}</span><span class="tnum muted small">${r.score}</span></div>`;
     }).join("");
-    const verdict = b.rank === 1 ? '<span class="badge badge-gold">BOLA DE OURO — nº 1 do mundo</span>'
-      : b.rank <= 3 ? `<span class="badge">Pódio mundial · ${b.rank}º</span>`
-        : `<span class="small muted">Você ficou em ${b.rank}º no ranking mundial.</span>`;
+    // sem indicação: o jogador não entrou nem à frente do pior dos craques fixos —
+    // mostra o Top 3 do mundo normalmente, mas sem te inserir artificialmente na lista.
+    const verdict = b.rank == null ? '<span class="small muted">Você não recebeu indicação ao prêmio este ano.</span>'
+      : b.rank === 1 ? '<span class="badge badge-gold">BOLA DE OURO — nº 1 do mundo</span>'
+        : b.rank <= 3 ? `<span class="badge">Pódio mundial · ${b.rank}º</span>`
+          : `<span class="small muted">Você ficou em ${b.rank}º no ranking mundial.</span>`;
     return `<hr class="rule"><div class="flex-b mb8"><div class="kicker" style="flex:1">Ranking mundial (Bola de Ouro)</div>${verdict}</div>${podium}${rows}`;
   }
 
@@ -1097,8 +1100,10 @@ window.CQ = window.CQ || {};
       </div>`;
     }).join("");
 
-    const bestRank = p.ballon.length ? Math.min.apply(null, p.ballon.map(function (b) { return b.rank; })) : null;
+    const nominatedRanks = p.ballon.map(function (b) { return b.rank; }).filter(function (r) { return r != null; });
+    const bestRank = nominatedRanks.length ? Math.min.apply(null, nominatedRanks) : null;
     const ballonRows = p.ballon.slice().reverse().slice(0, 8).map(function (b) {
+      if (b.rank == null) return `<tr><td class="tnum">${b.year}</td><td class="muted">sem indicação</td><td class="num muted">${b.score} pts</td></tr>`;
       return `<tr><td class="tnum">${b.year}</td><td>${b.rank <= 3 ? '<b>' + b.rank + 'º</b>' : b.rank + 'º'} no mundo</td><td class="num muted">${b.score} pts</td></tr>`;
     }).join("") || '<tr><td colspan="3" class="muted small" style="padding:10px">Ainda sem ranking mundial. Ele é calculado ao fim de cada temporada.</td></tr>';
 
@@ -1122,7 +1127,7 @@ window.CQ = window.CQ || {};
           </div></div></div>
         <div class="card"><div class="section-banner"><span class="sb-title">Bola de Ouro</span>${bestRank ? `<span class="sb-meta">melhor: ${bestRank}º</span>` : ""}</div>
           <div class="card-b tight"><table class="tbl"><thead><tr><th>Ano</th><th>Colocação</th><th class="num">Pontuação</th></tr></thead><tbody>${ballonRows}</tbody></table></div>
-          <p class="small muted" style="padding:8px 14px">Só o nº 1 do mundo leva a Bola de Ouro. Você disputa contra 12 craques de elite — precisa de números absurdos e um título grande.</p>
+          <p class="small muted" style="padding:8px 14px">Você só recebe indicação nas temporadas em que supera ao menos o pior dos 12 craques de elite do mundo — nas outras, nem entra na conversa. Só o nº 1 leva a Bola de Ouro.</p>
         </div>
       </div>
     </div>`;
@@ -1441,8 +1446,35 @@ window.CQ = window.CQ || {};
 
   function scorersHTML(G) {
     const kind = CQ.state.artKind || "g";
+    const field = kind === "a" ? "a" : "g";
+    const unit = kind === "a" ? "assistência" : "gol", unitP = kind === "a" ? "assistências" : "gols";
     const board = E().scoreboard(G, kind);
-    const top = board.slice(0, 14);
+    const me = board.find(function (s) { return s.you; });
+
+    // só mostra "você" na lista quando, NO RITMO ATUAL projetado pra temporada inteira,
+    // estiver perto (≤2) de quem vem logo à frente — igual à regra da Bola de Ouro.
+    // Comparar números AO VIVO (proporcionais ao quanto já rolou de temporada) engana:
+    // no início, todo mundo — inclusive os craques — tem poucos gols, e qualquer
+    // diferença de 1-2 parece "perto" mesmo sem sentido nenhum.
+    const NEAR = 2, MIN_GAMES = 5;
+    const S = G.season, nRounds = S.comps.LIGA ? S.comps.LIGA.nRounds : 38;
+    const ligaStats = G.player.stats.byComp.LIGA || { j: 0, g: 0, a: 0 };
+    let showMe = false, gap = 0, aboveName = "", aboveVal = 0, tooEarly = true;
+    if (ligaStats.j >= MIN_GAMES) {
+      tooEarly = false;
+      const myProjected = Math.round((ligaStats[field] || 0) / ligaStats.j * nRounds);
+      const peers = (S.scorers || []).map(function (s) { return { name: s.name, val: s[field] }; });
+      if (E().leagueOf(G, G.rival.clubId) === E().leagueOf(G, G.player.clubId)) {
+        const rProj = G.rival.seasonProj || 0;
+        peers.push({ name: G.rival.name, val: field === "a" ? Math.round(rProj * 0.4) : rProj });
+      }
+      const above = peers.filter(function (pe) { return pe.val > myProjected; }).sort(function (a, b) { return a.val - b.val; })[0];
+      gap = above ? above.val - myProjected : 0;
+      showMe = !above || gap <= NEAR;
+      if (above) { aboveName = above.name; aboveVal = above.val; }
+    }
+    const list = showMe ? board : board.filter(function (s) { return !s.you; });
+    const top = list.slice(0, 14);
     const rows = top.map(function (s, i) {
       const cls = s.you ? "me" : s.rival ? "rival-row" : "";
       const tag = s.you ? ' <span class="badge badge-gold">você</span>' : s.rival ? ' <span class="badge badge-soft">rival</span>' : "";
@@ -1452,6 +1484,11 @@ window.CQ = window.CQ || {};
         <td class="num ${kind === "g" ? "" : "muted"}"><b>${s.g}</b></td>
         <td class="num ${kind === "a" ? "" : "muted"}"><b>${s.a}</b></td></tr>`;
     }).join("");
+    const foot = tooEarly
+      ? `Ainda é cedo pra dizer — dispute mais jogos da liga pra sua colocação na artilharia aparecer aqui.`
+      : showMe
+        ? `Projeção ao vivo da temporada. Para levar a Chuteira de Ouro, precisa terminar em 1º — e os artilheiros da liga chegam fácil aos ${G.season.scorerTop || 25} gols.`
+        : `No seu ritmo atual, você projeta ficar a <b>${gap}</b> ${U.plural(gap, unit, unitP)} de ${esc(aboveName)} (~${aboveVal} na temporada) — ainda fora da briga direta, por isso não aparece na lista.`;
     return `<div class="card">
       <div class="section-banner"><span class="sb-title">${kind === "g" ? "Artilharia" : "Assistências"} · ${esc(G.season.comps.LIGA.name)}</span><span class="sb-meta">${G.year}</span></div>
       <div class="subtabs" style="border-bottom:1px solid var(--ink);margin:0">
@@ -1461,7 +1498,7 @@ window.CQ = window.CQ || {};
       <div class="card-b tight" style="overflow-x:auto"><table class="tbl">
         <thead><tr><th>#</th><th>Jogador</th><th>Clube</th><th class="num">Gols</th><th class="num">Assist.</th></tr></thead>
         <tbody>${rows}</tbody></table></div>
-      <p class="small muted" style="padding:8px 14px">Projeção ao vivo da temporada. Para levar a Chuteira de Ouro, precisa terminar em 1º — e os artilheiros da liga chegam fácil aos ${G.season.scorerTop || 25} gols.</p>
+      <p class="small muted" style="padding:8px 14px">${foot}</p>
     </div>`;
   }
 
@@ -1683,20 +1720,62 @@ window.CQ = window.CQ || {};
   function fmtK(n) { return n >= 1000 ? (n / 1000).toFixed(1).replace(".", ",") + " mil" : n; }
 
   function feedHTML() {
+    const G = g(), p = G.player;
     const f = CQ.state.feedFilter || "all";
-    const openPolls = g().feed.filter(function (p) { return p.poll && p.poll.voted == null; }).length;
+    const openPolls = G.feed.filter(function (po) { return po.poll && po.poll.voted == null; }).length;
     const tabs = [["all", "Tudo"], ["imprensa", "Imprensa"], ["torcida", "Torcida"], ["poll", "Enquetes" + (openPolls ? " (" + openPolls + ")" : "")]];
-    const list = g().feed.filter(function (p) {
-      if (f === "poll") return !!p.poll;
+    const list = G.feed.filter(function (po) {
+      if (f === "poll") return !!po.poll;
       if (f === "all") return true;
-      if (f === "imprensa") return p.tag === "Imprensa";
-      if (f === "torcida") return p.tag === "Torcida" || p.tag === "Rival";
+      if (f === "imprensa") return po.tag === "Imprensa";
+      if (f === "torcida") return po.tag === "Torcida" || po.tag === "Rival";
       return true;
     });
-    return `<div class="subtabs">${tabs.map(function (t) {
+    const subtabs = `<div class="subtabs">${tabs.map(function (t) {
       return `<button class="${f === t[0] ? "on" : ""}" onclick="CQ.state.feedFilter='${t[0]}';CQ.ui.render()">${t[1]}</button>`;
-    }).join("")}</div>
-    <div class="card" style="max-width:680px"><div class="card-b tight">${list.map(postHTML).join("") || '<div style="padding:20px" class="muted center">Silêncio nas redes... por enquanto.</div>'}</div></div>`;
+    }).join("")}</div>`;
+    const posts = list.length ? list.map(postHTML).join("")
+      : `<div class="feed-empty">${I.feed}<b>Silêncio nas redes</b><span>Entre em campo e dê o que falar — a imprensa e a torcida vão reagir.</span></div>`;
+
+    // rail: termômetro da imagem
+    const buzz = `<div>
+      <div class="section-banner"><span class="sb-title">Termômetro</span><span class="sb-meta">Sua imagem</span></div>
+      <div class="card" style="border-top:none"><div class="card-b">
+        <div class="meter-lbl"><span>Fama</span><span class="tnum">${Math.round(p.fame)}</span></div>${bar(p.fame, 100)}
+        <div class="meter-lbl mt8"><span>Reputação</span><span class="tnum">${Math.round(p.rep)}</span></div>${bar(p.rep, 100)}
+        <div class="meter-lbl mt8"><span>Moral</span><span class="tnum">${Math.round(p.morale)}%</span></div>${bar(p.morale, 100, p.morale < 35)}
+        ${openPolls ? `<p class="condsmall mt8">${I.feed} ${openPolls} ${U.plural(openPolls, "enquete aberta", "enquetes abertas")} esperando seu voto.</p>` : ""}
+      </div></div></div>`;
+
+    // rail: o rival
+    let rivalCard = "";
+    const rv = G.rival;
+    if (rv) {
+      const rvClub = E().oppObj(G, rv.clubId);
+      const myG = p.stats.g, rvG = rv.seasonG || 0;
+      const verdict = myG > rvG ? "Você lidera o duelo da temporada." : myG < rvG ? "Ele está na frente. A resposta é em campo." : "Duelo particular empatado. Tudo em aberto.";
+      rivalCard = `<div>
+        <div class="section-banner"><span class="sb-title">O Rival</span><span class="sb-meta">De olho</span></div>
+        <div class="card" style="border-top:none"><div class="card-b">
+          <div class="flex" style="align-items:center;gap:12px">
+            <div class="player-face" style="width:54px;height:54px;flex-shrink:0">${U.portraitSVG(rv.name + "rival", 54)}</div>
+            <div style="flex:1;min-width:0">
+              <div class="dossier-name" style="font-size:18px">${esc(rv.name)}</div>
+              <div class="dossier-sub">${esc(rvClub.short || rvClub.name)} · ${D.POSITIONS[rv.pos].name} · ${rv.age} anos</div>
+            </div>
+            <div style="text-align:right"><div class="dossier-ov" style="font-size:30px">${rv.overall}</div><div class="dossier-sub">Overall</div></div>
+          </div>
+          <hr class="rule">
+          <div class="tiles"><div class="tile"><b class="tnum">${myG}</b><span>Seus gols</span></div><div class="tile"><b class="tnum">${rvG}</b><span>Gols dele</span></div></div>
+          <p class="condsmall mt8">${verdict}</p>
+        </div></div></div>`;
+    }
+
+    return `<div class="section-banner"><span class="sb-title">A Rede</span><span class="sb-meta">O que falam de você</span></div>
+    <div class="cols mt12">
+      <div class="stack">${subtabs}<div class="card"><div class="card-b tight">${posts}</div></div></div>
+      <div class="stack">${buzz}${rivalCard}</div>
+    </div>`;
   }
 
   // ---------------- CLUBE ----------------

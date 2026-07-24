@@ -21,7 +21,20 @@ O progresso é salvo automaticamente no navegador (localStorage). Em **Clube →
 
 ## Direitos de imagem
 
-Nomes de clubes, formatos de competição e nomes de lendas são fatos históricos. O jogo **não** reproduz logotipos oficiais nem fotos de jogadores: os escudos são brasões vetoriais próprios desenhados a partir dos padrões de camisa de cada clube, e os rostos são retratos procedurais. Em **Clube → Visão geral** você pode apontar uma URL/arquivo local de escudo próprio, com fallback para o brasão desenhado. Bandeiras de países vêm de flagcdn.com (domínio público).
+Nomes de clubes, formatos de competição e nomes de lendas são fatos históricos, de uso livre.
+Fotos de jogadores continuam sendo **sempre** retratos procedurais (nunca fotos reais).
+
+**Escudos:** por decisão explícita do dono deste projeto, o jogo usa os **escudos oficiais reais**
+dos clubes mapeados (via `CQ.DATA.CREST_MAP` em `js/data.js`, carregados de
+`media.api-sports.io`), para uso **estritamente pessoal/entre amigos, nunca distribuído
+publicamente** — escudo de clube é marca registrada, e usá-lo num jogo publicado/distribuído
+sem licença dos clubes é risco real de infração. Clubes sem escudo mapeado (ou se a imagem
+falhar ao carregar) caem automaticamente no brasão vetorial procedural original. Em
+**Clube → Visão geral** você também pode apontar uma URL/arquivo local de escudo próprio, que
+tem prioridade sobre tudo. Bandeiras de países vêm de flagcdn.com (domínio público).
+
+**Se algum dia cogitar publicar/compartilhar além do círculo de amigos**, troque de volta para
+os brasões vetoriais (remova ou esvazie `CREST_MAP`) antes disso.
 
 ## Estrutura
 

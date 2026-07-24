@@ -1618,16 +1618,24 @@ window.CQ = window.CQ || {};
     // ---- Craque do Clube ----
     if (avg >= 7.2 && p.stats.j >= 18) won.push({ key: "clube", name: "Craque do Clube", detail: "eleito pela torcida" });
 
-    // ---- Bola de Ouro: ranking mundial. Só o nº 1 leva (muito difícil) ----
+    // ---- Bola de Ouro: ranking mundial. Só entra na conversa quem bate ao menos
+    // o pior dos 12 craques fixos nesta temporada — senão não é indicado (antes,
+    // o jogador era sempre inserido na lista de 13 e quase sempre aparecia em
+    // último, mesmo em temporadas fracas). Só o nº 1 leva (muito difícil).
     const pScore = ballonScore(g, avg, ligaStats.g);
     const ranking = ballonRanking(g, pScore);
-    const myRank = ranking.findIndex(function (r) { return r.me; }) + 1;
+    const worldOnly = ranking.filter(function (r) { return !r.me; });
+    const minWorldScore = Math.min.apply(null, worldOnly.map(function (r) { return r.score; }));
+    const nominated = pScore >= minWorldScore;
+    const myRank = nominated ? ranking.findIndex(function (r) { return r.me; }) + 1 : null;
     p.ballon.push({ year: g.year, rank: myRank, score: pScore });
-    g.lastBallon = { rank: myRank, top: ranking.slice(0, 10), score: pScore };
+    g.lastBallon = nominated
+      ? { rank: myRank, top: ranking.slice(0, 10), score: pScore }
+      : { rank: null, top: worldOnly.slice(0, 10), score: pScore };
     if (myRank === 1) {
       won.push({ key: "bola", name: "Bola de Ouro", detail: "o melhor do mundo em " + g.year });
       p.fame = 100;
-    } else if (myRank <= 3) {
+    } else if (myRank != null && myRank <= 3) {
       lost.push({ key: "bola", name: "Bola de Ouro", by: ranking[0].name, rank: myRank });
     }
 

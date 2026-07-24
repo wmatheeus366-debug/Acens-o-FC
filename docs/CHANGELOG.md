@@ -173,9 +173,151 @@ Correções a partir do feedback do jogador (6 pontos), sem quebrar saves nem a 
   Fim dos pop-ups "brancos sem empolgação".
 - Regressão: **23/23**; determinismo estável. Bundle regravado (`node scripts/build.mjs`).
 
+## Imersão — parte 4 (repaginação das telas principais)
+Resposta ao "a interface do jogo todo é esse branco, meio antigo". Mais drama e profundidade
+**sem** virar dashboard genérico — a identidade de jornal foi mantida.
+- **Confronto da rodada virou hero escuro** (`.lead-matchup`): faixa de acento vermelhão→dourado
+  no topo, fundo em tinta (`--hero-bg`, por tema), escudos com sombra projetada, nomes em creme
+  e marca d'água "VS". O jogo da rodada finalmente é o centro visual da home.
+- **Profundidade global:** fundo da página escurecido no tema claro (`--paper` #efe8d6 → #e5dcc4)
+  e `--newsprint` clareado (#f6f0e0 → #f7f2e4), com sombra de card mais firme
+  (3px .16 → 4px .20). Os cards agora "descolam" da página em vez de se fundirem nela.
+- **Feed (Redes) reconstruído:** deixou de ser uma coluna de 680px flutuando no vazio. Agora tem
+  cabeçalho editorial ("A Rede") e layout `.cols` de duas colunas com uma **lateral viva**:
+  - *Termômetro* — fama, reputação e moral em barras + aviso de enquetes abertas;
+  - *O Rival* — retrato, clube, overall e o duelo de gols da temporada com veredito narrativo.
+  - Estado vazio redesenhado (`.feed-empty`) com ícone e chamada, no lugar do texto solto.
+- Regressão: **23/23**. Colapso responsivo verificado a 375px (coluna única, sem overflow
+  horizontal); hero legível no mobile.
+
+## Sincronização de elencos reais (API-Football, plano Free)
+Resposta ao problema de fundo por trás de "jogadores nos times errados": só 20 dos 187 clubes
+tinham elenco real, o resto caía em nomes gerados. Em vez de curar à mão, criado
+`scripts/sync-squads.mjs`, que puxa o elenco **atual** de cada clube via API-Football
+(`/players/squads`, endpoint sem a restrição de temporada do plano grátis) e grava o resultado
+como texto estático em `js/data.js` (`REAL_SQUADS`) — **o jogo em si nunca faz chamada de rede
+a essa API**; a chave só existe em tempo de sync/build, lida de um `.env` local (fora do git,
+`.gitignore` criado).
+- **23 clubes brasileiros sincronizados** (7 da Série A que faltavam + os 16 da Série B
+  inteiros): rbb, mir, vit, cap, cfc, cha, rem, spt, for, cea, juv, goi, ava, cri, ame, crb,
+  pay, vil, pon, gua, ope, amz, ath. Os 13 clubes de Série A já curados à mão (fla, pal, cor,
+  sao, flu, bot, gre, int, cru, cam, vas, san, bah) foram preservados sem alteração.
+  **Total: 43 clubes com elenco real** (de 20 antes).
+- IDs de time confirmados manualmente contra a API (nome + cidade da sede) antes de gastar
+  cota — evitou trocas como Vitória-BA vs. Vitória-ES.
+- A API só devolve posição larga (Goleiro/Zagueiro-Lateral/Volante-Meia/Ponta-Atacante);
+  distribuição fina (GOL/ZAG/LAT/VOL/MEI/PON/ATA) é determinística por ordem de camisa,
+  aproximando a mistura real de um elenco.
+- Script é **idempotente e cacheável**: respostas ok ficam em `scripts/.cache/squads/`
+  (gitignored) — reexecuções não gastam cota; erros de rate limit não são cacheados,
+  permitindo retry seguro. Plano Free: 100 req/dia, ~10 req/min — script respeita isso com
+  um intervalo entre chamadas.
+- Validado: elenco (Clube → Elenco) e artilharia agora mostram consistentemente **o mesmo
+  jogador no mesmo clube** para todos os 43 clubes (ex.: Wendel/Ceará, João Ricardo/Fortaleza,
+  Lucas Arcanjo/Vitória). Regressão: **23/23**.
+
+## Correção — Bola de Ouro sempre em 13º
+Reportado pelo jogador: aparecia quase sempre em 13º na Bola de Ouro, mesmo em temporadas
+fracas — "não era pra aparecer se eu não fui um dos melhores". Diagnóstico com uma simulação
+de 25 carreiras de ATA (motor real, via shim de `balance-runner`) confirmou: **62,5% das
+temporadas** o jogador caía em exatamente 13º (último lugar), porque `ballonRanking` sempre
+inseria o jogador numa lista fixa de 12 craques mundiais fixos (`worldStars`, overall 84–95) +
+o próprio jogador = 13 posições — e ele quase nunca superava o *pior* desses 12, então caía
+sempre em último, temporada após temporada, independente de ter feito uma boa ou má temporada.
+- **Correção** (`js/engine.js` · `computeAwards`): o jogador só entra na lista/recebe rank
+  se `pScore >= menor pontuação dos 12 craques fixos` nesta temporada — critério não
+  arbitrário, é literalmente "você teria entrado na lista ou não". Se não bater nem o pior
+  dos 12, a temporada fica marcada como **sem indicação** (`rank: null`), em vez de forçar
+  um "13º" sem sentido.
+- Recalibrado com o mesmo diagnóstico: **antes** 62,5% das temporadas em 13º; **depois** só
+  0,4% (casos legítimos de "fui mesmo o pior dos indicados") e ~61% corretamente sem
+  indicação, concentradas fora do pico de carreira. A taxa de vitória (nº 1) **não mudou** —
+  a fórmula de pontuação e o critério de vitória são os mesmos, só a exibição de posições
+  sem sentido foi removida.
+- UI atualizada em 3 pontos (`js/ui.js`): resumo de temporada (`ballonBlock` — mostra "Você
+  não recebeu indicação ao prêmio este ano" no lugar do pódio/veredito), aba Carreira →
+  Marcos (histórico mostra "sem indicação" em vez de posição, e "melhor:" ignora temporadas
+  não indicadas), texto explicativo atualizado.
+- Regressão: **23/23**. Validado end-to-end no navegador (temporada fraca → "sem indicação"
+  sem vazar `null` no texto; temporada boa → posição real 1–13).
+
+## Sincronização de elencos reais — parte 2 (Brasil 100% + início da Europa)
+- **Todos os 63 clubes brasileiros do jogo agora têm elenco real** (Série A 20/20, Série B
+  16/16, estaduais 27/27) — cobertura completa, de 20 clubes no início da sessão para 63.
+  Alguns clubes menores (Boavista-RJ, Caldense) vieram com elenco mais magro (6–16 jogadores)
+  porque a própria API tem menos dados cadastrados para esses times — ainda assim, 100%
+  nomes reais, sem geração procedural.
+- **Início da Europa:** 42 clubes sincronizados nesta sessão — **Espanha 16/16** e
+  **Inglaterra 16/16 completas**, **Itália 10/17**. Somado aos 7 clubes já curados à mão
+  (Real Madrid, Barcelona, Man City, Liverpool, PSG, Bayern, Inter de Milão), total de
+  **49/108 clubes europeus** com elenco real.
+  IDs de time resolvidos via `/teams?country=X` (uma chamada por país, sem custo extra de
+  correspondência de nomes) e confirmados manualmente nos poucos casos ambíguos
+  (ex.: "Athletic Bilbao" aparece na API como "Athletic Club").
+- **Pendente para a próxima rodada** (mesmo mecanismo, reexecutar
+  `node scripts/sync-squads.mjs`): 7 clubes da Itália + Alemanha 17 + França 17 +
+  Portugal 18 = **59 clubes**. O script é idempotente — já tem os IDs de todos mapeados,
+  cache local evita regastar cota em clubes já sincronizados, e um limite de chamadas
+  ao vivo por execução (`node scripts/sync-squads.mjs <N>`) evita estourar o limite diário
+  do plano Free (100/dia) no meio da sincronização.
+- **Total atual: 112 clubes com elenco real** (era 20 no início da sessão).
+- Regressão: **23/23**.
+
+## Correção — Artilharia sempre visível, mesmo fora da briga
+Mesmo pedido do jogador aplicado à artilharia: só aparecer na lista quando estiver perto do
+gol/assistência de quem vem logo à frente — igual à regra da Bola de Ouro.
+- **Descoberta durante a implementação:** comparar os números AO VIVO (proporcionais ao
+  quanto já rolou de temporada, como já eram exibidos na tela) não funciona como critério de
+  proximidade — no início de qualquer temporada todo mundo, inclusive os craques, tem poucos
+  gols, então uma diferença de 1-2 gols parece "perto" mesmo sem sentido algum (confirmado
+  com um zagueiro de 0 gols aparecendo na lista 4 rodadas dentro da Liga).
+- **Correção** (`js/ui.js` · `scorersHTML`): o critério passou a ser a **projeção de ritmo
+  para a temporada inteira** (extrapolação do seu gols/jogo atual × rodadas da liga),
+  comparada às metas reais dos 12 artilheiros NPC + rival. Só aparece se a diferença for
+  ≤ 2 gols/assistências do colocado imediatamente acima. Com menos de 5 jogos de liga
+  disputados, a amostra é considerada cedo demais e a linha fica oculta por padrão.
+- Validado por posição com simulação real (12+ carreiras cada): **ATA aparece ~95%** das
+  vezes (atacante genuinamente costuma estar na briga), **GOL só ~6%** (goleiro quase nunca
+  concorre a artilheiro), **VOL/LAT ~49-58%** (depende da temporada real) — diferenciação por
+  posição que não existia antes (antes, todos apareciam ~80-97% do tempo independentemente
+  da posição, por causa do viés do número ao vivo).
+- Quando oculto, mostra nota explicativa com a projeção e a distância real
+  ("No seu ritmo atual, você projeta ficar a N gols de Fulano — ainda fora da briga direta").
+- Regressão: **23/23**.
+- **Nota de ferramental:** durante a validação, o preview do navegador chegou a servir uma
+  versão em cache do JS (sintoma: código no disco já corrigido, mas comportamento antigo em
+  tela). Contornado recarregando os módulos via `fetch` + `eval` direto no console antes de
+  validar — não é um problema do jogo, é uma peculiaridade do ambiente de preview.
+
+## Escudos reais dos clubes (decisão explícita — uso pessoal/entre amigos)
+O jogador pediu escudos oficiais reais em vez dos vetoriais procedurais. Flaguei o risco
+antes de implementar: escudo de clube é **marca registrada** (diferente de nomes/estatísticas,
+que são fatos de uso livre) — foi exatamente por isso que a especificação original do CRAQUE
+pedia brasões vetoriais próprios. O jogador confirmou que o jogo é **só para uso pessoal,
+entre amigos, nunca publicado/distribuído publicamente** — decisão explícita e informada dele,
+registrada aqui para contexto futuro. Ver `README.md` § Direitos de imagem.
+- **`CQ.DATA.CREST_MAP`** (`js/data.js`): mapa clubId → ID do time na API-Football, reaproveitado
+  do trabalho de sincronização de elencos (151 clubes) + 20 adicionais dos clubes já
+  curados à mão (13 brasileiros + 7 europeus grandes: Real Madrid, Barcelona, Man City,
+  Liverpool, PSG, Bayern, Inter). **171 clubes com escudo real** de 187 no jogo — faltam só
+  os 16 sul-americanos (Libertadores/Sula), pendentes da próxima sincronização.
+  IDs confirmados manualmente (nome + cidade da sede) antes de usar.
+- **`crestSVG` (`js/util.js`)** ganhou uma camada nova: se o clube tem ID mapeado, renderiza
+  `<img>` apontando para `media.api-sports.io` (CDN pública, **não precisa da chave de API**
+  — mesmo padrão já usado pelas bandeiras via flagcdn.com). Sem mapeamento, ou se a imagem
+  falhar ao carregar (`onerror`), cai automaticamente no brasão vetorial procedural original
+  — sem quebrar nada, sem depender de internet para clubes não mapeados.
+  Prioridade: logo customizado do jogador (já existia) > escudo real mapeado > vetorial.
+- Regressão: **23/23**. Validado visualmente (Flamengo, Volta Redonda, Boavista, Botafogo
+  com escudo oficial correto na tela; River Plate — ainda sem ID — caindo no vetorial).
+
 ## Próximos passos (fase seguinte — Mundo Real 2026)
-1. **Arquitetura do mundo** (`CQ.world`): snapshot versionado + modelo de jogador estruturado;
-   `squadOf` lendo do mundo com fallback para geração. Pode iniciar com os elencos curados.
-2. **Provider/sync** `scripts/sync-football-data.mjs` (chave por env var no build).
+1. Terminar a sincronização de elencos europeus (Alemanha, França, Portugal, resto da
+   Itália — 59 clubes, mecanismo já pronto em `scripts/sync-squads.mjs`).
+1b. Mapear os 16 clubes sul-americanos (River Plate, Boca Juniors, etc.) — elenco real +
+    `CREST_MAP` — precisa de `/teams?country=X` para Argentina/Uruguai/Chile/Paraguai/
+    Equador/Colômbia/Bolívia (novas chamadas, aguardar reset de cota).
+2. **Arquitetura do mundo** (`CQ.world`): snapshot versionado + modelo de jogador estruturado;
+   `squadOf` lendo do mundo com fallback para geração.
 3. Envelhecimento/aposentadoria global, base e mercado de NPCs; telas editoriais do mundo.
 4. **Ajuste opcional:** Bola de Ouro ocasional para defensores/goleiros de elite (hoje ~0).
