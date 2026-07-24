@@ -2954,7 +2954,7 @@ window.CQ = window.CQ || {};
       if (slot.stage === "SF") {
         if (!k.sfMine) return null;
         if (k.sfMine.winner) return null;
-        return mkFix(g, "EST", est.name + " · Semifinal", [k.sfMine.a, k.sfMine.b], { stage: "SF", knock: true, decisive: true, tie: k.sfMine, cup: "ESTK" });
+        return mkFix(g, "EST", est.name + " · Semifinal", [k.sfMine.a, k.sfMine.b], { stage: "SF", knock: true, decisive: false, tie: k.sfMine, cup: "ESTK" });
       }
       if (slot.stage === "F") {
         if (!k.fMine || k.fMine.winner) { finishEstadual(g, est); return null; }
@@ -2969,9 +2969,10 @@ window.CQ = window.CQ || {};
       const oppId = pair[0] === p.clubId ? pair[1] : pair[0];
       const isClassic = (myClub(g).rivals || []).indexOf(oppId) >= 0;
       const isRivalDuel = oppId === g.rival.clubId;
-      const late = slot.round >= L.nRounds - 2;
+      // decisivo (modo ao vivo) fica só pras finais de verdade — clássico/duelo de rival
+      // continuam com o tempero narrativo (classic/rivalDuel), mas resolvem rápido
       return mkFix(g, "LIGA", L.name + " · Rodada " + slot.round, pair, {
-        round: slot.round, decisive: isClassic || late || isRivalDuel, classic: isClassic, rivalDuel: isRivalDuel
+        round: slot.round, decisive: false, classic: isClassic, rivalDuel: isRivalDuel
       });
     }
     if (slot.comp === "CDB" || slot.comp === "COPA") {
@@ -2983,7 +2984,7 @@ window.CQ = window.CQ || {};
       if (nxt.stageIdx !== wantIdx) return null;
       const tie = nxt.tie;
       const pair = tie.a === p.clubId ? [tie.a, tie.b] : [tie.a, tie.b];
-      return mkFix(g, slot.comp, cup.name + " · " + STAGE_NAMES[slot.stage], pair, { stage: slot.stage, knock: true, decisive: true, tie: tie, cup: slot.comp, stageIdx: nxt.stageIdx });
+      return mkFix(g, slot.comp, cup.name + " · " + STAGE_NAMES[slot.stage], pair, { stage: slot.stage, knock: true, decisive: slot.stage === "F", tie: tie, cup: slot.comp, stageIdx: nxt.stageIdx });
     }
     if (slot.comp === "CONTI") {
       const C = S.comps.CONTI;
@@ -3025,18 +3026,18 @@ window.CQ = window.CQ || {};
       const stageIdx = C.koStages.indexOf(stage);
       const oppId = bracketOpp(g, C.koTeams, stageIdx, "contibracket" + C.id);
       const home = slot.ko % 2 === 0;
-      return mkFix(g, C.id, C.name + " · " + STAGE_NAMES[stage], home ? [p.clubId, oppId] : [oppId, p.clubId], { stage: stage, knock: true, decisive: true, conti: true, ko: slot.ko });
+      return mkFix(g, C.id, C.name + " · " + STAGE_NAMES[stage], home ? [p.clubId, oppId] : [oppId, p.clubId], { stage: stage, knock: true, decisive: stage === "F", conti: true, ko: slot.ko });
     }
     if (slot.comp === "SEL") {
       const nat = D.NATIONS[p.nat];
       if (slot.kind === "elim") {
-        return mkNatFix(g, "SEL", "Eliminatórias · " + nat.name, slot.opp, slot.home, { decisive: true, sel: "elim" });
+        return mkNatFix(g, "SEL", "Eliminatórias · " + nat.name, slot.opp, slot.home, { decisive: false, sel: "elim" });
       }
       const T = S.sel;
       if (!T || T.kind === "elim") return null;
       if (slot.phase === "G") {
         if (!T.alive) return null;
-        return mkNatFix(g, T.kind, T.name + " · Grupo, jogo " + slot.n, slot.opp, slot.home, { decisive: true, sel: "tourG", n: slot.n });
+        return mkNatFix(g, T.kind, T.name + " · Grupo, jogo " + slot.n, slot.opp, slot.home, { decisive: false, sel: "tourG", n: slot.n });
       }
       // mata-mata do torneio (chaveamento real, sem ressuscitar eliminados)
       if (!T.alive) return null;
@@ -3048,7 +3049,7 @@ window.CQ = window.CQ || {};
       const stageIdx = koKeys.indexOf(slot.stage);
       const oppTeam = T.koTeams ? bracketOpp(g, T.koTeams, stageIdx, "selbracket") : "nat:" + T.groupOpps[0];
       const home = stageIdx % 2 === 0;
-      return mkNatFix(g, T.kind, T.name + " · " + STAGE_NAMES[slot.stage], oppTeam, home, { decisive: true, sel: "tourKO", stage: slot.stage });
+      return mkNatFix(g, T.kind, T.name + " · " + STAGE_NAMES[slot.stage], oppTeam, home, { decisive: slot.stage === "F", sel: "tourKO", stage: slot.stage });
     }
     if (slot.comp === "MUN") {
       const M = S.mundial;
@@ -3062,7 +3063,7 @@ window.CQ = window.CQ || {};
       if (slot.phase === "G") {
         if (!T.alive) return null;
         const pair = slot.home ? [p.clubId, slot.opp] : [slot.opp, p.clubId];
-        return mkFix(g, "SUPER", "Supermundial · Grupo, jogo " + slot.n, pair, { decisive: true, superPhase: "G", n: slot.n });
+        return mkFix(g, "SUPER", "Supermundial · Grupo, jogo " + slot.n, pair, { decisive: false, superPhase: "G", n: slot.n });
       }
       if (!T.alive) return null;
       const koKeys = T.koKeys;
@@ -3073,7 +3074,7 @@ window.CQ = window.CQ || {};
       const stageIdx = koKeys.indexOf(slot.stage);
       const oppId = bracketOpp(g, T.koTeams, stageIdx, "superbracket");
       const home = stageIdx % 2 === 0;
-      return mkFix(g, "SUPER", "Supermundial · " + STAGE_NAMES[slot.stage], home ? [p.clubId, oppId] : [oppId, p.clubId], { stage: slot.stage, knock: true, decisive: true, superPhase: "KO", ko: slot.ko });
+      return mkFix(g, "SUPER", "Supermundial · " + STAGE_NAMES[slot.stage], home ? [p.clubId, oppId] : [oppId, p.clubId], { stage: slot.stage, knock: true, decisive: slot.stage === "F", superPhase: "KO", ko: slot.ko });
     }
     return null;
   }
@@ -4046,7 +4047,7 @@ window.CQ = window.CQ || {};
         const opp = pair[0] === p.clubId ? pair[1] : pair[0];
         return { comp: "EST", label: est.name + " · Rodada " + slot.round, oppName: club(opp).name, oppId: opp, home: pair[0] === p.clubId };
       }
-      return { comp: "EST", label: est.name + " · " + (slot.stage === "SF" ? "Semifinal" : "Final"), oppName: null, home: null, decisive: true };
+      return { comp: "EST", label: est.name + " · " + (slot.stage === "SF" ? "Semifinal" : "Final"), oppName: null, home: null, decisive: slot.stage === "F" };
     }
     if (slot.comp === "LIGA") {
       const L = S.comps.LIGA;
@@ -4057,7 +4058,7 @@ window.CQ = window.CQ || {};
     }
     if (slot.comp === "CDB" || slot.comp === "COPA") {
       const cup = S.comps[slot.comp]; if (!cup) return null;
-      return { comp: slot.comp, label: cup.name + " · " + STAGE_NAMES[slot.stage], oppName: null, home: null, decisive: true };
+      return { comp: slot.comp, label: cup.name + " · " + STAGE_NAMES[slot.stage], oppName: null, home: null, decisive: slot.stage === "F" };
     }
     if (slot.comp === "CONTI") {
       const C = S.comps.CONTI; if (!C) return null;
@@ -4069,13 +4070,24 @@ window.CQ = window.CQ || {};
       }
       const stage = C.koStages[slot.ko];
       const opp = C.koOpps && C.koOpps[stage];
-      return { comp: C.id, label: C.name + " · " + STAGE_NAMES[stage], oppName: opp ? oppObj(g, opp).name : null, oppId: opp || null, home: slot.ko % 2 === 0, decisive: true };
+      return { comp: C.id, label: C.name + " · " + STAGE_NAMES[stage], oppName: opp ? oppObj(g, opp).name : null, oppId: opp || null, home: slot.ko % 2 === 0, decisive: stage === "F" };
     }
     if (slot.comp === "SEL") {
       const nat = D.NATIONS[p.nat], T = S.sel;
-      if (slot.kind === "elim") return { comp: "SEL", label: "Eliminatórias · " + nat.name, oppName: (slot.opp || "").slice(4), home: slot.home, decisive: true };
-      if (slot.phase === "G") return { comp: "SEL", label: (T ? T.name : "Torneio") + " · Grupo, jogo " + slot.n, oppName: (slot.opp || "").slice(4), home: slot.home, decisive: true };
-      return { comp: "SEL", label: (T ? T.name : "Torneio") + " · " + STAGE_NAMES[slot.stage], oppName: null, home: null, decisive: true };
+      if (slot.kind === "elim") return { comp: "SEL", label: "Eliminatórias · " + nat.name, oppName: (slot.opp || "").slice(4), home: slot.home, decisive: false };
+      if (slot.phase === "G") return { comp: "SEL", label: (T ? T.name : "Torneio") + " · Grupo, jogo " + slot.n, oppName: (slot.opp || "").slice(4), home: slot.home, decisive: false };
+      return { comp: "SEL", label: (T ? T.name : "Torneio") + " · " + STAGE_NAMES[slot.stage], oppName: null, home: null, decisive: slot.stage === "F" };
+    }
+    if (slot.comp === "MUN") {
+      const M = S.mundial; if (!M) return null;
+      return { comp: "MUN", label: "Mundial de Clubes · Confronto único", oppName: oppObj(g, M.opp).name, oppId: M.opp, home: slot.home, decisive: true };
+    }
+    if (slot.comp === "SUPER") {
+      const T = S.super; if (!T) return null;
+      if (slot.phase === "G") {
+        return { comp: "SUPER", label: "Supermundial · Grupo, jogo " + slot.n, oppName: oppObj(g, slot.opp).name, oppId: slot.opp, home: slot.home, decisive: false };
+      }
+      return { comp: "SUPER", label: "Supermundial · " + STAGE_NAMES[slot.stage], oppName: null, home: null, decisive: slot.stage === "F" };
     }
     return null;
   }

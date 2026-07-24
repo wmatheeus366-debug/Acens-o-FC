@@ -373,6 +373,27 @@ espírito das duas competições reais que a FIFA passou a ter: a Copa Intercont
   fase de grupos (elimina sem título, igual a um torneio de seleção de verdade).
 - Regressão: **23/23**.
 
+## Temporada mais rápida — modo ao vivo só nas finais
+Pedido: a temporada estava lenta demais de jogar porque quase toda partida importante
+(eliminatórias, mata-matas de copa inteiros, fase de grupos de torneio) virava modo ao vivo.
+- **Critério de "decisivo" (o que aciona o modo ao vivo) ficou restrito às FINAIS de
+  verdade** (`js/engine.js` · `resolveSlot`/`peekSlot`): antes, oitavas/quartas/semi de
+  qualquer copa, TODAS as eliminatórias (8/ano), fase de grupos de torneio de seleção,
+  clássicos e duelos de rival na liga, e até fase de grupos do Supermundial entravam no
+  modo ao vivo. Agora só a última partida de cada competição (Final) — Estadual, Copa do
+  Brasil/copa nacional, continental (Libertadores/Champions/etc.), torneio de seleção
+  (Copa do Mundo/América/Euro) e Supermundial — mais o Mundial de Clubes (que já é um
+  confronto único). Tudo o mais resolve na hora com um clique.
+  Clássicos e duelos de rival continuam com o tempero narrativo (textos, badges), só não
+  travam mais o jogo no modo ao vivo.
+- Validado por simulação: temporada "normal" caiu de dezenas de partidas decisivas em
+  potencial para **2** (só as finais que o clube realmente disputou); temporada "cheia"
+  (seleção convocada + Mundial de Clubes aberto, overall de elite) chegou no máximo a
+  **4** — Mundial de Clubes, final estadual, final de copa nacional, final continental.
+- Também corrigido: `peekSlot` (pré-visualização do calendário) não tinha branch pro
+  Mundial de Clubes/Supermundial — agora aparecem corretamente na agenda.
+- Regressão: **23/23**.
+
 ## Próximos passos (fase seguinte — Mundo Real 2026)
 1. Terminar a sincronização de elencos europeus (Alemanha, França, Portugal, resto da
    Itália — 59 clubes, mecanismo já pronto em `scripts/sync-squads.mjs`).
