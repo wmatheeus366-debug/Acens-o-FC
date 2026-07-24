@@ -1,0 +1,1963 @@
+/* CRAQUE — interface: telas, overlays e fluxos de interação. */
+window.CQ = window.CQ || {};
+
+(function () {
+  "use strict";
+  const U = CQ.util, D = CQ.DATA, E = () => CQ.engine, I = CQ.util.I;
+
+  const $ = function (sel) { return document.querySelector(sel); };
+  function esc(s) { return U.esc(s); }
+  function g() { return CQ.state.game; }
+
+  // ---------------- helpers visuais ----------------
+  function crest(clubOrId, cls) {
+    const c = typeof clubOrId === "string" ? CQ.engine.oppObj(g(), clubOrId) : clubOrId;
+    if (c && c.isNation && c.flag) {
+      return `<span class="crest ${cls || ""}"><svg viewBox="0 0 40 44"><rect x="3" y="8" width="34" height="24" fill="#ece4d0" stroke="#1b1812"/><image href="https://flagcdn.com/w80/${c.flag}.png" x="4" y="9" width="32" height="22" preserveAspectRatio="xMidYMid slice"/></svg></span>`;
+    }
+    return U.crestSVG(c, cls);
+  }
+  function notaPill(n) {
+    if (n == null) return '<span class="muted">—</span>';
+    const cls = n >= 8 ? "n-great" : n >= 7 ? "n-good" : n >= 5.8 ? "n-mid" : "n-bad";
+    return `<span class="nota ${cls}">${U.fmtNota(n)}</span>`;
+  }
+  function bar(v, max, warm, marker) {
+    const pct = U.clamp(v / (max || 100) * 100, 0, 100);
+    const mk = marker != null ? `<b style="left:${U.clamp(marker / (max || 100) * 100, 0, 100)}%"></b>` : "";
+    return `<div class="bar ${warm ? "warm" : ""}"><i style="width:${pct}%"></i>${mk}</div>`;
+  }
+  function toast(msg) {
+    let w = $(".toast-wrap");
+    if (!w) { w = document.createElement("div"); w.className = "toast-wrap"; document.body.appendChild(w); }
+    const t = document.createElement("div");
+    t.className = "toast"; t.textContent = msg;
+    w.appendChild(t);
+    setTimeout(function () { t.remove(); }, 3200);
+  }
+
+  // ---------------- navegação ----------------
+  const NAV = [
+    { id: "home", label: "Início", icon: I.home },
+    { id: "career", label: "Carreira", icon: I.user },
+    { id: "comps", label: "Torneios", icon: I.trophy },
+    { id: "feed", label: "Redes", icon: I.feed },
+    { id: "club", label: "Clube", icon: I.club }
+  ];
+
+  function go(screen) {
+    if (CQ.audio) CQ.audio.play("click");
+    CQ.state.screen = screen;
+    render();
+  }
+  // splash de GOL em tela cheia (modo ao vivo)
+  function goalSplash(mine, sub) {
+    const div = document.createElement("div");
+    div.className = "goal-splash" + (mine ? "" : " opp");
+    div.innerHTML = `<div class="gs-word">${mine ? "GOL" : "gol"}</div>${sub ? `<div class="gs-sub">${esc(sub)}</div>` : ""}`;
+    document.body.appendChild(div);
+    if (CQ.audio) CQ.audio.play(mine ? "goal" : "miss");
+    setTimeout(function () { div.remove(); }, 1500);
+  }
+
+  function render() {
+    const s = CQ.state;
+    const app = $("#app");
+    if (s.screen === "create") { app.innerHTML = createHTML(); return; }
+    if (!s.game || s.screen === "cover") { app.innerHTML = coverHTML(); return; }
+    if (s.game.retired && s.screen !== "retro") s.screen = "retro";
+    let body = "";
+    switch (s.screen) {
+      case "home": body = homeHTML(); break;
+      case "career": body = careerHTML(); break;
+      case "comps": body = compsHTML(); break;
+      case "feed": body = feedHTML(); break;
+      case "club": body = clubHTML(); break;
+      case "retro": body = retroHTML(); break;
+      default: body = homeHTML();
+    }
+    app.innerHTML = mastheadHTML() + `<main class="page">${body}</main>` + bottomNavHTML();
+  }
+
+  const MONTHS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+  function romano(n) {
+    const map = [[1000, "M"], [900, "CM"], [500, "D"], [400, "CD"], [100, "C"], [90, "XC"], [50, "L"], [40, "XL"], [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"]];
+    let out = ""; map.forEach(function (m) { while (n >= m[0]) { out += m[1]; n -= m[0]; } }); return out;
+  }
+  function mastheadHTML() {
+    const G = g(), p = G.player;
+    const navBtns = NAV.map(function (n) {
+      return `<button class="${CQ.state.screen === n.id ? "on" : ""}" onclick="CQ.ui.go('${n.id}')">${n.icon}${n.label}</button>`;
+    }).join("");
+    const ed = G.year - 2025;
+    return `<header class="masthead"><div class="masthead-inner">
+      <div class="masthead-top">
+        <div class="mh-side left">Ano <b>${romano(ed)}</b> · Nº ${ed}<br>Edição ${esc(D.LEAGUES[E().leagueOf(G, p.clubId)] ? D.LEAGUES[E().leagueOf(G, p.clubId)].country : "BR")} · Temporada ${G.year}</div>
+        <div class="masthead-brand">CRAQUE<span class="dot">.</span></div>
+        <div class="mh-side right"><span class="mh-tag">${esc(String(p.name).toUpperCase())}</span><br>${esc(E().myClub(G).name)} · ${D.POSITIONS[p.pos].name} · ${p.age} anos</div>
+      </div>
+      <nav class="mainnav">${navBtns}</nav>
+    </div></header>`;
+  }
+  function bottomNavHTML() {
+    return `<nav class="bottomnav">${NAV.map(function (n) {
+      return `<button class="${CQ.state.screen === n.id ? "on" : ""}" onclick="CQ.ui.go('${n.id}')">${n.icon}<span>${n.label}</span></button>`;
+    }).join("")}</nav>`;
+  }
+
+  // ---------------- capa ----------------
+  function coverHTML() {
+    const has = CQ.main.hasSave();
+    return `<div class="cover">
+      <div class="kicker" style="max-width:300px;width:100%">Edição especial · Modo carreira</div>
+      <div class="cover-brand">CRAQUE<span class="dot">.</span></div>
+      <div class="cover-sub">O boletim da sua carreira no futebol</div>
+      <div class="cover-rule"></div>
+      <p class="muted" style="max-width:460px">Da base ao topo do mundo: crie seu atleta, escolha seu clube e escreva uma história partida a partida — estaduais, Brasileirão, Libertadores, Europa e Seleção.</p>
+      <div class="btnrow">
+        <button class="btn btn-pri btn-big" onclick="CQ.ui.startCreate()">Nova carreira</button>
+        ${has ? `<button class="btn btn-big" onclick="CQ.main.loadAndPlay()">Continuar carreira</button>` : ""}
+        <button class="btn btn-ghost" onclick="CQ.main.importSave()">Importar save</button>
+      </div>
+      <div class="cover-foot">Roda 100% no seu navegador · progresso salvo localmente</div>
+    </div>`;
+  }
+
+  // ---------------- criação ----------------
+  function startCreate() {
+    CQ.state.draft = {
+      step: 0, name: "", age: 17, foot: "Destro", num: 10, natId: "BR",
+      pos: "ATA", archId: "matador", legendIds: [], clubId: null
+    };
+    CQ.state.screen = "create";
+    render();
+  }
+
+  function createHTML() {
+    const d = CQ.state.draft;
+    const steps = ["Identidade", "Posição", "Os Craques", "Clube"];
+    let inner = "";
+    if (d.step === 0) inner = createStep0(d);
+    else if (d.step === 1) inner = createStep1(d);
+    else if (d.step === 2) inner = createStep2(d);
+    else inner = createStep3(d);
+    return `<main class="page" style="max-width:860px">
+      <div class="kicker mt12">Nova carreira · ${steps[d.step]}</div>
+      <h1 class="headline mb12">Crie seu <em>craque</em></h1>
+      <div class="steps">${steps.map(function (_, i) { return `<i class="${i <= d.step ? "done" : ""}"></i>`; }).join("")}</div>
+      <div class="card"><div class="card-b">${inner}</div></div>
+    </main>`;
+  }
+
+  function createStep0(d) {
+    const nats = Object.keys(D.NATIONS).map(function (k) {
+      const n = D.NATIONS[k];
+      return `<button class="choice ${d.natId === k ? "sel" : ""}" onclick="CQ.ui.dset('natId','${k}')">${U.flagImg(n)}<b>${esc(n.name)}</b><small>${n.confed}</small></button>`;
+    }).join("");
+    return `
+      <div class="field"><label>Nome do jogador</label>
+        <input type="text" id="cr-name" maxlength="28" value="${esc(d.name)}" placeholder="Ex.: Kaio Ribeiro" oninput="CQ.state.draft.name=this.value"></div>
+      <div class="cols" style="grid-template-columns:1fr 1fr 1fr;gap:12px">
+        <div class="field"><label>Idade inicial</label>
+          <select onchange="CQ.ui.dset('age',+this.value)">${[16, 17, 18].map(function (a) { return `<option ${d.age === a ? "selected" : ""} value="${a}">${a} anos</option>`; }).join("")}</select></div>
+        <div class="field"><label>Pé preferido</label>
+          <select onchange="CQ.ui.dset('foot',this.value)">${["Destro", "Canhoto", "Ambidestro"].map(function (f) { return `<option ${d.foot === f ? "selected" : ""}>${f}</option>`; }).join("")}</select></div>
+        <div class="field"><label>Número da camisa</label>
+          <input type="number" min="1" max="99" value="${d.num}" onchange="CQ.ui.dset('num',Math.max(1,Math.min(99,+this.value||10)))"></div>
+      </div>
+      <div class="field"><label>Nacionalidade</label><div class="choice-grid">${nats}</div></div>
+      <div class="btnrow mt12"><button class="btn btn-pri" onclick="CQ.ui.createNext()">Continuar ${""}</button></div>`;
+  }
+
+  function createStep1(d) {
+    const posBtns = Object.keys(D.POSITIONS).map(function (k) {
+      const P = D.POSITIONS[k];
+      return `<button class="choice ${d.pos === k ? "sel" : ""}" onclick="CQ.ui.dsetPos('${k}')"><b>${P.name}</b><small>${k}</small></button>`;
+    }).join("");
+    const archs = D.POSITIONS[d.pos].archs.map(function (a) {
+      return `<button class="choice ${d.archId === a.id ? "sel" : ""}" onclick="CQ.ui.dset('archId','${a.id}')"><b>${a.name}</b><small>${a.desc}</small></button>`;
+    }).join("");
+    return `
+      <div class="field"><label>Posição</label><div class="choice-grid">${posBtns}</div></div>
+      <div class="field"><label>Arquétipo de ${D.POSITIONS[d.pos].name}</label><div class="choice-grid">${archs}</div></div>
+      <div class="btnrow mt12">
+        <button class="btn btn-ghost" onclick="CQ.ui.dset('step',0)">Voltar</button>
+        <button class="btn btn-pri" onclick="CQ.ui.createNext()">Continuar</button>
+      </div>`;
+  }
+
+  function createStep2(d) {
+    const legends = D.LEGENDS.map(function (L) {
+      const on = d.legendIds.indexOf(L.id) >= 0;
+      return `<button class="choice ${on ? "sel" : ""}" onclick="CQ.ui.toggleLegend('${L.id}')"><b>${esc(L.name)}</b><small>${esc(L.trait)}</small></button>`;
+    }).join("");
+    return `
+      <p class="muted mb12">Escolha até <b>3 lendas</b> que inspiram seu jogo. O traço de cada uma empurra seus atributos naquela direção.</p>
+      <div class="choice-grid">${legends}</div>
+      <p class="condsmall mt12">${d.legendIds.length}/3 selecionados</p>
+      <div class="btnrow mt12">
+        <button class="btn btn-ghost" onclick="CQ.ui.dset('step',1)">Voltar</button>
+        <button class="btn btn-pri" onclick="CQ.ui.createNext()">Continuar</button>
+      </div>`;
+  }
+
+  function createStep3(d) {
+    const clubs = D.clubsOf("BRA").map(function (c) {
+      return `<button class="choice ${d.clubId === c.id ? "sel" : ""}" onclick="CQ.ui.dset('clubId','${c.id}')">
+        <span style="float:right">${crest(c, "crest-24")}</span><b>${esc(c.name)}</b><small>Força ${c.str} · ${c.uf}</small></button>`;
+    }).join("");
+    return `
+      <p class="muted mb12">Onde começa a história? Todos os 20 clubes da Série A estão na mesa — ou deixe o destino escolher.</p>
+      <div class="btnrow mb12"><button class="btn btn-sm" onclick="CQ.ui.randomClub()">Clube aleatório</button></div>
+      <div class="choice-grid">${clubs}</div>
+      <div class="btnrow mt16">
+        <button class="btn btn-ghost" onclick="CQ.ui.dset('step',2)">Voltar</button>
+        <button class="btn btn-green btn-big" onclick="CQ.ui.finishCreate()">Começar carreira</button>
+      </div>`;
+  }
+
+  function dset(k, v) { CQ.state.draft[k] = v; render(); }
+  function dsetPos(k) {
+    CQ.state.draft.pos = k;
+    CQ.state.draft.archId = D.POSITIONS[k].archs[0].id;
+    render();
+  }
+  function toggleLegend(id) {
+    const arr = CQ.state.draft.legendIds;
+    const i = arr.indexOf(id);
+    if (i >= 0) arr.splice(i, 1);
+    else if (arr.length < 3) arr.push(id);
+    render();
+  }
+  function randomClub() {
+    CQ.state.draft.clubId = U.choice(D.clubsOf("BRA")).id;
+    render();
+  }
+  function createNext() {
+    const d = CQ.state.draft;
+    if (d.step === 0) {
+      d.name = U.cleanInput(d.name, 28);
+      if (!d.name || d.name.length < 2) { toast("Escolha um nome para o seu jogador."); return; }
+    }
+    d.step++;
+    render();
+  }
+  function finishCreate() {
+    const d = CQ.state.draft;
+    if (!d.clubId) { toast("Escolha um clube para começar."); return; }
+    const game = E().newGame({
+      name: d.name, age: d.age, foot: d.foot, num: d.num, natId: d.natId,
+      pos: d.pos, archId: d.archId, legendIds: d.legendIds, clubId: d.clubId
+    });
+    CQ.state.game = game;
+    CQ.nar.post(game, "imprensa", "Promessa na área: o " + E().myClub(game).name + " assina com " + game.player.name + ", " + game.player.age + " anos, apontado como um dos nomes mais quentes da base.", { hot: true });
+    CQ.main.save();
+    go("home");
+  }
+
+  // ---------------- HOME (primeira página) ----------------
+  function leadHeadline(fx) {
+    const me = fx.myTeam.name, opp = fx.opp.name;
+    const recebe = fx.home ? "recebe" : "visita";
+    if (fx.stage === "F") return `É a final: ${me} decide o título diante do ${opp}`;
+    if (fx.rivalDuel) return `${me} e ${opp} reeditam o duelo de gerações`;
+    if (fx.classic) return fx.home ? `Clássico em casa: ${me} recebe o ${opp}` : `${me} encara o ${opp} em clássico fora`;
+    if (fx.knock) return `Mata-mata: ${me} ${recebe} o ${opp} valendo a vaga`;
+    if (fx.isNatMatch) return `Seleção em campo: ${me} enfrenta ${opp}`;
+    if (fx.decisive) return `Jogo grande: ${me} ${recebe} o poderoso ${opp}`;
+    return `${me} ${recebe} o ${opp} por mais três pontos`;
+  }
+  function leadDeck(G, fx) {
+    const p = G.player, S = G.season;
+    const bits = [];
+    const L = S.comps.LIGA;
+    const table = E().tableOf(G, L);
+    const myIdx = table.findIndex(function (t) { return t.id === p.clubId; });
+    if (myIdx >= 0 && table[myIdx].j > 0) bits.push(`O ${esc(E().myClub(G).name)} ocupa a ${myIdx + 1}ª posição na liga`);
+    const last5 = (S.history || []).slice(-5);
+    if (last5.length) {
+      const v = last5.filter(function (h) { return h.win; }).length;
+      bits.push(`${v} ${U.plural(v, "vitória", "vitórias")} nos últimos ${last5.length} jogos`);
+    }
+    if (fx.home) bits.push("mando de campo"); else bits.push("longe de seus domínios");
+    return bits.join(" · ") + ".";
+  }
+
+  // descreve a atuação com as estatísticas próprias da posição
+  function atuacaoBits(lr) {
+    const bits = [];
+    if (lr.pg) bits.push(`<b>${lr.pg} ${U.plural(lr.pg, "gol", "gols")}</b>`);
+    if (lr.pa) bits.push(lr.pa + " assist.");
+    if (lr.isGK) {
+      bits.push(lr.saves + " defesas");
+      if (lr.bigSaves) bits.push(lr.bigSaves + " defesaça" + (lr.bigSaves > 1 ? "s" : ""));
+      if (lr.go === 0) bits.push("sem sofrer gol");
+    } else {
+      if (lr.tackles) bits.push(lr.tackles + " desarmes");
+      if (lr.intercepts) bits.push(lr.intercepts + " interceptações");
+      if (lr.clearances) bits.push(lr.clearances + " cortes");
+      if (lr.keyPasses) bits.push(lr.keyPasses + " passes decisivos");
+    }
+    if (lr.error) bits.push('<span class="verm">falha no gol</span>');
+    if (!lr.starts && lr.plays) bits.push("entrou no 2º tempo");
+    return bits;
+  }
+
+  function homeHTML() {
+    const G = g(), p = G.player, S = G.season;
+    const fx = E().currentFixture(G);
+    if (fx) CQ.nar.preMatch(G, fx);
+    if (!G.season.drawShown) setTimeout(function () { maybeDrawCeremony(G); }, 80);
+
+    // ---- MANCHETE (lead) ----
+    let lead;
+    if (!fx) {
+      lead = `<div class="lead">
+        <div class="lead-kicker">Fim de temporada ${G.year}</div>
+        <h1 class="lead-head">O apito final soou. Hora do balanço.</h1>
+        <p class="lead-deck">Prêmios individuais, metas da diretoria, mercado da bola e o rumo da próxima temporada esperam por você.</p>
+        <div class="lead-cta"><div class="btnrow"><button class="btn btn-pri btn-big" onclick="CQ.ui.seasonEndFlow()">Ver balanço da temporada ${I.arrowR}</button></div></div>
+      </div>`;
+    } else {
+      const parts = esc(fx.label).split(" · ");
+      const comp = parts[0], sub = parts.slice(1).join(" · ");
+      const notices = [];
+      if (p.injury > 0) notices.push(`<div class="notice">${I.injury} Lesionado — fora por aproximadamente <b>${p.injury}</b> ${U.plural(p.injury, "jogo", "jogos")}. Você não entra em campo.</div>`);
+      if (p.susp > 0 && !fx.isNatMatch) notices.push(`<div class="notice warn">Suspenso — cumpre ${p.susp} ${U.plural(p.susp, "jogo", "jogos")} de gancho.</div>`);
+      if (p.condition < 40) notices.push(`<div class="notice warn">Condição física baixa (${Math.round(p.condition)}%). Risco de lesão elevado — considere poupar.</div>`);
+      lead = `<div class="lead">
+        <div class="lead-kicker">${comp}${sub ? " — " + sub : ""}${fx.decisive ? '<span class="live-flag">Ao vivo</span>' : ""}</div>
+        <h1 class="lead-head">${esc(leadHeadline(fx))}</h1>
+        <p class="lead-deck">${leadDeck(G, fx)}</p>
+        <div class="lead-matchup">
+          <div class="lm-team">${crest(fx.home ? fx.myTeam : fx.opp, "")}<span class="lm-name">${esc(fx.home ? fx.myTeam.name : fx.opp.name)}</span><span class="lm-role">Mandante</span></div>
+          <div class="lm-vs">×</div>
+          <div class="lm-team">${crest(fx.home ? fx.opp : fx.myTeam, "")}<span class="lm-name">${esc(fx.home ? fx.opp.name : fx.myTeam.name)}</span><span class="lm-role">Visitante</span></div>
+        </div>
+        ${notices.length ? `<div class="stack mt12" style="gap:8px">${notices.join("")}</div>` : ""}
+        <div class="lead-cta"><div class="btnrow">
+          <button class="btn btn-pri btn-big" onclick="CQ.ui.actionPlay()">${fx.decisive ? "Entrar em campo — ao vivo" : "Jogar a partida"}</button>
+          <button class="btn" onclick="CQ.ui.actionRest()">Poupar</button>
+          <button class="btn btn-ghost" onclick="CQ.ui.actionSim(1)">Simular</button>
+          <button class="btn btn-ghost" onclick="CQ.ui.actionSim(5)">Simular 5</button>
+          <button class="btn btn-ghost" onclick="CQ.ui.actionSim(10)">Simular 10</button>
+        </div></div>
+      </div>`;
+    }
+
+    // ---- TICKER de resultados ----
+    const hist = (S.history || []).slice(-12).reverse();
+    let ticker = "";
+    if (hist.length) {
+      const items = hist.map(function (h) {
+        const r = h.win ? "win" : h.draw ? "" : "loss";
+        const pill = h.win ? "V" : h.draw ? "E" : "D";
+        const a = h.home ? h.gm : h.go, b = h.home ? h.go : h.gm;
+        return `<div class="ticker-item ${r}"><span class="result-pill ${pill}">${pill}</span><span>${h.home ? "" : "@ "}${esc(h.opp)}</span><span class="ti-sc">${a}-${b}</span></div>`;
+      }).join("");
+      ticker = `<div class="ticker"><div class="ticker-label">Últimos jogos</div><div class="ticker-track">${items}</div></div>`;
+    }
+
+    // ---- BOX-SCORE (última partida) ----
+    let boxscore = "";
+    const lr = S.lastRes;
+    if (lr) {
+      const f2 = lr.fixture;
+      const hg = f2.home ? lr.gm : lr.go, ag = f2.home ? lr.go : lr.gm;
+      const so = lr.shootout ? ` <span class="muted">(${lr.shootout.my}-${lr.shootout.opp} nos pênaltis)</span>` : "";
+      let mine = "";
+      if (lr.rest) mine = `<span class="badge badge-soft">Você foi poupado</span>`;
+      else if (!lr.plays) mine = `<span class="badge badge-soft">${lr.injured ? "Você estava lesionado" : lr.susp ? "Você estava suspenso" : "Você ficou no banco"}</span>`;
+      else {
+        mine = `${notaPill(lr.nota)} <span>Sua atuação: ${atuacaoBits(lr).join(" · ") || "discreta"}</span>`;
+      }
+      boxscore = `<div class="boxscore">
+        <div class="boxscore-h"><span>Placar da rodada</span><span>${esc(f2.label)}</span></div>
+        <div class="boxscore-b">
+          <div class="bs-team">${crest(f2.home ? f2.myTeam : f2.opp, "crest-34")}<span class="bs-tn">${esc(f2.home ? f2.myTeam.name : f2.opp.name)}</span></div>
+          <div class="bs-score">${hg} <span class="muted">×</span> ${ag}</div>
+          <div class="bs-team away"><span class="bs-tn">${esc(f2.home ? f2.opp.name : f2.myTeam.name)}</span>${crest(f2.home ? f2.opp : f2.myTeam, "crest-34")}</div>
+        </div>
+        <div class="boxscore-line"><span>${mine}</span><span>${so}</span></div>
+      </div>`;
+    }
+
+    // ---- diretoria (faixa) ----
+    const metaCard = `<div class="card"><div class="card-h"><h3>Diretoria &amp; contrato</h3>${G.boardFail > 0 ? '<span class="kicker-side verm">Meta falhada na última temporada</span>' : ""}</div><div class="card-b">
+      <div class="flex-b wrap mb8"><span class="small">${I.whistle} Meta da temporada: <b>${esc(G.board.desc)}</b></span></div>
+      <div class="tiles">
+        <div class="tile"><b class="tnum">${U.fmtBRL(p.salary)}</b><span>Salário/mês</span></div>
+        <div class="tile"><b class="tnum">${U.fmtBRL(p.money)}</b><span>Patrimônio</span></div>
+        <div class="tile"><b class="tnum">${p.contractEnd}</b><span>Fim contrato</span></div>
+      </div></div></div>`;
+
+    // ---- RAIL: dossiê do jogador ----
+    const form = (S.history || []).slice(-5).map(function (h) {
+      const r = h.win ? "V" : h.draw ? "E" : "D";
+      return `<span class="result-pill ${r}" title="${esc(h.opp)}">${r}</span>`;
+    }).join("") || '<span class="muted small">Sem jogos ainda</span>';
+    const st = p.stats;
+    const dossier = `<div>
+      <div class="section-banner"><span class="sb-title">O Craque</span><span class="sb-meta">Ficha do atleta</span></div>
+      <div class="card" style="border-top:none">
+        <div class="card-b">
+          <div class="flex" style="align-items:center;gap:14px">
+            <div class="player-face" style="width:72px;height:72px;flex-shrink:0">${U.portraitSVG(p.name + G.seed, 72)}</div>
+            <div style="flex:1;min-width:0">
+              <div class="dossier-name">${esc(p.name)}</div>
+              <div class="dossier-sub">${D.POSITIONS[p.pos].name} · ${p.age} anos · nº ${p.num}</div>
+            </div>
+            <div style="text-align:right"><div class="dossier-ov">${p.overall}</div><div class="dossier-sub">Overall</div></div>
+          </div>
+          <hr class="rule">
+          <div class="meter-lbl"><span>Potencial ${p.pot}</span><span>Fama ${Math.round(p.fame)}</span></div>${bar(p.overall, 100, false, p.pot)}
+          <div class="meter-lbl mt8"><span>Condição</span><span class="tnum">${Math.round(p.condition)}%</span></div>${bar(p.condition, 100, p.condition < 40)}
+          <div class="meter-lbl mt8"><span>Moral</span><span class="tnum">${Math.round(p.morale)}%</span></div>${bar(p.morale, 100, p.morale < 35)}
+          <hr class="rule">
+          <div class="flex-b"><span class="condsmall">Forma recente</span><span class="lastres">${form}</span></div>
+          <hr class="rule">
+          <div class="tiles">
+            <div class="tile"><b class="tnum">${st.j}</b><span>Jogos</span></div>
+            ${p.pos === "GOL"
+        ? `<div class="tile"><b class="tnum">${st.cs}</b><span>Sem sofrer</span></div><div class="tile"><b class="tnum">${st.saves}</b><span>Defesas</span></div>`
+        : `<div class="tile"><b class="tnum">${st.g}</b><span>Gols</span></div><div class="tile"><b class="tnum">${st.a}</b><span>Assist.</span></div>`}
+            <div class="tile"><b class="tnum">${st.notaN ? U.fmtNota(st.notaSum / st.notaN) : "—"}</b><span>Nota</span></div>
+          </div>
+          ${p.takerPen ? '<p class="condsmall mt8">' + I.ball + ' Cobrador oficial de pênaltis</p>' : ""}
+        </div>
+      </div></div>`;
+
+    // ---- RAIL: standings agate (competição em disputa) ----
+    let L = S.comps.LIGA;
+    if (fx && fx.compKey === "EST" && S.comps.EST) L = S.comps.EST;
+    else if (S.comps.LIGA && E().tableOf(G, S.comps.LIGA)[0].j === 0 && S.comps.EST) L = S.comps.EST;
+    const table = E().tableOf(G, L);
+    const myIdx = table.findIndex(function (t) { return t.id === p.clubId; });
+    const from = U.clamp(myIdx - 2, 0, Math.max(0, table.length - 5));
+    const rows = table.slice(from, from + 5).map(function (t, i) {
+      const pos = from + i + 1;
+      return `<tr class="${t.id === p.clubId ? "me" : ""}"><td class="tnum">${pos}</td><td><span class="clubcell">${crest(t.id, "crest-20")} ${esc(CQ.engine.oppObj(G, t.id).short)}</span></td><td class="num">${t.j}</td><td class="num"><b>${t.pts}</b></td></tr>`;
+    }).join("");
+    const standings = `<div>
+      <div class="section-banner"><span class="sb-title">Classificação</span><span class="sb-meta">${esc(L.name)}</span></div>
+      <div class="card" style="border-top:none"><div class="card-b tight"><table class="tbl"><thead><tr><th>#</th><th>Clube</th><th class="num">J</th><th class="num">Pts</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div style="padding:8px 14px;border-top:1px solid var(--rule-soft)"><button class="btn btn-sm btn-block" onclick="CQ.ui.go('comps')">Ver tabela completa</button></div></div></div>`;
+
+    // ---- RAIL: nas redes ----
+    const posts = G.feed.slice(0, 3).map(postHTML).join("") || '<div class="card-b muted small">Nada por aqui ainda.</div>';
+    const feedCard = `<div>
+      <div class="section-banner"><span class="sb-title">Nas redes</span><button class="btn btn-sm" style="box-shadow:none;border-color:var(--newsprint);color:var(--newsprint);background:transparent" onclick="CQ.ui.go('feed')">Tudo</button></div>
+      <div class="card" style="border-top:none"><div class="card-b tight">${posts}</div></div></div>`;
+
+    return `<div class="frontpage">
+      <div class="fp-main">${lead}${ticker}${boxscore}${metaCard}</div>
+      <aside class="fp-rail">${dossier}${standings}${feedCard}</aside>
+    </div>`;
+  }
+
+  // ---------------- ações de jogo ----------------
+  function actionPlay() {
+    const G = g();
+    const fx = E().currentFixture(G);
+    if (!fx) { seasonEndFlow(); return; }
+    if (fx.decisive) {
+      CQ.state.live = CQ.live.buildLive(G, fx);
+      renderLiveOverlay(true);
+      return;
+    }
+    const res = E().resolveMatch(G, fx, {});
+    E().applyMatch(G, res);
+    CQ.main.save();
+    render();
+    afterMatchFlow(res);
+  }
+
+  function actionRest() {
+    const G = g();
+    const fx = E().currentFixture(G);
+    if (!fx) { seasonEndFlow(); return; }
+    const res = E().resolveMatch(G, fx, { rest: true });
+    E().applyMatch(G, res);
+    CQ.main.save();
+    render();
+    toast("Você foi poupado. Condição física recuperada.");
+    checkSeasonOver();
+  }
+
+  function actionSim(n) {
+    const G = g();
+    for (let i = 0; i < n; i++) {
+      const fx = E().currentFixture(G);
+      if (!fx) break;
+      const res = E().resolveMatch(G, fx, {});
+      E().applyMatch(G, res);
+    }
+    CQ.main.save();
+    render();
+    checkSeasonOver();
+  }
+
+  function checkSeasonOver() {
+    if (!E().currentFixture(g())) {
+      // deixa o herói de fim de temporada aparecer na home
+      if (CQ.state.screen !== "home") go("home");
+    }
+  }
+
+  // ---------------- CAPA DE JORNAL (momento marcante) ----------------
+  // decide se a partida merece uma capa e monta o conteúdo (prioridade: título > marco > hat-trick > estreia)
+  function buildFrontPage(G, res) {
+    if (!res.plays) return null;
+    const p = G.player, fx = res.fixture;
+    const meName = fx.isNatMatch ? fx.myTeam.name : E().myClub(G).name;
+    const first = String(p.name).split(" ")[0];
+    const NAME = String(p.name).toUpperCase();
+    const statline = function () {
+      const s = [];
+      if (res.pg) s.push({ n: res.pg, l: res.pg > 1 ? "Gols" : "Gol" });
+      if (res.pa) s.push({ n: res.pa, l: "Assist." });
+      if (res.isGK) s.push({ n: res.saves, l: "Defesas" });
+      s.push({ n: fx.home ? res.gm + "-" + res.go : res.go + "-" + res.gm, l: "Placar" });
+      s.push({ n: U.fmtNota(res.nota), l: "Nota" });
+      return s;
+    };
+    const cap = function (kicker, headline, deck, tag) {
+      return { kicker: kicker, headline: headline, deck: deck, tag: tag, seed: p.name + G.seed, stats: statline() };
+    };
+
+    // marco histórico (gols de carreira)
+    if (res.milestones && res.milestones.length) {
+      const m = res.milestones.find(function (x) { return x.field === "goals" && x.n >= 50; }) || res.milestones[0];
+      if (m.field === "goals" && m.n >= 50) {
+        return cap("Números de lenda · " + G.year, esc(NAME) + ": <em>" + m.n + "</em> gols na carreira",
+          "Mais uma página escrita. " + first + " atinge a marca de " + m.n + " gols como profissional e entra de vez para a galeria dos grandes goleadores.",
+          "MARCO");
+      }
+    }
+    // hat-trick
+    if (res.hatTrick) {
+      return cap("Noite inesquecível · " + G.year, "<em>TRINCA!</em> " + esc(first) + " decide sozinho",
+        "Três vezes a rede balançou com a assinatura do camisa " + p.num + ". " + esc(meName) + " " + (fx.home ? res.gm + " a " + res.go : res.go + " a " + res.gm) + " e um espetáculo que ninguém no estádio vai esquecer.",
+        "HAT-TRICK");
+    }
+    // estreia profissional (primeiro jogo da carreira)
+    if (p.stats.j === 1 && p.career.length === 0) {
+      return cap("Nasce uma promessa · " + G.year, "O primeiro capítulo de <em>" + esc(first) + "</em>",
+        "A camisa " + p.num + " do " + esc(meName) + " ganha um novo dono. Aos " + p.age + " anos, " + first + " faz sua estreia no profissional — o começo de uma história que promete.",
+        "ESTREIA");
+    }
+    return null;
+  }
+
+  function showFrontPage(capa, next) {
+    CQ.state.afterCapa = next;
+    const statsHTML = capa.stats.map(function (s) {
+      return `<div class="ci-stat"><b class="tnum">${esc(String(s.n))}</b><span>${esc(s.l)}</span></div>`;
+    }).join("");
+    const ed = g().year - 2025;
+    overlay(`<div class="capa">
+      <div class="capa-mast">
+        <div class="cm-brand">CRAQUE<span class="dot">.</span></div>
+        <div class="cm-date"><b>EDIÇÃO EXTRA</b> · ${g().year}<br>Ano ${ed} · O boletim da sua carreira</div>
+      </div>
+      <div class="capa-kicker">${esc(capa.kicker)}</div>
+      <h1 class="capa-headline">${capa.headline}</h1>
+      <div class="capa-body">
+        <div class="capa-photo">
+          <div class="cp-frame">${U.portraitSVG(capa.seed, 200)}</div>
+          <div class="cp-cap">${esc(g().player.name)} · ${esc(capa.tag)}</div>
+        </div>
+        <div class="capa-deck">
+          <p class="cd-text">${esc(capa.deck)}</p>
+          <div class="capa-infobox"><div class="ci-h">A ficha da partida</div><div class="ci-b">${statsHTML}</div></div>
+        </div>
+      </div>
+      <div class="capa-foot">
+        <span class="cf-note">Guarde esta capa — momentos assim não se repetem</span>
+        <button class="btn btn-pri btn-big" onclick="CQ.ui.closeCapa()">Seguir a história ${I.arrowR}</button>
+      </div>
+    </div>`, true);
+    const box = $("#cq-overlay .overlay-box");
+    if (box) { box.style.background = "transparent"; box.style.border = "none"; box.style.boxShadow = "none"; }
+  }
+  function closeCapa() {
+    closeOverlay();
+    const next = CQ.state.afterCapa;
+    CQ.state.afterCapa = null;
+    if (next) next();
+  }
+
+  function afterMatchFlow(res) {
+    const G = g();
+    // momento marcante → capa de jornal em tela cheia (antes de tudo)
+    const capa = buildFrontPage(G, res);
+    if (capa) { showFrontPage(capa, function () { afterMatchInterview(res); }); return; }
+    afterMatchInterview(res);
+  }
+  function afterMatchInterview(res) {
+    const G = g();
+    if (res.hatTrick) toast("HAT-TRICK! Três gols numa partida.");
+    if (res.milestones && res.milestones.length) toast("Marco batido: " + res.milestones[0].n + " " + res.milestones[0].label + "!");
+    const itv = CQ.nar.maybeInterview(G, res);
+    if (itv) { showInterview(itv, res); return; }
+    afterInterview();
+  }
+  function afterInterview() {
+    const G = g();
+    const ev = CQ.nar.maybeLifeEvent(G);
+    if (ev) { showLifeEvent(ev); return; }
+    CQ.main.save();
+    checkSeasonOver();
+  }
+
+  // ---------------- overlays genéricos ----------------
+  function overlay(html, wide) {
+    closeOverlay();
+    const div = document.createElement("div");
+    div.className = "overlay";
+    div.id = "cq-overlay";
+    div.innerHTML = `<div class="overlay-box ${wide ? "wide" : ""}" role="dialog" aria-modal="true">${html}</div>`;
+    document.body.appendChild(div);
+    // acessibilidade: foca o primeiro controle acionável do diálogo
+    const first = div.querySelector("button, a, input, select, .dc-opt, .choice, .shoot-slot");
+    if (first && first.focus) { try { first.focus(); } catch (e) { } }
+  }
+  function closeOverlay() {
+    const o = $("#cq-overlay");
+    if (o) o.remove();
+    // o confete NÃO é removido aqui (ele acompanha a celebração e se auto-remove em ~5s)
+  }
+
+  // ---------------- entrevista ----------------
+  // chips de efeito coloridos (verde = ganho, vermelho = perda, dourado = dinheiro)
+  function fxChips(fx) {
+    const c = [];
+    function chip(v, label) { if (v) c.push(`<span class="fxchip ${v > 0 ? "up" : "down"}">${v > 0 ? "+" : ""}${v} ${label}</span>`); }
+    chip(fx.rep, "reputação"); chip(fx.fame, "fama"); chip(fx.morale, "moral"); chip(fx.cond, "condição");
+    if (fx.money) c.push(`<span class="fxchip ${fx.money > 0 ? "money" : "down"}">${fx.money > 0 ? "+" : ""}${U.fmtBRL(fx.money)}</span>`);
+    return c.length ? `<div class="o2-fx">${c.join("")}</div>` : "";
+  }
+
+  function showInterview(itv, res) {
+    CQ.state.itv = itv;
+    const opts = itv.options.map(function (o, i) {
+      return `<button class="opt2" onclick="CQ.ui.pickInterview(${i})">
+        <span class="o2-label">${esc(o.label)} <span class="o2-tone">${esc(o.tone)}</span></span>
+        ${fxChips({ rep: o.rep, fame: o.fame, morale: o.morale })}</button>`;
+    }).join("");
+    overlay(`<div class="modal2">
+      <div class="modal2-hero ev-verm">
+        <div class="modal2-icon">${I.press}</div>
+        <div class="modal2-kicker">${I.press} Zona mista · entrevista pós-jogo</div>
+        <div class="modal2-title">"${esc(itv.q)}"</div>
+      </div>
+      <div class="modal2-body">${opts}</div>
+    </div>`);
+  }
+  function pickInterview(i) {
+    const itv = CQ.state.itv;
+    CQ.nar.applyInterview(g(), itv, itv.options[i]);
+    CQ.state.itv = null;
+    closeOverlay();
+    CQ.main.save();
+    render();
+    afterInterview();
+  }
+
+  // ---------------- evento de vida ----------------
+  // ícone de atmosfera por tipo de evento de vida
+  const LIFE_ICON = {
+    hospital: "heart", empresario: "coin", coletiva: "press", aniversario: "heart", colega: "user",
+    influencer: "feed", incomodo: "injury", jantar: "trophy", base: "star", documentario: "feed",
+    tenis: "coin", torcedor: "heart", arbitro: "whistle", vaquinha: "heart"
+  };
+  function showLifeEvent(ev) {
+    CQ.state.lifeEv = ev;
+    const opts = ev.opts.map(function (o, i) {
+      const fx = o.fx || {};
+      return `<button class="opt2" onclick="CQ.ui.pickLife(${i})">
+        <span class="o2-label">${esc(o.label)}</span>
+        ${fxChips(fx) || '<div class="o2-fx"><span class="fxchip">sem efeito direto</span></div>'}</button>`;
+    }).join("");
+    const ico = I[LIFE_ICON[ev.id]] || I.heart;
+    overlay(`<div class="modal2">
+      <div class="modal2-hero ev-green">
+        <div class="modal2-icon">${ico}</div>
+        <div class="modal2-kicker">${ico} Fora de campo</div>
+        <div class="modal2-title">${esc(ev.title)}</div>
+      </div>
+      <div class="modal2-body">
+        <p class="modal2-desc">${esc(ev.desc)}</p>
+        ${opts}
+      </div>
+    </div>`);
+  }
+  function pickLife(i) {
+    const ev = CQ.state.lifeEv;
+    const opt = ev.opts[i];
+    CQ.nar.applyLifeEvent(g(), ev, opt);
+    CQ.state.lifeEv = null;
+    closeOverlay();
+    toast(opt.note);
+    CQ.main.save();
+    render();
+    checkSeasonOver();
+  }
+
+  // ---------------- partida ao vivo ----------------
+  function renderLiveOverlay(fresh) {
+    const live = CQ.state.live;
+    const fx = live.fixture;
+    const header = `<div class="live-head">
+      <span class="lh-comp">${esc(fx.label)}</span>
+      <span class="live-clock"><span class="liveblink"></span><span id="lv-score" class="tnum">${liveScoreStr(live)}</span></span>
+    </div>`;
+    overlay(`${header}<div class="mm-feed" id="lv-feed"></div><div id="lv-foot" style="padding:12px 16px"></div>`, false);
+    if (fresh) { if (CQ.audio) CQ.audio.play("whistle"); liveStep(); }
+  }
+
+  function liveScoreStr(live) {
+    const fx = live.fixture;
+    const a = fx.home ? live.score[0] : live.score[1];
+    const b = fx.home ? live.score[1] : live.score[0];
+    return `${esc(fx.home ? fx.myTeam.short : fx.opp.short)} ${a} × ${b} ${esc(fx.home ? fx.opp.short : fx.myTeam.short)}`;
+  }
+
+  function evIcon(e) {
+    if (e.type === "goal") return `<span class="green">${I.goal}</span>`;
+    if (e.type === "oppgoal") return `<span class="verm">${I.goal}</span>`;
+    if (e.type === "card") return `<span style="color:#c9a227">${I.card}</span>`;
+    if (e.type === "redcard") return `<span class="verm">${I.card}</span>`;
+    if (e.type === "ko" || e.type === "ht" || e.type === "ft") return I.whistle;
+    if (e.type === "flavor") return `<span class="verm">${I.press}</span>`;
+    return I.ball;
+  }
+
+  function liveStep() {
+    const live = CQ.state.live;
+    const revealed = CQ.live.step(live);
+    const feedEl = $("#lv-feed");
+    revealed.forEach(function (e) {
+      const div = document.createElement("div");
+      div.className = "mm-ev " + (e.type === "goal" ? "goal" : e.type === "oppgoal" ? "goal-opp" : "") + (e.big ? " big" : "");
+      div.innerHTML = `<span class="mmin tnum">${e.min}'</span><span class="mico">${evIcon(e)}</span><span class="mtext">${esc(e.text)}</span>`;
+      feedEl.appendChild(div);
+      // splash de gol em tela cheia
+      if (e.type === "goal") goalSplash(true, e.min + "'");
+      else if (e.type === "oppgoal") goalSplash(false, "");
+    });
+    const sc = $("#lv-score");
+    if (sc) sc.textContent = liveScoreStr(live).replace(/&amp;/g, "&");
+    const foot = $("#lv-foot");
+    if (live.phase === "decision") {
+      const dec = live.decision;
+      foot.innerHTML = "";
+      const div = document.createElement("div");
+      div.className = "decision";
+      div.innerHTML = `<div class="dc-h">Decisão · a partida está pausada</div><div class="dc-b"><div class="dc-q">${esc(dec.q)}</div>
+        ${dec.opts.map(function (o, i) {
+        return `<button class="dc-opt" onclick="CQ.ui.liveDecide(${i})">${esc(o.label)}<small>${esc(o.sub)} · ${Math.round(o.p * 100)}% de chance</small></button>`;
+      }).join("")}</div>`;
+      foot.appendChild(div);
+    } else if (live.phase === "shootout") {
+      renderShootoutPick();
+    } else if (live.phase === "done") {
+      foot.innerHTML = `<button class="btn btn-pri btn-block btn-big" onclick="CQ.ui.finishLive()">Encerrar partida</button>`;
+    } else {
+      foot.innerHTML = `<button class="btn btn-block" onclick="CQ.ui.liveStep()">Continuar &rsaquo;</button>`;
+    }
+    const box = $("#cq-overlay .overlay-box");
+    if (box) box.scrollTop = box.scrollHeight;
+  }
+
+  function liveDecide(i) {
+    const live = CQ.state.live;
+    // aplica a decisão (insere o evento, atualiza res) e revela pelo caminho único
+    // do step(), que é o único que mexe no placar visual — sem duplicar gol.
+    CQ.live.chooseDecision(live, i);
+    liveStep();
+  }
+
+  function renderShootoutPick() {
+    const foot = $("#lv-foot");
+    const isGK = g().player.pos === "GOL";
+    foot.innerHTML = `<div class="decision"><div class="dc-h">Pênaltis · escolha sua cobrança</div><div class="dc-b">
+      <div class="dc-q">${isGK ? "Você é o goleiro — mas pode assumir uma cobrança. Em qual bola você vai?" : "Empate no tempo normal. Em qual das 5 cobranças você bate?"}</div>
+      <div class="shootout-grid">
+        ${[1, 2, 3, 4, 5].map(function (n) {
+      const drama = n === 5 ? "A decisiva" : n === 1 ? "Abre a disputa" : n === 4 ? "Pressão alta" : "Meio da lista";
+      return `<button class="shoot-slot" onclick="CQ.ui.shootPick(${n})"><b>${n}ª</b><span class="condsmall">${drama}</span></button>`;
+    }).join("")}
+      </div>
+      <button class="dc-opt" onclick="CQ.ui.shootPick(0)">Não bater — deixo com os companheiros<small>${isGK ? "Foco total em defender" : "Menos risco, menos glória"}</small></button>
+    </div></div>`;
+  }
+
+  function shootPick(slot) {
+    const live = CQ.state.live;
+    live.shootSlot = slot;
+    CQ.live.runShootout(live, slot); // computa toda a disputa; será revelada lance a lance
+    renderShootout();
+  }
+
+  function renderShootout() {
+    const live = CQ.state.live, so = live.shootout, fx = live.fixture;
+    const myShort = esc(fx.myTeam.short), opShort = esc(fx.opp.short);
+    function dots(shown, total) {
+      let out = "";
+      for (let i = 0; i < Math.max(total, 5); i++) {
+        if (i < shown.length) out += `<i class="${shown[i] ? "ok" : "miss"}"></i>`;
+        else out += `<i></i>`;
+      }
+      return out;
+    }
+    const running = CQ.live.shootRunning(so);
+    const myGoals = so.myShown.filter(Boolean).length;
+    const opGoals = so.opShown.filter(Boolean).length;
+    // qual foi o último lance revelado (para o comentário)
+    const last = so.reveal > 0 ? so.log[so.reveal - 1] : null;
+    let lastTxt = "Disputa de pênaltis. Nervos de aço.";
+    if (last) {
+      const who = last.side === "my" ? (last.me ? "VOCÊ" : myShort) : opShort;
+      lastTxt = last.ok
+        ? (last.me ? "VOCÊ MARCOU! Frieza total na cobrança." : who + " converteu.")
+        : (last.me ? "VOCÊ PERDEU... o goleiro pegou!" : who + " desperdiçou! Isso muda tudo.");
+    }
+    const foot = $("#lv-foot");
+    let footHTML = `<div class="shootout-panel">
+      <div class="shoot-team"><span>${myShort}</span><span class="shoot-dots">${dots(so.myShown, Math.ceil(so.log.length / 2))}</span><b class="tnum">${myGoals}</b></div>
+      <div class="shoot-team"><span>${opShort}</span><span class="shoot-dots">${dots(so.opShown, Math.ceil(so.log.length / 2))}</span><b class="tnum">${opGoals}</b></div>
+      <p class="shoot-comment ${last && last.ok ? "ok" : last ? "miss" : ""}">${esc(lastTxt)}</p>`;
+    if (running) {
+      footHTML += `<button class="btn btn-pri btn-block" onclick="CQ.ui.shootReveal()">Próxima cobrança &rsaquo;</button>`;
+    } else {
+      const win = live.res.shootoutWin;
+      footHTML += `<div class="notice ${win ? "ok" : ""} mb8"><b>${win ? "CLASSIFICADO" : "ELIMINADO"} nos pênaltis: ${so.my} × ${so.opp}.</b></div>
+        <button class="btn btn-pri btn-block btn-big" onclick="CQ.ui.finishLive()">Encerrar partida</button>`;
+    }
+    footHTML += `</div>`;
+    foot.innerHTML = footHTML;
+    const box = $("#cq-overlay .overlay-box");
+    if (box) box.scrollTop = box.scrollHeight;
+  }
+
+  function shootReveal() {
+    const live = CQ.state.live;
+    CQ.live.shootStep(live);
+    renderShootout();
+  }
+
+  function finishLive() {
+    const live = CQ.state.live;
+    CQ.state.live = null;
+    closeOverlay();
+    E().applyMatch(g(), live.res);
+    CQ.main.save();
+    render();
+    if (g().season.lastTitle) {
+      const t = g().season.lastTitle;
+      g().season.lastTitle = null;
+      showTitleCelebration(t, function () { afterMatchFlow(live.res); });
+      return;
+    }
+    afterMatchFlow(live.res);
+  }
+
+  function showTitleCelebration(t, next) {
+    CQ.state.afterTitle = next;
+    const cl = E().myClub(g());
+    const cores = [cl.c1 || "#b8330f", cl.c2 || "#f5efdf", "#9c7c1e"];
+    dropConfetti(cores);
+    if (CQ.audio) CQ.audio.play("trophy");
+    overlay(`<div class="trophy-banner">
+      ${trophyIcon(t.key)}
+      <div class="tb-k">É campeão · ${g().year}</div>
+      <h2>${esc(t.name)}</h2>
+      <p class="mt8">Bônus de título: <b>${U.fmtBRL(t.bonus)}</b></p>
+    </div>
+    <div style="padding:16px"><button class="btn btn-green btn-block btn-big" onclick="CQ.ui.closeTitle()">Levantar a taça</button></div>`);
+  }
+  // papel picado nas cores do clube (respeita movimento reduzido)
+  function dropConfetti(cores) {
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const wrap = document.createElement("div");
+    wrap.className = "confetti";
+    let html = "";
+    for (let i = 0; i < 90; i++) {
+      const c = cores[i % cores.length];
+      const left = Math.random() * 100;
+      const dur = 2.4 + Math.random() * 2.2;
+      const delay = Math.random() * 0.8;
+      const w = 6 + Math.random() * 6;
+      html += `<i style="left:${left}%;background:${c};width:${w}px;height:${w * 1.6}px;animation-duration:${dur}s;animation-delay:${delay}s;transform:rotate(${Math.random() * 360}deg)"></i>`;
+    }
+    wrap.innerHTML = html;
+    document.body.appendChild(wrap);
+    setTimeout(function () { wrap.remove(); }, 5200);
+  }
+  function closeTitle() {
+    closeOverlay();
+    const cf = document.querySelector(".confetti"); if (cf) cf.remove();
+    const next = CQ.state.afterTitle;
+    CQ.state.afterTitle = null;
+    if (next) next(); else checkSeasonOver();
+  }
+
+  // ---------------- fim de temporada ----------------
+  function seasonEndFlow() {
+    const G = g();
+    if (!G.pendingSummary) E().endSeason(G);
+    CQ.main.save();
+    showSummary();
+  }
+
+  function ballonBlock(sum) {
+    if (!sum.ballon) return "";
+    const b = sum.ballon, G = g();
+    // pódio visual dos 3 primeiros (ordem 2-1-3 para o degrau central ser o mais alto)
+    const top3 = b.top.slice(0, 3);
+    function podFace(r) {
+      const seed = r.me ? G.player.name + G.seed : r.name + "star";
+      return U.portraitSVG(seed, 46);
+    }
+    const order = [top3[1], top3[0], top3[2]];
+    const cls = ["p2", "p1", "p3"];
+    const podium = `<div class="podium">${order.map(function (r, i) {
+      if (!r) return "<div></div>";
+      const rank = r === top3[0] ? 1 : r === top3[1] ? 2 : 3;
+      return `<div class="pod ${cls[i]} ${r.me ? "me" : ""}"><div class="pod-face">${podFace(r)}</div>
+        <div class="pod-name">${esc(String(r.name).split(" ")[0])}${r.me ? " (você)" : ""}</div>
+        <div class="pod-bar">${rank}º</div></div>`;
+    }).join("")}</div>`;
+    const rows = b.top.slice(3, 6).map(function (r, i) {
+      return `<div class="flex-b" style="padding:3px 0"><span class="small"><span class="tnum" style="display:inline-block;width:22px">${i + 4}º</span> ${esc(r.name)}${r.me ? ' <span class="badge badge-gold">você</span>' : ""}</span><span class="tnum muted small">${r.score}</span></div>`;
+    }).join("");
+    const verdict = b.rank === 1 ? '<span class="badge badge-gold">BOLA DE OURO — nº 1 do mundo</span>'
+      : b.rank <= 3 ? `<span class="badge">Pódio mundial · ${b.rank}º</span>`
+        : `<span class="small muted">Você ficou em ${b.rank}º no ranking mundial.</span>`;
+    return `<hr class="rule"><div class="flex-b mb8"><div class="kicker" style="flex:1">Ranking mundial (Bola de Ouro)</div>${verdict}</div>${podium}${rows}`;
+  }
+
+  function showSummary() {
+    const G = g(), sum = G.pendingSummary, p = G.player;
+    const aw = sum.awards;
+    // celebração: Bola de Ouro ou títulos na temporada
+    const bolaDeOuro = sum.ballon && sum.ballon.rank === 1;
+    if (bolaDeOuro || (sum.titles && sum.titles.length)) {
+      dropConfetti(bolaDeOuro ? ["#c9a227", "#9c7c1e", "#f5efdf"] : [E().myClub(G).c1 || "#b8330f", E().myClub(G).c2 || "#f5efdf", "#9c7c1e"]);
+      if (CQ.audio) CQ.audio.play("trophy");
+    }
+    const awardRows = aw.won.map(function (a) {
+      return `<div class="flex-b" style="padding:6px 0;border-bottom:1px dashed var(--rule-soft)"><span class="flex">${I.star} <b>${esc(a.name)}</b></span><span class="small muted">${esc(a.detail || "")}</span></div>`;
+    }).join("") || '<p class="muted small">Sem prêmios individuais nesta temporada.</p>';
+    const lostRows = aw.lost.map(function (a) {
+      return `<p class="small muted">· ${esc(a.name)} ficou com ${esc(a.by || (a.num + " do concorrente"))}.</p>`;
+    }).join("");
+    const titles = sum.titles.length ? `<div class="notice ok mb8">${I.trophy} Títulos: <b>${sum.titles.map(esc).join(", ")}</b></div>` : "";
+    const moves = [];
+    if (sum.moves.myMove === "down") moves.push('<div class="notice">Rebaixado! Na próxima temporada, o clube disputa a divisão de baixo.</div>');
+    if (sum.moves.myMove === "up") moves.push('<div class="notice ok">ACESSO! Na próxima temporada, o clube sobe de divisão.</div>');
+    const convo = sum.convNews === "convocado" ? '<div class="notice ok">Convocado para a Seleção! O ciclo internacional entra no seu calendário.</div>'
+      : sum.convNews === "cortado" ? '<div class="notice warn">Você perdeu a vaga na Seleção. Rendimento manda.</div>' : "";
+    const idol = sum.becameIdol ? `<div class="notice ok mb8">${I.star} <b>Você virou ÍDOLO do ${esc(sum.becameIdol)}!</b> Estátua na entrada do estádio e nome eternizado na história do clube.</div>` : "";
+    const capt = sum.newCaptain ? `<div class="notice ok mb8">${I.trophy} <b>Você é o novo capitão do ${esc(sum.newCaptain)}!</b> A braçadeira reconhece sua liderança.</div>` : "";
+    const traitsN = sum.newTraits && sum.newTraits.length ? `<div class="notice ok mb8">${I.star} Novo traço desbloqueado: ${sum.newTraits.map(function (k) { return "<b>" + esc(CQ.engine.TRAITS[k].name) + "</b>"; }).join(", ")}.</div>` : "";
+    overlay(`<div class="live-head"><span class="lh-comp">Balanço da temporada ${sum.year}</span>${I.calendar}</div>
+      <div style="padding:16px">
+        ${titles}${idol}${capt}${traitsN}${moves.join("")}${convo}
+        <div class="kicker mb8">Números da temporada</div>
+        <div class="tiles mb12">
+          <div class="tile"><b class="tnum">${sum.stats.j}</b><span>Jogos</span></div>
+          ${p.pos === "GOL"
+        ? `<div class="tile"><b class="tnum">${sum.stats.cs}</b><span>Sem sofrer</span></div><div class="tile"><b class="tnum">${sum.stats.saves}</b><span>Defesas</span></div>`
+        : `<div class="tile"><b class="tnum">${sum.stats.g}</b><span>Gols</span></div><div class="tile"><b class="tnum">${sum.stats.a}</b><span>Assist.</span></div>`}
+          <div class="tile"><b class="tnum">${sum.stats.avg ? U.fmtNota(sum.stats.avg) : "—"}</b><span>Nota média</span></div>
+          <div class="tile"><b class="tnum">${sum.pos}º</b><span>Na liga</span></div>
+        </div>
+        ${sum.vitima ? `<p class="small muted mb8">Maior vítima: <b>${esc(sum.vitima.name)}</b> (${sum.vitima.gols} gols sofridos de você).</p>` : ""}
+        <div class="kicker mb8">Prêmios</div>
+        ${awardRows}${lostRows}
+        ${ballonBlock(sum)}
+        <hr class="rule">
+        <div class="flex-b wrap mb8">
+          <span class="small">Valor de mercado: <b>${U.fmtBRL(sum.marketValue || p.marketValue)}</b></span>
+          ${sum.income ? `<span class="badge badge-green">Renda de negócios: ${U.fmtBRL(sum.income)}</span>` : ""}
+        </div>
+        <div class="flex-b wrap">
+          <span class="small">Meta da diretoria: <b>${esc(sum.meta.desc)}</b></span>
+          <span class="badge ${sum.metaOk ? "badge-green" : "badge-verm"}">${sum.metaOk ? "Cumprida · bônus " + U.fmtBRL(400000) : "Falhada"}</span>
+        </div>
+        ${sum.forcedOut ? '<div class="notice mt8">Duas temporadas sem cumprir metas: a diretoria abriu as portas. Você DEVE trocar de clube.</div>' : ""}
+        <hr class="rule">
+        <p class="small muted">Rival de geração: <b>${esc(sum.rival.name)}</b> fechou o ano com ${sum.rival.g} gols pelo ${esc(sum.rival.club)}.</p>
+        ${sum.aging.drops.length ? `<p class="small muted">O tempo cobra: ${sum.aging.drops.map(function (d) { return esc(D.ATTR_NAMES[d.attr]) + " -" + d.d; }).join(", ")}.</p>` : (sum.aging.note ? `<p class="small green">${esc(sum.aging.note)}</p>` : "")}
+        ${sum.aging.potUp ? '<p class="small green">Grande temporada: seu teto de crescimento (potencial) aumentou.</p>' : ""}
+        <div class="btnrow mt16">
+          <button class="btn btn-pri btn-big btn-block" onclick="CQ.ui.summaryNext()">${sum.retiring ? "Encerrar carreira" : sum.offers ? "Ir ao mercado da bola" : "Próxima temporada"}</button>
+        </div>
+      </div>`, true);
+  }
+
+  function summaryNext() {
+    const G = g(), sum = G.pendingSummary;
+    closeOverlay();
+    if (sum.retiring) { G.retired = true; CQ.main.save(); go("retro"); return; }
+    if (sum.offers) { showMarket(); return; }
+    E().nextSeason(G);
+    CQ.main.save();
+    go("home");
+    toast("Temporada " + G.year + " começa agora. Boa sorte!");
+  }
+
+  function showMarket() {
+    const G = g(), sum = G.pendingSummary, p = G.player, of = sum.offers;
+    const cards = of.list.map(function (o, i) {
+      const c = D.CLUBS[o.clubId];
+      const roleLbl = { estrela: "como ESTRELA", titular: "como titular", rotacao: "como rotação" }[o.role] || "como titular";
+      return `<button class="dc-opt" onclick="CQ.ui.pickOffer(${i})">
+        <span class="flex">${crest(c, "crest-24")} <b>${esc(o.name)}</b> <span class="badge badge-soft">${esc(o.league)}</span> <span class="badge ${o.role === "estrela" ? "badge-gold" : "badge-soft"}">${roleLbl}</span></span>
+        <small>Salário ${U.fmtBRL(o.salary)}/mês · contrato de ${o.years} anos · luvas ${U.fmtBRL(o.salary * 2)}</small></button>`;
+    }).join("");
+    const renewBtn = of.renew ? `<button class="dc-opt" onclick="CQ.ui.pickRenew()">
+      <span class="flex">${crest(E().myClub(G), "crest-24")} <b>Renovar com o ${esc(E().myClub(G).name)}</b></span>
+      <small>Novo salário ${U.fmtBRL(of.renew.salary)}/mês · mais ${of.renew.years} anos</small></button>`
+      : '<p class="small muted">O clube atual não ofereceu renovação.</p>';
+    overlay(`<div class="live-head"><span class="lh-comp">Mercado da bola · janela de ${sum.year}</span>${I.coin}</div>
+      <div style="padding:16px">
+        <h3 class="mb8">Propostas na mesa</h3>
+        <p class="small muted mb12">${sum.mustMove ? "A diretoria encerrou seu ciclo — escolha um novo destino." : of.requested ? "Você pediu para sair — estas são as portas que se abriram." : "Seu contrato chegou ao fim. Escolha seu futuro."}</p>
+        ${cards || '<p class="muted">Nenhuma proposta externa desta vez.</p>'}
+        <hr class="rule">${renewBtn}
+      </div>`, true);
+  }
+
+  function pickOffer(i) {
+    const G = g(), sum = G.pendingSummary;
+    const o = sum.offers.list[i];
+    E().acceptOffer(G, o);
+    CQ.nar.post(G, "imprensa", "MERCADO: " + G.player.name + " é o novo reforço do " + o.name + ". Contrato de " + o.years + " anos.", { hot: true });
+    closeOverlay();
+    E().nextSeason(G);
+    CQ.main.save();
+    go("home");
+    toast("Bem-vindo ao " + o.name + "!");
+  }
+  function pickRenew() {
+    const G = g(), sum = G.pendingSummary;
+    E().acceptRenew(G, sum.offers.renew);
+    CQ.nar.post(G, "clube", G.player.name + " renova contrato! O camisa " + G.player.num + " segue com a gente.", { hot: true });
+    closeOverlay();
+    E().nextSeason(G);
+    CQ.main.save();
+    go("home");
+    toast("Contrato renovado. Nova temporada!");
+  }
+
+  // ---------------- CARREIRA ----------------
+  function careerHTML() {
+    const G = g(), p = G.player;
+    const tab = CQ.state.ctab || "attrs";
+    const nat = D.NATIONS[p.nat];
+    const tabs = [["attrs", "Atributos"], ["marcos", "Marcos"], ["evo", "Evolução"], ["hist", "Temporadas"], ["troph", "Conquistas"], ["duel", "Duelo"]];
+    const head = `<div class="player-card mb12">
+      <div class="player-face">${U.portraitSVG(p.name + G.seed, 96)}</div>
+      <div>
+        <div class="pc-name">${esc(p.name)}</div>
+        <div class="pc-sub">${U.flagImg(nat)} ${esc(nat.name)} · ${D.POSITIONS[p.pos].name} (${archName(p)}) · ${p.foot} · nº ${p.num}</div>
+        <div class="pc-sub">${crest(E().myClub(G), "crest-20")} ${esc(E().myClub(G).name)} · ${p.age} anos · Fama ${Math.round(p.fame)} · Reputação ${Math.round(p.rep)}</div>
+      </div>
+      <div class="ov-plate"><b>${p.overall}</b><span>Overall</span></div>
+    </div>`;
+    const subtabs = `<div class="subtabs">${tabs.map(function (t) {
+      return `<button class="${tab === t[0] ? "on" : ""}" onclick="CQ.ui.ctab('${t[0]}')">${t[1]}</button>`;
+    }).join("")}</div>`;
+    let body = "";
+    if (tab === "attrs") body = attrsHTML(p);
+    else if (tab === "marcos") body = marcosHTML(G);
+    else if (tab === "evo") body = evoHTML(p);
+    else if (tab === "hist") body = histHTML(p);
+    else if (tab === "troph") body = trophHTML(p);
+    else body = duelHTML(G);
+    return head + subtabs + body;
+  }
+
+  function marcosHTML(G) {
+    const p = G.player;
+    const tot = E().careerTotals(G);
+    // marcos alcançados e o próximo alvo de cada linha
+    const rows = E().MILESTONE_DEFS.map(function (def) {
+      const cur = tot[def.field];
+      const next = def.steps.find(function (s) { return cur < s; });
+      const lastHit = def.steps.filter(function (s) { return cur >= s; }).pop();
+      const pct = next ? Math.round(cur / next * 100) : 100;
+      return `<div style="padding:9px 0;border-bottom:1px dashed var(--rule-soft)">
+        <div class="flex-b"><span class="condsmall">${esc(def.label)}</span><b class="tnum" style="font-family:var(--serif);font-size:17px">${cur}</b></div>
+        ${next ? `<div class="meter-lbl" style="margin-top:4px"><span>${lastHit ? "último marco " + lastHit : "próximo marco"}</span><span>meta ${next}</span></div>${bar(pct, 100)}`
+          : `<span class="badge badge-gold mt8">todos os marcos batidos</span>`}
+      </div>`;
+    }).join("");
+
+    const bestRank = p.ballon.length ? Math.min.apply(null, p.ballon.map(function (b) { return b.rank; })) : null;
+    const ballonRows = p.ballon.slice().reverse().slice(0, 8).map(function (b) {
+      return `<tr><td class="tnum">${b.year}</td><td>${b.rank <= 3 ? '<b>' + b.rank + 'º</b>' : b.rank + 'º'} no mundo</td><td class="num muted">${b.score} pts</td></tr>`;
+    }).join("") || '<tr><td colspan="3" class="muted small" style="padding:10px">Ainda sem ranking mundial. Ele é calculado ao fim de cada temporada.</td></tr>';
+
+    return `<div class="cols">
+      <div class="stack">
+        <div class="card"><div class="section-banner"><span class="sb-title">Valor de mercado</span></div>
+          <div class="card-b center">
+            <div style="font-family:var(--serif);font-weight:900;font-size:38px">${U.fmtBRL(p.marketValue)}</div>
+            <p class="small muted mt8">Sobe com overall, fama e momento — e despenca com a idade. Pico entre 24 e 27 anos.</p>
+          </div></div>
+        <div class="card"><div class="section-banner"><span class="sb-title">Marcos de carreira</span></div>
+          <div class="card-b">${rows}</div></div>
+      </div>
+      <div class="stack">
+        <div class="card"><div class="section-banner"><span class="sb-title">Recordes</span></div>
+          <div class="card-b"><div class="tiles">
+            <div class="tile"><b class="tnum">${p.records.hatTricks}</b><span>Hat-tricks</span></div>
+            <div class="tile"><b class="tnum">${p.records.bestSeasonG}</b><span>Recorde de gols/temp.</span></div>
+            <div class="tile"><b class="tnum">${p.records.bestSeasonAvg ? U.fmtNota(p.records.bestSeasonAvg) : "—"}</b><span>Melhor nota/temp.</span></div>
+            <div class="tile"><b class="tnum">${tot.titles}</b><span>Títulos</span></div>
+          </div></div></div>
+        <div class="card"><div class="section-banner"><span class="sb-title">Bola de Ouro</span>${bestRank ? `<span class="sb-meta">melhor: ${bestRank}º</span>` : ""}</div>
+          <div class="card-b tight"><table class="tbl"><thead><tr><th>Ano</th><th>Colocação</th><th class="num">Pontuação</th></tr></thead><tbody>${ballonRows}</tbody></table></div>
+          <p class="small muted" style="padding:8px 14px">Só o nº 1 do mundo leva a Bola de Ouro. Você disputa contra 12 craques de elite — precisa de números absurdos e um título grande.</p>
+        </div>
+      </div>
+    </div>`;
+  }
+  function archName(p) {
+    const a = D.POSITIONS[p.pos].archs.find(function (x) { return x.id === p.archId; });
+    return a ? a.name : "";
+  }
+  function ctab(t) { CQ.state.ctab = t; render(); }
+
+  function attrsHTML(p) {
+    const rows = CQ.engine.ATTRS.map(function (a) {
+      if (p.pos !== "GOL" && a === "ref") return "";
+      if (p.pos === "GOL" && (a === "fin" || a === "dri")) return "";
+      return `<div class="attr-row"><span class="alabel">${D.ATTR_NAMES[a]}</span>${bar(p.attrs[a], 100, p.attrs[a] < 55)}<span class="aval tnum">${p.attrs[a]}</span></div>`;
+    }).join("");
+    const legends = p.legendIds.map(function (id) {
+      const L = D.LEGENDS.find(function (x) { return x.id === id; });
+      return L ? `<span class="badge badge-gold">${esc(L.name)} · ${esc(L.trait)}</span>` : "";
+    }).join(" ");
+    // traços/especialidades desbloqueados
+    const allTraitKeys = Object.keys(CQ.engine.TRAITS);
+    const traitsHTML = allTraitKeys.map(function (k) {
+      const t = CQ.engine.TRAITS[k];
+      const on = CQ.engine.hasTrait(p, k);
+      return `<div class="trait ${on ? "on" : ""}">${on ? I[t.icon] || I.star : I.star}<div><b>${esc(t.name)}</b><small>${esc(t.desc)}</small></div></div>`;
+    }).join("");
+    const traitsCard = `<div class="card"><div class="card-h"><h3>Traços &amp; especialidades</h3><span class="kicker-side">${p.traits.length}/${allTraitKeys.length}</span></div>
+      <div class="card-b"><div class="trait-grid">${traitsHTML}</div>
+      <p class="small muted mt8">Desbloqueados por desempenho (gols, assistências, decisões, capitania...). Cada traço melhora seu jogo de verdade.</p></div></div>`;
+    return `<div class="cols"><div class="stack">
+      <div class="card"><div class="card-h"><h3>Atributos</h3><span class="kicker-side">Potencial ${p.pot}</span></div>
+      <div class="card-b">${rows}</div></div>
+      ${traitsCard}
+    </div><div class="stack">
+      <div class="card"><div class="card-h"><h3>Inspirações — Os Craques</h3></div><div class="card-b">${legends || '<span class="muted small">Nenhuma lenda escolhida.</span>'}</div></div>
+      <div class="card"><div class="card-h"><h3>Seleção ${esc(D.NATIONS[p.nat].name)}</h3></div><div class="card-b">
+        ${p.natTeam.convocado ? '<span class="badge badge-green">Convocado no ciclo atual</span>' : '<span class="badge badge-soft">Fora da lista</span>'}
+        <div class="tiles mt12">
+          <div class="tile"><b class="tnum">${p.natTeam.caps}</b><span>Jogos</span></div>
+          <div class="tile"><b class="tnum">${p.natTeam.goals}</b><span>Gols</span></div>
+        </div></div></div>
+    </div></div>`;
+  }
+
+  function evoHTML(p) {
+    const H = p.hist;
+    if (H.length < 2) {
+      return `<div class="card"><div class="card-b center muted">A curva de evolução aparece a partir da segunda temporada.<br><br>${chartSVG(H, p)}</div></div>`;
+    }
+    return `<div class="card"><div class="card-h"><h3>Evolução do overall</h3><span class="kicker-side">${H[0].y}–${H[H.length - 1].y}</span></div>
+      <div class="card-b chart-wrap">${chartSVG(H, p)}</div></div>`;
+  }
+
+  function chartSVG(H, p) {
+    const W = Math.max(560, H.length * 60), Ht = 220, pad = 34;
+    const ovs = H.map(function (h) { return h.ov; });
+    const lo = Math.min.apply(null, ovs.concat([p.pot])) - 4;
+    const hi = Math.max.apply(null, ovs.concat([p.pot])) + 4;
+    function x(i) { return pad + i * (W - pad * 2) / Math.max(1, H.length - 1); }
+    function y(v) { return Ht - pad - (v - lo) * (Ht - pad * 2) / (hi - lo); }
+    const line = H.map(function (h, i) { return (i ? "L" : "M") + x(i).toFixed(1) + " " + y(h.ov).toFixed(1); }).join(" ");
+    const dots = H.map(function (h, i) {
+      return `<circle cx="${x(i)}" cy="${y(h.ov)}" r="3.4" fill="#bf3711"/><text x="${x(i)}" y="${y(h.ov) - 9}" text-anchor="middle" font-size="11" font-family="Barlow Condensed" fill="#1b1812">${h.ov}</text><text x="${x(i)}" y="${Ht - 10}" text-anchor="middle" font-size="10" font-family="Barlow Condensed" fill="#7a7261">${h.y}</text>`;
+    }).join("");
+    const potY = y(p.pot);
+    return `<svg width="${W}" height="${Ht}" viewBox="0 0 ${W} ${Ht}" xmlns="http://www.w3.org/2000/svg">
+      <line x1="${pad}" y1="${potY}" x2="${W - pad}" y2="${potY}" stroke="#9c7c1e" stroke-dasharray="5 4" stroke-width="1.4"/>
+      <text x="${W - pad}" y="${potY - 6}" text-anchor="end" font-size="10.5" font-family="Barlow Condensed" fill="#9c7c1e">POTENCIAL ${p.pot}</text>
+      <path d="${line}" fill="none" stroke="#17563a" stroke-width="2.4"/>
+      ${dots}</svg>`;
+  }
+
+  function histHTML(p) {
+    const rows = p.career.slice().reverse().map(function (s) {
+      return `<tr><td class="tnum">${s.year}</td><td><span class="clubcell">${crest(s.clubId, "crest-20")} ${esc(s.clubName)}</span></td>
+        <td class="small">${esc(s.league)}</td><td class="num">${s.pos}º</td><td class="num">${s.j}</td>
+        <td class="num">${p.pos === "GOL" ? s.cs : s.g}</td><td class="num">${s.a}</td><td class="num">${notaPill(s.avg)}</td><td class="num tnum">${s.ov}</td></tr>`;
+    }).join("");
+    if (!rows) return '<div class="card"><div class="card-b muted center">Sua primeira temporada ainda está em andamento.</div></div>';
+    return `<div class="card"><div class="card-h"><h3>Histórico temporada a temporada</h3></div>
+      <div class="card-b tight" style="overflow-x:auto"><table class="tbl tbl-zebra">
+      <thead><tr><th>Ano</th><th>Clube</th><th>Liga</th><th class="num">Pos</th><th class="num">J</th><th class="num">${p.pos === "GOL" ? "SG" : "G"}</th><th class="num">A</th><th class="num">Nota</th><th class="num">OVR</th></tr></thead>
+      <tbody>${rows}</tbody></table></div></div>`;
+  }
+
+  function trophHTML(p) {
+    const titles = p.titles.slice().reverse().map(function (t) {
+      return `<div class="flex-b" style="padding:7px 0;border-bottom:1px dashed var(--rule-soft)"><span class="flex">${trophyIcon(t.key)} <span><b>${esc(t.name)}</b>${t.club ? `<br><span class="condsmall">pelo ${esc(t.club)}</span>` : ""}</span></span><span class="tnum muted">${t.year}</span></div>`;
+    }).join("") || '<p class="muted small">A sala de troféus ainda espera o primeiro.</p>';
+    const awards = p.awards.slice().reverse().map(function (a) {
+      return `<div class="flex-b" style="padding:7px 0;border-bottom:1px dashed var(--rule-soft)"><span class="flex">${I.star} <span>${esc(a.name)}${a.club ? `<br><span class="condsmall">no ${esc(a.club)}</span>` : ""}</span></span><span class="tnum muted">${a.year}</span></div>`;
+    }).join("") || '<p class="muted small">Nenhum prêmio individual ainda.</p>';
+    // vitrine visual de troféus
+    let room = "";
+    if (p.titles.length) {
+      const cells = p.titles.slice().reverse().map(function (t) {
+        const big = ["WC", "UCL", "LIB"].indexOf(t.key) >= 0;
+        return `<div class="trophy-cell ${big ? "big" : ""}">${trophyIcon(t.key)}<span class="tc-n">${esc(D.COMP_NAMES[t.key] || t.name)}</span><span class="tc-y">${t.year}</span></div>`;
+      }).join("");
+      room = `<div style="grid-column:1/-1"><div class="card"><div class="section-banner"><span class="sb-title">Sala de troféus</span><span class="sb-meta">${p.titles.length} ${U.plural(p.titles.length, "taça", "taças")}</span></div>
+        <div class="card-b" style="padding:0"><div class="trophy-room">${cells}</div></div></div></div>`;
+    }
+    return `<div class="cols">
+      ${room}
+      <div class="card"><div class="card-h"><h3>Títulos coletivos</h3><span class="kicker-side">${p.titles.length}</span></div><div class="card-b">${titles}</div></div>
+      <div class="card"><div class="card-h"><h3>Prêmios individuais</h3><span class="kicker-side">${p.awards.length}</span></div><div class="card-b">${awards}</div></div>
+    </div>`;
+  }
+
+  function duelHTML(G) {
+    const r = G.rival, p = G.player, h = G.h2h;
+    const rc = D.CLUBS[r.clubId];
+    const hist = (G.rivalHistory || []);
+    const histRows = hist.slice().reverse().map(function (rv) {
+      const total = rv.h2h.v + rv.h2h.e + rv.h2h.d;
+      const verdict = rv.h2h.v > rv.h2h.d ? "levou a melhor" : rv.h2h.v < rv.h2h.d ? "levou a pior" : "empate técnico";
+      return `<tr><td>${esc(rv.name)}</td><td class="small">geração ${rv.gen}</td>
+        <td class="num tnum">${rv.h2h.v}-${rv.h2h.e}-${rv.h2h.d}</td>
+        <td class="small ${rv.h2h.v > rv.h2h.d ? "green" : rv.h2h.v < rv.h2h.d ? "verm" : "muted"}">${total ? verdict : "sem duelos"}</td>
+        <td class="num tnum">${rv.careerG}</td></tr>`;
+    }).join("");
+    const histCard = hist.length ? `<div class="card"><div class="section-banner"><span class="sb-title">Rivais anteriores</span><span class="sb-meta">${hist.length} ${U.plural(hist.length, "geração", "gerações")}</span></div>
+      <div class="card-b tight" style="overflow-x:auto"><table class="tbl"><thead><tr><th>Rival</th><th>Ger.</th><th class="num">V-E-D</th><th>Balanço</th><th class="num">Gols carr.</th></tr></thead><tbody>${histRows}</tbody></table></div>
+      <p class="small muted" style="padding:8px 14px">Cada geração traz um novo desafiante. O retrospecto zera quando um rival se aposenta.</p></div>` : "";
+    return `<div class="cols">
+      <div class="card"><div class="card-h"><h3>Rival de geração</h3><span class="kicker-side">Eleito pela mídia · geração ${r.gen}</span></div>
+        <div class="card-b">
+          <div class="player-card" style="grid-template-columns:72px 1fr auto;border-width:1px">
+            <div class="player-face" style="width:72px;height:72px">${U.portraitSVG(r.name + "rival" + r.gen, 72)}</div>
+            <div><div class="pc-name" style="font-size:19px">${esc(r.name)}</div>
+            <div class="pc-sub">${crest(rc, "crest-20")} ${esc(rc.name)} · ${D.POSITIONS[r.pos].name} · ${r.age} anos</div></div>
+            <div class="ov-plate"><b>${r.overall}</b><span>OVR</span></div>
+          </div>
+          <div class="tiles mt12">
+            <div class="tile"><b class="tnum">${r.overall}</b><span>OVR (você ${p.overall})</span></div>
+            <div class="tile"><b class="tnum">${r.careerG}</b><span>Gols (você ${E().careerTotals(G).goals})</span></div>
+            <div class="tile"><b class="tnum">${r.awards.length}</b><span>Prêmios (você ${p.awards.length})</span></div>
+          </div>
+        </div></div>
+      <div class="card"><div class="card-h"><h3>Retrospecto atual</h3></div>
+        <div class="card-b center">
+          <div class="scoreline" style="grid-template-columns:1fr auto 1fr">
+            <div class="team"><span class="tname">${esc(String(p.name).split(" ")[0])}</span><b style="font-family:var(--serif);font-size:38px" class="tnum">${h.v}</b><span class="condsmall">vitórias</span></div>
+            <div class="score" style="font-size:20px;color:var(--ink-3)">${h.e}<small>empates</small></div>
+            <div class="team"><span class="tname">${esc(String(r.name).split(" ")[0])}</span><b style="font-family:var(--serif);font-size:38px" class="tnum">${h.d}</b><span class="condsmall">vitórias</span></div>
+          </div>
+          <p class="small muted mt12">Confrontos diretos em jogos de clube contra o rival atual.</p>
+        </div></div>
+      ${histCard ? '<div style="grid-column:1/-1">' + histCard + '</div>' : ""}
+    </div>`;
+  }
+
+  // taças vetoriais próprias por tipo de competição (não são réplicas oficiais)
+  function trophyIcon(key) {
+    const tier = ["WC", "UCL", "LIB"].indexOf(key) >= 0 ? "big" : ["CA", "EU", "BRA", "LIGA", "SUL", "UEL", "ESP", "ENG", "ITA", "GER", "FRA", "POR"].indexOf(key) >= 0 ? "mid" : "small";
+    const c = tier === "big" ? "var(--gold)" : tier === "mid" ? "var(--ink-2)" : "var(--ink-3)";
+    if (tier === "big") return `<svg viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="1.6" style="width:1.15em;height:1.15em"><path d="M7 3h10v4a5 5 0 01-10 0V3z"/><path d="M7 4H4v2a3 3 0 003 3M17 4h3v2a3 3 0 01-3 3M9 13h6l-1 4h-4z"/><path d="M8 21h8M12 17v4"/><circle cx="12" cy="6" r="1.4" fill="${c}" stroke="none"/></svg>`;
+    return `<svg viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="1.7"><path d="M8 4h8v4a4 4 0 01-8 0V4z"/><path d="M8 5H5v1.5A3 3 0 008 9M16 5h3v1.5A3 3 0 0116 9M10 14h4l-.5 3h-3z"/><path d="M9 21h6M12 17v4"/></svg>`;
+  }
+
+  // ---------------- TORNEIOS ----------------
+  function compsHTML() {
+    const G = g(), S = G.season;
+    const tab = CQ.state.ttab || "pano";
+    const tabs = [["pano", "Panorama"], ["cal", "Calendário"], ["liga", "Liga"], ["art", "Artilharia"]];
+    if (S.comps.EST) tabs.push(["est", "Estadual"]);
+    if (S.comps.CDB) tabs.push(["cdb", "Copa do Brasil"]);
+    if (S.comps.COPA) tabs.push(["cdb", D.LEAGUES[E().leagueOf(G, G.player.clubId)].cupName]);
+    if (S.comps.CONTI) tabs.push(["conti", S.comps.CONTI.name]);
+    if (S.sel) tabs.push(["sel", "Seleção"]);
+    tabs.push(["champ", "Campeões"]);
+    const subtabs = `<div class="subtabs">${tabs.map(function (t) {
+      return `<button class="${tab === t[0] ? "on" : ""}" onclick="CQ.ui.ttab('${t[0]}')">${esc(t[1])}</button>`;
+    }).join("")}</div>`;
+    let body = "";
+    const none = '<div class="card"><div class="card-b muted">Sua equipe não disputa esta competição nesta temporada.</div></div>';
+    if (tab === "pano") body = panoramaHTML(G);
+    else if (tab === "cal") body = calendarHTML(G);
+    else if (tab === "liga") body = leagueTableHTML(S.comps.LIGA, true);
+    else if (tab === "art") body = scorersHTML(G);
+    else if (tab === "est") body = S.comps.EST ? estHTML(S.comps.EST) : none;
+    else if (tab === "cdb") body = (S.comps.CDB || S.comps.COPA) ? cupHTML(S.comps.CDB || S.comps.COPA) : none;
+    else if (tab === "conti") body = S.comps.CONTI ? contiHTML(S.comps.CONTI) : none;
+    else if (tab === "sel") body = selHTML(S);
+    else body = champsHTML(G);
+    return subtabs + body;
+  }
+  function ttab(t) { CQ.state.ttab = t; render(); }
+
+  const COMP_ABBR = { EST: "EST", LIGA: "LIGA", BRA: "LIGA", BRB: "SÉRIE B", CDB: "COPA BR", COPA: "COPA", LIB: "LIBERT", SUL: "SULA", UCL: "UCL", UEL: "UEL", SEL: "SELEÇÃO", WC: "COPA", CA: "COPA AM", EU: "EURO" };
+  // classe de cor por competição (para diferenciar no calendário/panorama)
+  const COMP_COLOR = { EST: "c-est", LIGA: "c-liga", BRA: "c-liga", BRB: "c-serieb", CDB: "c-copa", COPA: "c-copa", LIB: "c-lib", SUL: "c-sula", UCL: "c-ucl", UEL: "c-uel", SEL: "c-sel", WC: "c-sel", CA: "c-sel", EU: "c-sel" };
+  function compTag(comp) {
+    return `<span class="cal-tag ${COMP_COLOR[comp] || ""}">${esc(COMP_ABBR[comp] || comp)}</span>`;
+  }
+  function calendarHTML(G) {
+    const sched = E().peekSchedule(G);
+    const nextIdx = sched.findIndex(function (m) { return !m.done; });
+    let played = 0, wins = 0;
+    const rows = sched.map(function (m, i) {
+      const isNext = i === nextIdx;
+      const opp = m.oppName ? esc(m.oppName) : "<span class='muted'>a definir</span>";
+      const oppCrest = m.oppId ? crest(m.oppId, "crest-20") : (m.comp === "SEL" && m.oppName ? "" : "");
+      let localTag, statusCell;
+      if (m.home === true) localTag = '<span class="cal-loc home">Casa</span>';
+      else if (m.home === false) localTag = '<span class="cal-loc away">Fora</span>';
+      else localTag = '<span class="cal-loc muted">—</span>';
+      if (m.done) {
+        played++;
+        const w = m.win, d = m.draw;
+        if (w) wins++;
+        const pill = w ? "V" : d ? "E" : "D";
+        const a = m.home ? m.gm : m.go, b = m.home ? m.go : m.gm;
+        const mine = m.plays ? notaPill(m.nota) : '<span class="cal-dnp">—</span>';
+        statusCell = `<span class="cal-res"><span class="result-pill ${pill}">${pill}</span> <b class="tnum">${a}-${b}</b></span>`;
+        return `<tr class="cal-done"><td>${compTag(m.comp)}</td><td><span class="clubcell">${oppCrest} ${opp}</span></td><td>${localTag}</td><td class="num">${statusCell}</td><td class="num">${mine}</td></tr>`;
+      }
+      statusCell = isNext ? '<span class="cal-next">Próximo</span>' : '<span class="muted small">Agendado</span>';
+      return `<tr class="${isNext ? "cal-now" : ""}"><td>${compTag(m.comp)}${m.decisive ? ' <span class="cal-dec">decisivo</span>' : ""}</td><td><span class="clubcell">${oppCrest} ${opp}</span></td><td>${localTag}</td><td class="num" colspan="2">${statusCell}</td></tr>`;
+    }).join("");
+    const upcoming = sched.length - played;
+    return `<div class="card">
+      <div class="section-banner"><span class="sb-title">Calendário da temporada</span><span class="sb-meta">${G.year}</span></div>
+      <div class="tiles" style="border-top:none;border-bottom:1px solid var(--ink)">
+        <div class="tile"><b class="tnum">${sched.length}</b><span>Jogos no ano</span></div>
+        <div class="tile"><b class="tnum">${played}</b><span>Disputados</span></div>
+        <div class="tile"><b class="tnum">${upcoming}</b><span>A jogar</span></div>
+        <div class="tile"><b class="tnum">${played ? Math.round(wins / played * 100) : 0}%</b><span>Aproveit. (V)</span></div>
+      </div>
+      <div class="card-b tight" style="overflow-x:auto"><table class="tbl">
+        <thead><tr><th>Competição</th><th>Adversário</th><th>Local</th><th class="num">Resultado</th><th class="num">Nota</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="5" class="muted center" style="padding:16px">Temporada ainda não iniciada.</td></tr>'}</tbody>
+      </table></div>
+      <p class="small muted" style="padding:8px 14px">Jogos de mata-mata mostram o adversário assim que o chaveamento é sorteado.</p>
+    </div>`;
+  }
+
+  // lista todas as competições da temporada com status e próximo confronto
+  function seasonComps(G) {
+    const S = G.season, p = G.player, out = [];
+    function pushComp(key, name, phase, nextOpp, statusTag) { out.push({ key: key, name: name, phase: phase, nextOpp: nextOpp, statusTag: statusTag }); }
+    const fx = E().currentFixture(G);
+    const nextByComp = {};
+    E().peekSchedule(G).forEach(function (m) { if (!m.done && !nextByComp[m.comp]) nextByComp[m.comp] = m; });
+    if (S.comps.EST) { const k = S.comps.EST; pushComp("EST", k.name, k.knock && k.knock.champion ? "Encerrado" : "Em disputa", nextByComp.EST, k.knock && k.knock.champion ? (k.knock.champion === E().myClub(G).name ? "campeão" : "encerrado") : "ativo"); }
+    if (S.comps.LIGA) { const tb = E().tableOf(G, S.comps.LIGA); const pos = tb.findIndex(function (t) { return t.id === p.clubId; }) + 1; pushComp("LIGA", S.comps.LIGA.name, pos ? pos + "º na tabela" : "A começar", nextByComp.LIGA, "ativo"); }
+    ["CDB", "COPA"].forEach(function (ck) { if (S.comps[ck]) { const cup = S.comps[ck]; pushComp(ck, cup.name, cup.champion ? "Campeão!" : cup.alive ? "Vivo no mata-mata" : "Eliminado", nextByComp[ck], cup.champion ? "campeão" : cup.alive ? "ativo" : "fora"); } });
+    if (S.comps.CONTI) { const C = S.comps.CONTI; pushComp("CONTI", C.name, C.champion ? "Campeão!" : C.alive ? (C.koIdx >= 0 ? "No mata-mata" : "Fase de grupos") : "Eliminado", nextByComp.CONTI, C.champion ? "campeão" : C.alive ? "ativo" : "fora"); }
+    if (S.sel) { const T = S.sel; pushComp("SEL", T.kind === "elim" ? "Eliminatórias · " + D.NATIONS[p.nat].name : T.name, T.champion ? "Campeão!" : T.eliminatedAt ? "Eliminado" : (T.kind === "elim" ? "Em disputa" : "No torneio"), nextByComp.SEL, T.champion ? "campeão" : T.eliminatedAt ? "fora" : "ativo"); }
+    return out;
+  }
+
+  function panoramaHTML(G) {
+    const comps = seasonComps(G);
+    const cards = comps.map(function (c) {
+      const badgeCls = c.statusTag === "campeão" ? "badge-gold" : c.statusTag === "fora" ? "badge-verm" : c.statusTag === "encerrado" ? "badge-soft" : "badge-green";
+      const next = c.nextOpp;
+      return `<div class="card" style="box-shadow:none">
+        <div class="card-h"><h3>${compTag(c.key === "CONTI" && G.season.comps.CONTI ? G.season.comps.CONTI.id : c.key)} ${esc(c.name)}</h3><span class="badge ${badgeCls}">${esc(c.statusTag)}</span></div>
+        <div class="card-b">
+          <div class="flex-b"><span class="condsmall">Situação</span><b class="small">${esc(c.phase)}</b></div>
+          <hr class="rule">
+          <div class="flex-b"><span class="condsmall">Próximo jogo</span>
+            <span class="small">${next ? `${next.oppName ? esc(next.oppName) : "a definir"} ${next.home === true ? "(casa)" : next.home === false ? "(fora)" : ""}` : "—"}</span></div>
+        </div></div>`;
+    }).join("");
+    return `<div class="card"><div class="section-banner"><span class="sb-title">Panorama da temporada</span><span class="sb-meta">${G.year} · ${comps.length} competições</span></div>
+      <div class="card-b"><div class="choice-grid" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr))">${cards}</div>
+      <p class="small muted mt12">Todas as competições que você disputa neste ano. Use as abas ao lado para ver tabelas, grupos, chaveamentos e o calendário completo.</p></div></div>`;
+  }
+
+  // ---------------- SORTEIO DE GRUPOS (cerimônia) ----------------
+  function pendingDraws(G) {
+    const S = G.season, draws = [];
+    if (S.comps.CONTI && S.comps.CONTI.group) {
+      const C = S.comps.CONTI;
+      draws.push({ key: C.id, name: C.name, sub: "Fase de grupos", teams: C.group.teamIds.map(function (id) { return { id: id, name: CQ.engine.oppObj(G, id).name, me: id === G.player.clubId }; }) });
+    }
+    if (S.sel && S.sel.kind !== "elim" && S.sel.groupOpps) {
+      const nat = D.NATIONS[G.player.nat];
+      const members = [nat.name].concat(S.sel.groupOpps);
+      draws.push({ key: S.sel.kind, name: S.sel.name, sub: "Fase de grupos", teams: members.map(function (n) { return { id: "nat:" + n, name: n, me: n === nat.name }; }) });
+    }
+    return draws;
+  }
+
+  function maybeDrawCeremony(G) {
+    if (G.season.drawShown) return false;
+    if (document.getElementById("cq-overlay")) return false; // aguarda fechar outro overlay
+    const draws = pendingDraws(G);
+    G.season.drawShown = true;
+    if (!draws.length) return false;
+    showDrawCeremony(draws);
+    return true;
+  }
+
+  function showDrawCeremony(draws) {
+    const cards = draws.map(function (d, di) {
+      const pots = d.teams.map(function (t, ti) {
+        return `<div class="draw-ball" style="animation-delay:${(di * d.teams.length + ti) * 0.22}s">
+          ${t.id.indexOf("nat:") === 0 ? crest(t.id, "crest-24") : crest(t.id, "crest-24")}
+          <span>${esc(t.name)}</span>${t.me ? '<b class="verm">VOCÊ</b>' : ""}</div>`;
+      }).join("");
+      return `<div class="draw-group"><div class="draw-group-h">${compTag(d.key)} ${esc(d.name)} · ${esc(d.sub)}</div>
+        <div class="draw-balls">${pots}</div></div>`;
+    }).join("");
+    overlay(`<div class="live-head"><span class="lh-comp">Sorteio dos grupos · ${g().year}</span>${I.trophy}</div>
+      <div style="padding:16px">
+        <p class="small muted mb12">As bolinhas estão saindo da urna... veja em que grupo você caiu.</p>
+        ${cards}
+        <div class="btnrow mt16"><button class="btn btn-pri btn-block btn-big" onclick="CQ.ui.closeDraw()">Bola pra frente ${I.arrowR}</button></div>
+      </div>`, true);
+  }
+  function closeDraw() { closeOverlay(); CQ.main.save(); }
+
+  function scorersHTML(G) {
+    const kind = CQ.state.artKind || "g";
+    const board = E().scoreboard(G, kind);
+    const top = board.slice(0, 14);
+    const rows = top.map(function (s, i) {
+      const cls = s.you ? "me" : s.rival ? "rival-row" : "";
+      const tag = s.you ? ' <span class="badge badge-gold">você</span>' : s.rival ? ' <span class="badge badge-soft">rival</span>' : "";
+      return `<tr class="${cls}"><td class="tnum">${i + 1}</td>
+        <td><span class="clubcell">${crest(s.clubId, "crest-20")} ${esc(s.name)}${tag}</span></td>
+        <td class="small muted">${esc(CQ.engine.oppObj(G, s.clubId).short)}</td>
+        <td class="num ${kind === "g" ? "" : "muted"}"><b>${s.g}</b></td>
+        <td class="num ${kind === "a" ? "" : "muted"}"><b>${s.a}</b></td></tr>`;
+    }).join("");
+    return `<div class="card">
+      <div class="section-banner"><span class="sb-title">${kind === "g" ? "Artilharia" : "Assistências"} · ${esc(G.season.comps.LIGA.name)}</span><span class="sb-meta">${G.year}</span></div>
+      <div class="subtabs" style="border-bottom:1px solid var(--ink);margin:0">
+        <button class="${kind === "g" ? "on" : ""}" onclick="CQ.state.artKind='g';CQ.ui.render()">Goleadores</button>
+        <button class="${kind === "a" ? "on" : ""}" onclick="CQ.state.artKind='a';CQ.ui.render()">Garçons</button>
+      </div>
+      <div class="card-b tight" style="overflow-x:auto"><table class="tbl">
+        <thead><tr><th>#</th><th>Jogador</th><th>Clube</th><th class="num">Gols</th><th class="num">Assist.</th></tr></thead>
+        <tbody>${rows}</tbody></table></div>
+      <p class="small muted" style="padding:8px 14px">Projeção ao vivo da temporada. Para levar a Chuteira de Ouro, precisa terminar em 1º — e os artilheiros da liga chegam fácil aos ${G.season.scorerTop || 25} gols.</p>
+    </div>`;
+  }
+
+  function leagueTableHTML(L, zones) {
+    const G = g();
+    const table = E().tableOf(G, L);
+    const z = zones ? E().leagueZones(G, L) : null;
+    const rows = table.map(function (t, i) {
+      const pos = i + 1;
+      let zc = "";
+      if (z) {
+        if (pos <= z.lib) zc = "z-lib";
+        else if (z.sula > 0 && pos <= z.sula) zc = "z-sula";
+        else if (pos > z.reb) zc = "z-reb";
+      }
+      const c = CQ.engine.oppObj(G, t.id);
+      return `<tr class="${t.id === G.player.clubId ? "me" : ""} ${zc}">
+        <td class="tnum">${pos}</td><td><span class="clubcell">${crest(c, "crest-20")} ${esc(c.name)}</span></td>
+        <td class="num">${t.j}</td><td class="num">${t.v}</td><td class="num">${t.e}</td><td class="num">${t.d}</td>
+        <td class="num">${t.gp - t.gc > 0 ? "+" : ""}${t.gp - t.gc}</td><td class="num"><b>${t.pts}</b></td></tr>`;
+    }).join("");
+    const legend = z ? `<div class="legend-dots">
+      <span><i class="lg-lib"></i>Zona continental principal</span>
+      ${z.sula > 0 ? '<span><i class="lg-sula"></i>Segunda vaga continental</span>' : ""}
+      <span><i class="lg-reb"></i>Rebaixamento</span></div>` : "";
+    return `<div class="card"><div class="card-h"><h3>${esc(L.name)} · ${g().year}</h3></div>
+      <div class="card-b tight" style="overflow-x:auto"><table class="tbl">
+      <thead><tr><th>#</th><th>Clube</th><th class="num">J</th><th class="num">V</th><th class="num">E</th><th class="num">D</th><th class="num">SG</th><th class="num">Pts</th></tr></thead>
+      <tbody>${rows}</tbody></table>${legend}</div></div>`;
+  }
+
+  function estHTML(est) {
+    const k = est.knock;
+    let knock = "";
+    if (k && k.sf) {
+      knock = `<div class="card mt16"><div class="card-h"><h3>Mata-mata</h3></div><div class="card-b">
+        <div class="bracket">
+          <div class="br-round"><h4>Semifinais</h4>${k.sf.map(tieHTML).join("")}</div>
+          <div class="br-round"><h4>Final</h4>${k.f ? tieHTML(k.f) : '<div class="br-tie"><div class="br-t muted">A definir</div></div>'}</div>
+        </div>
+        ${k.champion ? `<p class="mt8"><b>Campeão: ${esc(k.champion)}</b></p>` : ""}
+      </div></div>`;
+    }
+    return leagueTableHTML(est, false) + knock;
+  }
+
+  function tieHTML(t) {
+    const G = g();
+    const a = CQ.engine.oppObj(G, t.a), b = CQ.engine.oppObj(G, t.b);
+    const mine = t.a === G.player.clubId || t.b === G.player.clubId;
+    const pens = t.pens ? `<span class="condsmall">(${t.pens[0]}-${t.pens[1]} pên.)</span>` : "";
+    return `<div class="br-tie ${mine ? "mine" : ""}">
+      <div class="br-t ${t.winner === t.a ? "wn" : ""}"><span class="clubcell">${crest(a, "crest-20")} ${esc(a.short)}</span><span class="sc">${t.sa != null ? t.sa : ""}</span></div>
+      <div class="br-t ${t.winner === t.b ? "wn" : ""}"><span class="clubcell">${crest(b, "crest-20")} ${esc(b.short)}</span><span class="sc">${t.sb != null ? t.sb : ""} ${pens}</span></div>
+    </div>`;
+  }
+
+  function cupHTML(cup) {
+    if (!cup) return '<div class="card"><div class="card-b muted">Sem copa nesta temporada.</div></div>';
+    const rounds = cup.stages.map(function (st, i) {
+      const ties = st.ties ? st.ties.map(tieHTML).join("") : '<div class="br-tie"><div class="br-t muted">A definir</div></div>';
+      return `<div class="br-round"><h4>${CQ.engine.STAGE_NAMES[st.key]}</h4>${ties}</div>`;
+    }).join("");
+    const status = cup.champion ? `<p class="mt8"><b>Campeão: ${esc(cup.champion)}</b></p>`
+      : !cup.alive ? `<p class="mt8 muted">Sua equipe foi eliminada nas ${CQ.engine.STAGE_NAMES[cup.eliminatedAt] || "fases iniciais"}.</p>` : "";
+    return `<div class="card"><div class="card-h"><h3>${esc(cup.name)} · ${g().year}</h3></div>
+      <div class="card-b"><div class="bracket">${rounds}</div>${status}</div></div>`;
+  }
+
+  function contiHTML(C) {
+    const G = g();
+    const group = leagueTableHTML(C.group, false).replace("card-h\"><h3>" + esc(C.group.name), "card-h\"><h3>" + esc(C.name) + " · Grupo");
+    let ko = "";
+    const done = C.koStages.filter(function (s) { return C.koOpps[s]; });
+    if (C.koIdx >= 0 || done.length) {
+      ko = `<div class="card mt16"><div class="card-h"><h3>Mata-mata</h3></div><div class="card-b">
+        ${C.koStages.map(function (s, i) {
+        const opp = C.koOpps[s];
+        if (!opp) return "";
+        const passed = C.eliminatedAt !== s && (C.koIdx > i || C.champion);
+        const cur = C.koIdx === i && C.alive;
+        return `<div class="flex-b" style="padding:6px 0;border-bottom:1px dashed var(--rule-soft)">
+          <span class="flex">${CQ.engine.STAGE_NAMES[s]}: ${crest(opp, "crest-20")} ${esc(CQ.engine.oppObj(G, opp).name)}</span>
+          <span class="badge ${passed ? "badge-green" : cur ? "badge-gold" : "badge-verm"}">${passed ? "Superado" : cur ? "Em jogo" : "Eliminado"}</span></div>`;
+      }).join("")}
+        ${C.champion ? `<p class="mt8"><b>Campeão: ${esc(C.champion)}</b></p>` : ""}
+      </div></div>`;
+    } else if (!C.alive) {
+      ko = `<div class="notice mt12">Eliminado na fase de grupos.</div>`;
+    }
+    return group + ko;
+  }
+
+  function selHTML(S) {
+    const G = g(), T = S.sel, p = G.player, nat = D.NATIONS[p.nat];
+    if (!T) return "";
+    const title = T.kind === "elim" ? "Eliminatórias" : T.name;
+    const status = T.champion ? `<div class="notice ok">${I.trophy} CAMPEÃO! ${esc(T.name)} conquistada com a ${esc(nat.name)}!</div>`
+      : T.eliminatedAt ? `<div class="notice">Eliminado (${CQ.engine.STAGE_NAMES[T.eliminatedAt] || "grupos"}).</div>` : "";
+
+    // todos os confrontos da seleção nesta temporada (jogados + agendados)
+    const selFix = E().peekSchedule(G).filter(function (m) { return m.comp === "SEL"; });
+    const fixRows = selFix.map(function (m) {
+      if (m.done) {
+        const pill = m.win ? "V" : m.draw ? "E" : "D";
+        return `<tr><td><span class="clubcell">${m.oppName ? crest("nat:" + m.oppName, "crest-20") : ""} ${esc(m.oppName || "—")}</span></td>
+          <td class="num"><span class="cal-res"><span class="result-pill ${pill}">${pill}</span> <b class="tnum">${m.gm}-${m.go}</b></span></td>
+          <td class="num">${m.plays && m.pg ? notaPill(m.nota) : (m.plays ? notaPill(m.nota) : '<span class="muted">—</span>')}</td></tr>`;
+      }
+      return `<tr><td><span class="clubcell">${m.oppName ? crest("nat:" + m.oppName, "crest-20") : ""} ${esc(m.oppName || "<span class=muted>a definir</span>")}</span></td>
+        <td class="num muted small" colspan="2">${m.label.indexOf("Grupo") >= 0 ? "grupo" : m.label.split("·").pop().trim()} · agendado</td></tr>`;
+    }).join("") || '<tr><td colspan="3" class="muted small" style="padding:10px">Ainda sem jogos neste ciclo.</td></tr>';
+
+    // grupo (torneios) ou lista de adversários (eliminatórias)
+    let groupCard = "";
+    if (T.kind !== "elim" && T.groupOpps) {
+      const members = [nat.name].concat(T.groupOpps);
+      groupCard = `<div class="card mb12"><div class="section-banner"><span class="sb-title">Fase de grupos</span><span class="sb-meta">${esc(T.name)}</span></div>
+        <div class="card-b"><div class="choice-grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">
+          ${members.map(function (n) { return `<div class="choice" style="cursor:default"><span class="flex">${crest("nat:" + n, "crest-20")} <b>${esc(n)}</b></span>${n === nat.name ? '<small class="verm">sua seleção</small>' : ""}</div>`; }).join("")}
+        </div><p class="small muted mt8">Classificam-se os 2 primeiros do grupo (você precisa de ${4} pontos).</p></div></div>`;
+    }
+
+    return groupCard + `<div class="card"><div class="section-banner"><span class="sb-title">${esc(title)} ${g().year}</span><span class="sb-meta">${p.natTeam.caps} caps · ${p.natTeam.goals} gols pela seleção</span></div>
+      <div class="card-b">${status}</div>
+      <div class="card-b tight" style="overflow-x:auto"><table class="tbl"><thead><tr><th>Adversário</th><th class="num">Placar</th><th class="num">Nota</th></tr></thead><tbody>${fixRows}</tbody></table></div></div>`;
+  }
+
+  function champsHTML(G) {
+    const f = CQ.state.champFilter || "BRA";
+    const keys = Object.keys(G.champs).filter(function (k) { return Object.keys(G.champs[k]).length; });
+    const names = {};
+    keys.forEach(function (k) {
+      names[k] = D.COMP_NAMES[k] || (D.LEAGUES[k] ? D.LEAGUES[k].name : k);
+    });
+    const sel = `<select onchange="CQ.state.champFilter=this.value;CQ.ui.render()" style="border:1px solid var(--ink);background:#fffdf6;padding:6px 10px;font-size:14px">
+      ${keys.map(function (k) { return `<option value="${k}" ${f === k ? "selected" : ""}>${esc(names[k])}</option>`; }).join("")}</select>`;
+    const data = G.champs[f] || {};
+    const rows = Object.keys(data).sort(function (a, b) { return b - a; }).map(function (y) {
+      const isMe = data[y] === E().myClub(G).name || data[y] === D.NATIONS[G.player.nat].name;
+      return `<tr><td class="tnum">${y}</td><td><b>${esc(data[y])}</b> ${isMe && +y >= 2026 ? '<span class="badge badge-gold">com você</span>' : ""}</td></tr>`;
+    }).join("");
+    return `<div class="card"><div class="card-h"><h3>Histórico de campeões</h3>${sel}</div>
+      <div class="card-b tight"><table class="tbl tbl-zebra"><thead><tr><th>Ano</th><th>Campeão</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <p class="small muted" style="padding:8px 14px">Edições até 2025 são fatos reais; a partir de 2026, a história é escrita por você.</p></div>
+      ${hallScorersHTML(G, f)}`;
+  }
+
+  // artilheiros históricos reais da competição, com você inserido
+  function hallScorersHTML(G, key) {
+    const hall = D.HALL_SCORERS[key];
+    if (!hall) return "";
+    const p = G.player;
+    const mine = (p.compGoals && p.compGoals[key]) || 0;
+    // só entra na lista ranqueada quem já marcou; com 0 gols, você aparece separado no rodapé
+    const base = hall.list.map(function (s) { return { name: s.name, n: s.n, me: false }; });
+    const ranked = base.slice();
+    if (mine > 0) ranked.push({ name: p.name, n: mine, me: true });
+    ranked.sort(function (a, b) { return b.n - a.n; });
+    const myRank = mine > 0 ? ranked.findIndex(function (s) { return s.me; }) + 1 : null;
+    const passed = base.filter(function (s) { return s.n < mine; }).length;
+    const rows = ranked.map(function (s, i) {
+      return `<tr class="${s.me ? "me" : ""}"><td class="tnum">${i + 1}º</td><td>${esc(s.name)}${s.me ? ' <span class="badge badge-gold">você</span>' : ""}</td><td class="num"><b>${s.n}</b></td></tr>`;
+    }).join("");
+    // linha do jogador quando ainda não pontuou
+    const myFoot = mine === 0
+      ? `<tr class="me"><td class="tnum">—</td><td>${esc(p.name)} <span class="badge badge-gold">você</span></td><td class="num"><b>0</b></td></tr>`
+      : "";
+    return `<div class="card mt16"><div class="section-banner"><span class="sb-title">Artilheiros de todos os tempos</span><span class="sb-meta">${base.length} lendas · dados reais</span></div>
+      <div class="card-b tight" style="overflow-x:auto"><table class="tbl"><thead><tr><th>#</th><th>Jogador</th><th class="num">Gols</th></tr></thead><tbody>${rows}${myFoot}</tbody></table></div>
+      <p class="small muted" style="padding:8px 14px">${mine > 0 ? `Você tem <b>${mine}</b> gols nesta competição — <b>${myRank}º</b> na lista histórica de ${base.length + 1}${passed ? `, já passou ${passed} ${U.plural(passed, "lenda", "lendas")}` : ""}. ` : `Você ainda não marcou nesta competição. Comece a fazer gols para escalar a lista dos <b>${base.length}</b> maiores goleadores da história do torneio.`}</p></div>`;
+  }
+
+  // ---------------- FEED ----------------
+  function postHTML(post) {
+    let av;
+    if (post.clubAv) av = crest(post.clubAv, "");
+    else if (post.natAv && D.NATIONS[post.natAv]) av = U.natAvatar(D.NATIONS[post.natAv]);
+    else if (post.k === "voce") av = U.portraitSVG(g().player.name + g().seed, 42);
+    else if (post.k === "rival") av = U.portraitSVG(post.name + "rival", 42);
+    else {
+      const P = CQ.nar.PROFILES[post.k];
+      av = P && P.av ? P.av() : CQ.nar.PROFILES.imprensa.av();
+    }
+    const body = post.poll ? pollHTML(post) : `<div class="pbody">${esc(post.text)}</div>`;
+    return `<div class="post ${post.hot ? "hot" : ""}">
+      <div class="pavatar">${av}</div>
+      <div><div class="phead"><span class="pname">${esc(post.name)}</span><span class="phandle">${esc(post.handle || "")}</span><span class="ptag">${esc(post.tag)}</span></div>
+      ${body}
+      <div class="pmeta"><span>${I.heart} ${fmtK(post.likes)}</span><span>${I.repost} ${fmtK(post.rp)}</span><span>${post.year}</span></div></div>
+    </div>`;
+  }
+
+  function pollHTML(post) {
+    const poll = post.poll;
+    const voted = poll.voted != null;
+    const total = poll.opts.reduce(function (s, o) { return s + o.base; }, 0) || 1;
+    const opts = poll.opts.map(function (o, i) {
+      const pct = Math.round(o.base / total * 100);
+      if (voted) {
+        return `<div class="poll-opt ${poll.voted === i ? "mine" : ""}"><span class="poll-bar" style="width:${pct}%"></span><span>${esc(o.label)} <span class="poll-pct">${pct}%</span></span></div>`;
+      }
+      return `<button class="poll-opt" onclick="CQ.ui.votePoll(${post.id},${i})"><span>${esc(o.label)}</span></button>`;
+    }).join("");
+    return `<div class="pbody"><div class="poll"><div class="poll-q">${esc(poll.q)}</div>${opts}${voted ? `<span class="poll-voted-tag">Você votou · ${fmtK(total)} votos</span>` : `<span class="poll-voted-tag">Toque para votar</span>`}</div></div>`;
+  }
+  function votePoll(feedId, optIdx) {
+    const fx = CQ.nar.applyVote(g(), feedId, optIdx);
+    CQ.main.save();
+    render();
+    if (fx) {
+      const bits = [];
+      if (fx.fame) bits.push((fx.fame > 0 ? "+" : "") + fx.fame + " fama");
+      if (fx.rep) bits.push((fx.rep > 0 ? "+" : "") + fx.rep + " reputação");
+      if (fx.morale) bits.push((fx.morale > 0 ? "+" : "") + fx.morale + " moral");
+      if (bits.length) toast("Voto registrado: " + bits.join(", "));
+    }
+  }
+  function fmtK(n) { return n >= 1000 ? (n / 1000).toFixed(1).replace(".", ",") + " mil" : n; }
+
+  function feedHTML() {
+    const f = CQ.state.feedFilter || "all";
+    const openPolls = g().feed.filter(function (p) { return p.poll && p.poll.voted == null; }).length;
+    const tabs = [["all", "Tudo"], ["imprensa", "Imprensa"], ["torcida", "Torcida"], ["poll", "Enquetes" + (openPolls ? " (" + openPolls + ")" : "")]];
+    const list = g().feed.filter(function (p) {
+      if (f === "poll") return !!p.poll;
+      if (f === "all") return true;
+      if (f === "imprensa") return p.tag === "Imprensa";
+      if (f === "torcida") return p.tag === "Torcida" || p.tag === "Rival";
+      return true;
+    });
+    return `<div class="subtabs">${tabs.map(function (t) {
+      return `<button class="${f === t[0] ? "on" : ""}" onclick="CQ.state.feedFilter='${t[0]}';CQ.ui.render()">${t[1]}</button>`;
+    }).join("")}</div>
+    <div class="card" style="max-width:680px"><div class="card-b tight">${list.map(postHTML).join("") || '<div style="padding:20px" class="muted center">Silêncio nas redes... por enquanto.</div>'}</div></div>`;
+  }
+
+  // ---------------- CLUBE ----------------
+  function squadOf(G) {
+    const cl = E().myClub(G);
+    const rng = U.rngFor(G.seed, "squad", cl.id, G.year);
+    const real = D.REAL_SQUADS && D.REAL_SQUADS[cl.id];
+    if (real) {
+      return real.map(function (pl) {
+        return { name: pl.n, pos: pl.p, age: U.ri(18, 35, rng), ov: U.clamp(cl.str - 4 + U.ri(-6, 6, rng), 55, 93), real: true };
+      }).sort(function (a, b) { return b.ov - a.ov; });
+    }
+    const POSN = ["GOL", "GOL", "ZAG", "ZAG", "ZAG", "LAT", "LAT", "LAT", "VOL", "VOL", "VOL", "MEI", "MEI", "MEI", "PON", "PON", "PON", "ATA", "ATA", "ATA"];
+    return POSN.map(function (pos, i) {
+      return { name: U.nameGen(rng, "BR"), pos: pos, age: U.ri(18, 34, rng), ov: U.clamp(cl.str - 5 + U.ri(-5, 6, rng), 52, 92) };
+    }).sort(function (a, b) { return b.ov - a.ov; });
+  }
+
+  function clubHTML() {
+    const G = g(), p = G.player, cl = E().myClub(G);
+    const lg = E().leagueOf(G, p.clubId);
+    const tab = CQ.state.clubTab || "info";
+    const tabs = [["info", "Visão geral"], ["elenco", "Elenco"], ["vida", "Estilo de vida"], ["fin", "Contrato & mercado"], ["save", "Save & dados"]];
+    const subtabs = `<div class="subtabs">${tabs.map(function (t) {
+      return `<button class="${tab === t[0] ? "on" : ""}" onclick="CQ.state.clubTab='${t[0]}';CQ.ui.render()">${t[1]}</button>`;
+    }).join("")}</div>`;
+    let body = "";
+    if (tab === "info") {
+      body = `<div class="cols"><div class="stack">
+        <div class="card"><div class="card-h"><h3>${esc(cl.name)}</h3><span class="kicker-side">${D.LEAGUES[lg] ? esc(D.LEAGUES[lg].name) : lg}</span></div>
+          <div class="card-b"><div class="flex" style="align-items:flex-start">
+            ${crest(cl, "crest-48")}
+            <div style="flex:1">
+              <div class="tiles"><div class="tile"><b class="tnum">${cl.str}</b><span>Força do elenco</span></div>
+              <div class="tile"><b>${cl.uf || "—"}</b><span>Estado</span></div>
+              <div class="tile"><b class="tnum">${G.boardFail}</b><span>Metas falhadas</span></div></div>
+              <div class="notice ${G.boardFail ? "warn" : "ok"} mt12">${I.whistle} Meta da temporada: <b>${esc(G.board.desc)}</b>${G.boardFail ? " — a paciência da diretoria está curta." : ""}</div>
+              ${p.idolClubs && p.idolClubs.indexOf(p.clubId) >= 0 ? `<div class="notice ok mt8">${I.star} <b>Ídolo do ${esc(cl.name)}</b> — estátua e nome eternizado. ${p.clubGoals[p.clubId] || 0} gols com essa camisa.</div>` : `<p class="small muted mt8">Gols por este clube: <b>${p.clubGoals[p.clubId] || 0}</b>. Faça história (100 gols, ou 60 gols + 2 títulos) para virar ídolo eterno.</p>`}
+              ${p.captain === p.clubId ? `<div class="notice ok mt8">${I.trophy} <b>Capitão do ${esc(cl.name)}</b> — a braçadeira é sua.</div>` : ""}
+            </div>
+          </div></div></div>
+        <div class="card"><div class="card-h"><h3>Centro de treinamento</h3></div><div class="card-b">
+          <p class="small muted mb8">Escolha o <b>foco de treino</b>: seus pontos de evolução vão priorizar esses atributos. Boas atuações rendem mais pontos (${p.age <= 24 ? "e até os 24 o crescimento é mais rápido" : p.age <= 33 ? "evolução gradual na sua fase" : "aqui o desafio é segurar o nível"}).</p>
+          <div class="choice-grid" style="grid-template-columns:repeat(auto-fill,minmax(130px,1fr))">
+            ${[["equil", "Equilibrado", "sem prioridade"], ["ataque", "Ataque", "finalização + posição"], ["criacao", "Criação", "passe + drible"], ["atletico", "Atlético", "ritmo + físico"], ["defensivo", "Defesa", "marcação + reflexo"], ["bolaparada", "Bola parada", "faltas e pênaltis"]].map(function (f) {
+        return `<button class="choice ${G.trainingFocus === f[0] ? "sel" : ""}" onclick="CQ.ui.setFocus('${f[0]}')"><b>${f[1]}</b><small>${f[2]}</small></button>`;
+      }).join("")}
+          </div>
+          <div class="meter-lbl mt12"><span>Progresso até o próximo ponto</span><span class="tnum">${Math.round((p.xp % 1) * 100)}%</span></div>${bar((p.xp % 1) * 100, 100)}
+        </div></div>
+      </div><div class="stack">
+        ${(function () {
+        const conf = E().managerConf(G);
+        const mgr = G.manager ? G.manager.name : "—";
+        const confLbl = conf >= 75 ? "Confia cegamente em você" : conf >= 55 ? "Conta com você" : conf >= 35 ? "Ainda te avalia" : "Desconfiado — sua vaga corre risco";
+        const roleLbl = { estrela: "Estrela do time", titular: "Titular", rotacao: "Peça de rotação" }[p.squadRole] || "Titular";
+        return `<div class="card"><div class="card-h"><h3>Técnico &amp; vestiário</h3></div><div class="card-b">
+          <div class="flex" style="align-items:center;gap:12px">
+            <div class="player-face" style="width:52px;height:52px;flex-shrink:0">${U.portraitSVG("mgr" + mgr, 52)}</div>
+            <div style="flex:1;min-width:0"><b style="font-family:var(--serif);font-size:16px">${esc(mgr)}</b><div class="condsmall">Treinador · ${esc(roleLbl)}</div></div>
+          </div>
+          <div class="meter-lbl mt12"><span>Confiança do técnico</span><span class="tnum">${Math.round(conf)}%</span></div>${bar(conf, 100, conf < 40)}
+          <p class="small muted mt8">${esc(confLbl)}. A confiança sobe com boas atuações e cai quando você não rende ou fica no banco — e decide sua titularidade.</p>
+          ${p.captain === p.clubId ? `<span class="badge badge-gold mt8">${I.trophy} Capitão</span>` : ""}
+        </div></div>`;
+      })()}
+        <div class="card"><div class="card-h"><h3>Escudo personalizado</h3></div><div class="card-b">
+          <p class="small muted mb8">Não usamos logotipos oficiais. Se você tiver o escudo do clube em PNG, cole a URL (ou caminho local do arquivo) abaixo:</p>
+          <div class="field"><input type="text" id="logo-url" placeholder="https://... ou file:///C:/escudos/meu.png" value="${esc(G.customLogos[cl.id] || "")}"></div>
+          <div class="btnrow"><button class="btn btn-sm" onclick="CQ.ui.setLogo('${cl.id}')">Aplicar</button>
+          <button class="btn btn-sm btn-ghost" onclick="CQ.ui.clearLogo('${cl.id}')">Voltar ao brasão desenhado</button></div>
+        </div></div>
+      </div></div>`;
+    } else if (tab === "elenco") {
+      const rows = squadOf(G).map(function (j) {
+        return `<tr><td>${esc(j.name)}</td><td>${D.POSITIONS[j.pos].name}</td><td class="num">${j.age}</td><td class="num"><b>${j.ov}</b></td></tr>`;
+      }).join("");
+      const meRow = `<tr class="me"><td>${esc(p.name)} <span class="badge badge-gold">você</span></td><td>${D.POSITIONS[p.pos].name}</td><td class="num">${p.age}</td><td class="num"><b>${p.overall}</b></td></tr>`;
+      body = `<div class="card"><div class="card-h"><h3>Elenco ${esc(cl.name)}</h3><span class="kicker-side">nomes fictícios</span></div>
+        <div class="card-b tight" style="overflow-x:auto"><table class="tbl tbl-zebra"><thead><tr><th>Jogador</th><th>Posição</th><th class="num">Idade</th><th class="num">OVR</th></tr></thead>
+        <tbody>${meRow}${rows}</tbody></table></div>
+        <p class="small muted" style="padding:8px 14px">Se o seu overall ficar muito abaixo do nível do elenco, o técnico vai te deixar no banco — titularidade se conquista.</p></div>`;
+    } else if (tab === "vida") {
+      const inc = E().assetIncome(G);
+      const items = E().LIFESTYLE.map(function (it) {
+        const owned = p.assets.indexOf(it.key) >= 0;
+        const canBuy = !owned && p.money >= it.cost;
+        const fx = [];
+        if (it.fame) fx.push("+" + it.fame + " fama");
+        if (it.rep) fx.push("+" + it.rep + " reputação");
+        if (it.morale) fx.push("+" + it.morale + " moral");
+        if (it.income) fx.push(U.fmtBRL(it.income) + "/ano");
+        return `<div class="card" style="box-shadow:none">
+          <div class="card-b">
+            <div class="flex-b"><b style="font-family:var(--serif);font-size:16px">${esc(it.name)}</b>${owned ? '<span class="badge badge-green">adquirido</span>' : `<b class="tnum small">${U.fmtBRL(it.cost)}</b>`}</div>
+            <p class="small muted" style="margin:4px 0 8px">${esc(it.desc)}</p>
+            <div class="flex-b wrap"><span class="condsmall">${fx.join(" · ")}</span>
+            ${owned ? "" : `<button class="btn btn-sm ${canBuy ? "btn-pri" : ""}" ${canBuy ? "" : "disabled"} onclick="CQ.ui.buyAsset('${it.key}')">Comprar</button>`}</div>
+          </div></div>`;
+      }).join("");
+      body = `<div class="card"><div class="section-banner"><span class="sb-title">Estilo de vida &amp; negócios</span><span class="sb-meta">Patrimônio ${U.fmtBRL(p.money)}</span></div>
+        <div class="tiles" style="border-top:none;border-bottom:1px solid var(--ink)">
+          <div class="tile"><b class="tnum">${U.fmtBRL(p.money)}</b><span>Disponível</span></div>
+          <div class="tile"><b class="tnum">${inc ? U.fmtBRL(inc) : "—"}</b><span>Renda passiva/ano</span></div>
+          <div class="tile"><b class="tnum">${p.assets.length}</b><span>Bens & negócios</span></div>
+        </div>
+        <div class="card-b"><div class="choice-grid" style="grid-template-columns:repeat(auto-fill,minmax(230px,1fr))">${items}</div>
+        <p class="small muted mt12">Alguns bens dão fama/reputação na hora; negócios geram renda passiva creditada a cada fim de temporada. O dinheiro finalmente serve pra algo.</p></div>
+      </div>`;
+    } else if (tab === "fin") {
+      const yearsLeft = Math.max(0, p.contractEnd - G.year);
+      const canEurope = p.overall >= 77 || p.fame >= 62;
+      const transferPanel = G.transferRequested
+        ? `<div class="notice warn mb8">${I.arrowR} Pedido de transferência entregue à diretoria. Ao fim da temporada, propostas de outros clubes vão aparecer no mercado da bola.</div>
+           <button class="btn btn-ghost" onclick="CQ.ui.cancelTransfer()">Voltar atrás — quero ficar</button>`
+        : `<p class="small muted mb8">Quer mudar de ares? Você pode pedir para deixar o clube. Isso <b>garante que propostas apareçam ao fim da temporada</b> (mesmo com contrato em vigor) — mas mexe com a sua moral e com a diretoria.</p>
+           <button class="btn" onclick="CQ.ui.requestTransfer()">Pedir para deixar o clube</button>`;
+      body = `<div class="cols"><div class="stack">
+        <div class="card"><div class="card-h"><h3>Contrato atual</h3></div><div class="card-b">
+          <div class="flex mb8">${crest(cl, "crest-34")}<div><b style="font-family:var(--serif);font-size:18px">${esc(cl.name)}</b><div class="condsmall">${D.LEAGUES[lg] ? esc(D.LEAGUES[lg].name) : lg}</div></div></div>
+          <div class="tiles">
+            <div class="tile"><b class="tnum">${U.fmtBRL(p.salary)}</b><span>Salário mensal</span></div>
+            <div class="tile"><b class="tnum">${p.contractEnd}</b><span>Vínculo até</span></div>
+            <div class="tile"><b>${{ estrela: "Estrela", titular: "Titular", rotacao: "Rotação" }[p.squadRole] || "Titular"}</b><span>Papel no elenco</span></div>
+          </div>
+          <p class="small muted mt12">${p.squadRole === "estrela" ? "Como estrela do time, você tem prioridade na escalação." : p.squadRole === "rotacao" ? "Como peça de rotação, precisa brigar por minutos." : "Como titular, mantém a vaga com bom desempenho."} ${canEurope ? "Sua fama já abre portas na Europa." : "Ganhe fama e overall para atrair clubes maiores."}</p>
+        </div></div>
+        <div class="card"><div class="card-h"><h3>Patrimônio</h3></div><div class="card-b">
+          <div class="tiles">
+            <div class="tile"><b class="tnum">${U.fmtBRL(p.money)}</b><span>Acumulado</span></div>
+            <div class="tile"><b class="tnum">${U.fmtBRL(p.salary * 12)}</b><span>Por ano (base)</span></div>
+          </div>
+          <p class="small muted mt12">Cresce com salários, luvas de transferência, bônus de metas (${U.fmtBRL(400000)}) e premiações.</p>
+        </div></div>
+      </div><div class="stack">
+        <div class="card"><div class="card-h"><h3>Pedido de transferência</h3></div><div class="card-b">${transferPanel}</div></div>
+        <div class="card"><div class="card-h"><h3>Como funciona o mercado</h3></div><div class="card-b">
+          <p class="small muted">Ao fim de cada temporada, se o contrato terminar, se você for dispensado ou se pedir para sair, chega o <b>mercado da bola</b>: 2 a 4 propostas reais (com salário e duração) e a opção de renovar. Fama alta destrava ofertas da Europa.</p>
+        </div></div>
+      </div></div>`;
+    } else {
+      body = `<div class="card"><div class="card-h"><h3>Save &amp; dados</h3></div><div class="card-b">
+        <p class="small muted mb12">Seu progresso é salvo automaticamente no navegador. Exporte um arquivo de backup para não perder a carreira.</p>
+        <div class="btnrow">
+          <button class="btn btn-green" onclick="CQ.main.exportSave()">Exportar save (.json)</button>
+          <button class="btn" onclick="CQ.main.importSave()">Importar save</button>
+          <button class="btn btn-ghost" onclick="CQ.main.resetGame()">Apagar carreira</button>
+        </div>
+      </div></div>`;
+    }
+    return subtabs + body;
+  }
+
+  function setLogo(clubId) {
+    const v = U.cleanInput($("#logo-url").value, 300);
+    if (v) g().customLogos[clubId] = v; else delete g().customLogos[clubId];
+    CQ.main.save(); render();
+  }
+  function clearLogo(clubId) {
+    delete g().customLogos[clubId];
+    CQ.main.save(); render();
+  }
+  function requestTransfer() {
+    E().requestTransfer(g());
+    CQ.nar.post(g(), "imprensa", g().player.name + " pede para deixar o " + E().myClub(g()).name + ". O estafe do jogador já negocia uma saída para o fim da temporada.", { hot: true });
+    CQ.main.save(); render();
+    toast("Pedido de transferência entregue à diretoria.");
+  }
+  function cancelTransfer() {
+    E().cancelTransfer(g());
+    CQ.main.save(); render();
+    toast("Pedido retirado. Você segue no clube.");
+  }
+  function setFocus(f) {
+    g().trainingFocus = f;
+    CQ.main.save(); render();
+  }
+  function buyAsset(key) {
+    const ok = E().buyAsset(g(), key);
+    if (!ok) { toast("Patrimônio insuficiente."); return; }
+    const it = E().LIFESTYLE.find(function (x) { return x.key === key; });
+    CQ.main.save(); render();
+    toast(esc(it.name) + " adquirido!");
+    if (it.fame >= 10 || it.rep >= 10) CQ.nar.post(g(), "imprensa", g().player.name + " investe em " + it.name.toLowerCase() + " e vira assunto fora de campo.");
+  }
+
+  // avalia o legado da carreira (tier + pontuação)
+  function careerLegacy(p) {
+    const tot = E().careerTotals(g());
+    const bolas = p.awards.filter(function (a) { return a.name === "Bola de Ouro"; }).length;
+    const wc = p.titles.filter(function (t) { return t.key === "WC"; }).length;
+    const ucl = p.titles.filter(function (t) { return t.key === "UCL" || t.key === "LIB"; }).length;
+    let score = tot.goals * 1.2 + tot.assists * 0.8 + p.titles.length * 8 + p.awards.length * 6 + bolas * 40 + wc * 30 + ucl * 15 + p.natTeam.caps * 0.5;
+    score = Math.round(score);
+    let tier;
+    if (bolas >= 3 || (wc >= 1 && bolas >= 1) || score >= 900) tier = { t: "LENDA IMORTAL", d: "Seu nome entra para o panteão dos maiores de todos os tempos. Gerações vão contar suas histórias." };
+    else if (bolas >= 1 || score >= 600) tier = { t: "CRAQUE HISTÓRICO", d: "Um dos melhores da sua era. A bola sentiu sua falta no dia da despedida." };
+    else if (p.titles.length >= 5 || score >= 380) tier = { t: "GRANDE ÍDOLO", d: "Vitorioso e querido. Sua camisa vira relíquia nas arquibancadas." };
+    else if (p.titles.length >= 1 || score >= 200) tier = { t: "JOGADOR RESPEITADO", d: "Uma carreira sólida, com dias de glória que ninguém vai esquecer." };
+    else tier = { t: "CARREIRA PROFISSIONAL", d: "Viveu do futebol e deixou sua marca por onde passou. Missão cumprida." };
+    tier.score = score; tier.bolas = bolas;
+    return tier;
+  }
+
+  // ---------------- aposentadoria ----------------
+  function retroHTML() {
+    const G = g(), p = G.player;
+    const totalJ = p.career.reduce(function (s, c) { return s + c.j; }, 0);
+    const totalG = p.career.reduce(function (s, c) { return s + c.g; }, 0);
+    const totalA = p.career.reduce(function (s, c) { return s + c.a; }, 0);
+    const clubs = [];
+    p.career.forEach(function (c) { if (clubs.indexOf(c.clubName) < 0) clubs.push(c.clubName); });
+    const leg = careerLegacy(p);
+    const idols = p.idolClubs && p.idolClubs.length ? p.idolClubs : [];
+    return `<div class="trophy-banner" style="border:2px solid var(--gold)">
+      <div class="tb-k">Edição histórica · aposentadoria</div>
+      <h2>${esc(p.name)} pendura as chuteiras</h2>
+      <p class="mt8 muted">${p.age} anos · ${p.career.length} temporadas como profissional</p>
+    </div>
+    <div class="card mt16" style="border:2px solid var(--gold)"><div class="card-b center">
+      <div class="tb-k gold" style="font-family:var(--cond);letter-spacing:.2em;text-transform:uppercase;font-size:12px">Veredito da carreira</div>
+      <h2 style="font-size:30px;font-style:italic;margin:6px 0">${leg.t}</h2>
+      <p class="muted" style="max-width:560px;margin:0 auto">${leg.d}</p>
+      ${leg.bolas ? `<p class="mt8"><span class="badge badge-gold">${leg.bolas}× Bola de Ouro</span></p>` : ""}
+      ${idols.length ? `<p class="small mt8">Eternizado como <b>ídolo</b> de: ${idols.map(function (id) { return esc(D.CLUBS[id] ? D.CLUBS[id].name : id); }).join(", ")} — com estátua e nome na história do clube.</p>` : ""}
+    </div></div>
+    <div class="cols mt16">
+      <div class="stack">
+        <div class="card"><div class="card-h"><h3>Números da carreira</h3></div><div class="card-b">
+          <div class="tiles">
+            <div class="tile"><b class="tnum">${totalJ}</b><span>Jogos</span></div>
+            <div class="tile"><b class="tnum">${p.pos === "GOL" ? p.career.reduce(function (s, c) { return s + c.cs; }, 0) : totalG}</b><span>${p.pos === "GOL" ? "Jogos sem sofrer" : "Gols"}</span></div>
+            <div class="tile"><b class="tnum">${totalA}</b><span>Assistências</span></div>
+            <div class="tile"><b class="tnum">${p.titles.length}</b><span>Títulos</span></div>
+            <div class="tile"><b class="tnum">${p.awards.length}</b><span>Prêmios</span></div>
+            <div class="tile"><b class="tnum">${U.fmtBRL(p.money)}</b><span>Patrimônio</span></div>
+          </div>
+          <p class="small muted mt12">Clubes defendidos: ${clubs.map(esc).join(", ") || esc(E().myClub(G).name)}.</p>
+        </div></div>
+        ${trophHTML(p)}
+      </div>
+      <div class="stack">
+        ${histHTML(p)}
+        <div class="card"><div class="card-b center">
+          <button class="btn btn-pri btn-big" onclick="CQ.main.resetToCover()">Começar nova carreira</button>
+        </div></div>
+      </div>
+    </div>`;
+  }
+
+  CQ.ui = {
+    go: go, render: render, startCreate: startCreate,
+    dset: dset, dsetPos: dsetPos, toggleLegend: toggleLegend, randomClub: randomClub,
+    createNext: createNext, finishCreate: finishCreate,
+    actionPlay: actionPlay, actionRest: actionRest, actionSim: actionSim,
+    liveStep: liveStep, liveDecide: liveDecide, shootPick: shootPick, shootReveal: shootReveal, finishLive: finishLive,
+    pickInterview: pickInterview, pickLife: pickLife,
+    seasonEndFlow: seasonEndFlow, summaryNext: summaryNext, pickOffer: pickOffer, pickRenew: pickRenew,
+    ctab: ctab, ttab: ttab, closeTitle: closeTitle, closeDraw: closeDraw, closeCapa: closeCapa, votePoll: votePoll,
+    setLogo: setLogo, clearLogo: clearLogo, toast: toast,
+    requestTransfer: requestTransfer, cancelTransfer: cancelTransfer,
+    setFocus: setFocus, buyAsset: buyAsset
+  };
+})();
