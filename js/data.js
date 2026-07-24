@@ -332,7 +332,8 @@ window.CQ = window.CQ || {};
     BRA: "Brasileirão Série A", BRB: "Brasileirão Série B", CDB: "Copa do Brasil", LIB: "Libertadores",
     SUL: "Sul-Americana", UCL: "Champions League", UEL: "Europa League", WC: "Copa do Mundo",
     CA: "Copa América", EU: "Eurocopa", GC: "Copa Ouro", AC: "Copa da Ásia", EST: "Estadual",
-    LIGA: "Liga nacional", COPA: "Copa nacional", SEL: "Seleção"
+    LIGA: "Liga nacional", COPA: "Copa nacional", SEL: "Seleção",
+    MUN: "Mundial de Clubes", SUPER: "Supermundial"
   };
 
   // Maiores artilheiros HISTÓRICOS (dados factuais — gols acumulados na competição).

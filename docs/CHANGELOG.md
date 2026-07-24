@@ -346,6 +346,33 @@ faltavam jogos de eliminatórias.
   (baseado no clube) continua igual para quem não se destacou pela seleção.
 - Regressão: **23/23**.
 
+## Nova competição — Mundial de Clubes + Supermundial
+Pedido: ganhar a Libertadores (ou Champions) deveria abrir o Mundial de Clubes, e também
+queria o "Supermundial" — confirmado com o jogador que são duas coisas diferentes, no
+espírito das duas competições reais que a FIFA passou a ter: a Copa Intercontinental
+(pequena, anual) e o novo Mundial de Clubes 2025+ (grande, a cada 4 anos).
+- **Mundial de Clubes** (`js/engine.js` · `buildMundialCycle`): sempre que o clube atual do
+  jogador vence Libertadores ou Champions numa temporada, a temporada seguinte inclui um
+  **confronto único** (estilo Intercontinental pré-2000) contra o campeão simulado do outro
+  lado do mundo (LIB→adversário é o campeão da UCL daquele ano, e vice-versa). Pênaltis em
+  caso de empate. Só conta se o título foi ganho **neste mesmo clube** — não segue o jogador
+  se ele transferir depois de ser campeão (o convite é do clube).
+- **Supermundial** (torneio grande e raro): a cada 4 anos (2029, 2033, ...), se o clube tiver
+  vencido Libertadores/Champions em algum dos últimos 4 anos, disputa um torneio de verdade —
+  grupo de 4 (3 adversários) + mata-mata completo (oitavas/quartas/semi/final), com clubes de
+  todas as confederações (Américas + Europa). Chaveamento por blocos disjuntos, igual às
+  outras competições continentais/seleção (sem ressuscitar eliminado).
+- **Prêmios:** título dá fama, dinheiro (Supermundial paga mais que qualquer coisa do jogo —
+  R$ 4M — maior que a própria Copa do Mundo) e pontua alto na Bola de Ouro (Supermundial 50,
+  Mundial 26 — acima até de Libertadores/Champions isolados).
+- Aparecem no calendário com cor dourada própria (`c-mun`) e entram automaticamente na sala
+  de troféus / lista de títulos (ícone grande, junto com Copa do Mundo/Champions/Libertadores).
+- Validado por simulação: Mundial de Clubes testado nos dois desfechos (vitória → título,
+  fama e bônus aplicados; derrota → sem título, sem crash); Supermundial testado com grupo +
+  mata-mata completo até a final, título aplicado corretamente; e também o caso de cair na
+  fase de grupos (elimina sem título, igual a um torneio de seleção de verdade).
+- Regressão: **23/23**.
+
 ## Próximos passos (fase seguinte — Mundo Real 2026)
 1. Terminar a sincronização de elencos europeus (Alemanha, França, Portugal, resto da
    Itália — 59 clubes, mecanismo já pronto em `scripts/sync-squads.mjs`).

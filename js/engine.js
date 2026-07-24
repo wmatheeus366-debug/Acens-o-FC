@@ -174,7 +174,7 @@ window.CQ = window.CQ || {};
     const y = g.year;
     let titleBonus = 0;
     p.titles.filter(function (t) { return t.year === y; }).forEach(function (t) {
-      titleBonus += ({ WC: 45, UCL: 30, LIB: 24, EU: 18, CA: 18, BRA: 12, LIGA: 12, CDB: 6, COPA: 6, EST: 2 }[t.key] || 4);
+      titleBonus += ({ SUPER: 50, WC: 45, UCL: 30, MUN: 26, LIB: 24, EU: 18, CA: 18, BRA: 12, LIGA: 12, CDB: 6, COPA: 6, EST: 2 }[t.key] || 4);
     });
     let s = p.stats.g * 1.25 + p.stats.a * 0.75 + Math.max(0, avg - 6.8) * 15 + p.fame * 0.25 + titleBonus + (p.overall - 80) * 3;
     if (p.pos === "GOL") s += p.stats.cs * 1.6; // goleiros pontuam por clean sheets
@@ -308,6 +308,8 @@ window.CQ = window.CQ || {};
     }
     // seleção
     buildNationalCycle(g, S, rngS);
+    // Mundial de Clubes / Supermundial (se aplicável)
+    buildMundialCycle(g, S);
     // artilheiros NPC da liga (corrida do goleador)
     buildScorers(g, S, lg);
     // técnico do clube (com regressão de confiança à média a cada ano)
@@ -515,6 +517,62 @@ window.CQ = window.CQ || {};
   function strengthRank(g, lg, clubId) {
     const ids = leagueTeamIds(g, lg).slice().sort(function (a, b) { return D.CLUBS[b].str - D.CLUBS[a].str; });
     return ids.indexOf(clubId) + 1;
+  }
+
+  // ---------- Mundial de Clubes / Supermundial ----------
+  // clube (com id de verdade) que "ganhou" a outra competição continental naquele ano —
+  // usado para achar o adversário do Mundial de Clubes (não dá pra usar g.champs porque
+  // lá só fica guardado o NOME do campeão, não o id do clube).
+  function pickContiChampionClub(g, contiId, year) {
+    const rng = U.rngFor(g.seed, "mundialopp", contiId, year);
+    const pool = contiId === "LIB"
+      ? D.clubsOf("SAM").concat(D.clubsOf("BRA").filter(function (c) { return c.str >= 80; }))
+      : D.EURO_LEAGUES.reduce(function (acc, l) { return acc.concat(D.clubsOf(l).filter(function (c) { return c.str >= 84; })); }, []);
+    return pickWeighted(pool, rng);
+  }
+
+  function buildMundialCycle(g, S) {
+    const p = g.player, y = g.year;
+    const myClubName = myClub(g).name;
+    const contiKeys = ["LIB", "UCL"];
+    // só conta título ganho enquanto já estava NESTE clube (o convite é do clube, não segue
+    // o jogador se ele for pra outro time depois de ser campeão)
+    const wonLastSeason = p.titles.find(function (t) { return t.year === y - 1 && contiKeys.indexOf(t.key) >= 0 && t.club === myClubName; });
+    const isSuperYear = (y - 2029) % 4 === 0;
+    const recentContiWin = p.titles.some(function (t) { return t.year >= y - 4 && t.year <= y - 1 && contiKeys.indexOf(t.key) >= 0 && t.club === myClubName; });
+
+    if (isSuperYear && recentContiWin) {
+      // Supermundial: torneio grande e raro (a cada 4 anos), clubes de todas as confederações
+      const rng = U.rngFor(g.seed, "super", y);
+      const bigPool = D.clubsOf("SAM")
+        .concat(D.clubsOf("BRA").filter(function (c) { return c.id !== p.clubId && c.str >= 78; }))
+        .concat(D.EURO_LEAGUES.reduce(function (acc, l) { return acc.concat(D.clubsOf(l).filter(function (c) { return c.id !== p.clubId && c.str >= 78; })); }, []));
+      const bigIds = bigPool.map(function (c) { return c.id; });
+      const groupOpps = U.shuffle(bigIds, rng).slice(0, 3);
+      const at = Math.floor(S.queue.length * 0.5);
+      const block = groupOpps.map(function (o, i) {
+        return { comp: "SUPER", phase: "G", n: i + 1, opp: o, home: i !== 2 };
+      });
+      const koKeys = ["R16", "QF", "SF", "F"];
+      koKeys.forEach(function (k) { block.push({ comp: "SUPER", phase: "KO", stage: k }); });
+      S.queue.splice.apply(S.queue, [at, 0].concat(block));
+      const koSize = Math.pow(2, koKeys.length);
+      const others = U.shuffle(bigIds, U.rngFor(g.seed, "superkoteams", y)).filter(function (o) { return groupOpps.indexOf(o) < 0; });
+      const koTeams = [p.clubId];
+      let oi = 0;
+      while (koTeams.length < koSize) { koTeams.push(others[oi++] || bigIds[oi % bigIds.length]); }
+      S.super = { name: "Supermundial", groupPts: 0, groupOpps: groupOpps, alive: true, groupDone: false, koKeys: koKeys, koTeams: koTeams, record: [], eliminatedAt: null, champion: null };
+    } else if (wonLastSeason) {
+      // Mundial de Clubes: confronto único (estilo Intercontinental pré-2000) contra o
+      // campeão da outra competição continental
+      const oppConti = wonLastSeason.key === "LIB" ? "UCL" : "LIB";
+      const oppClub = pickContiChampionClub(g, oppConti, y - 1);
+      const homeRng = U.rngFor(g.seed, "mundialhome", y);
+      const home = U.chance(0.5, homeRng);
+      const at = Math.max(1, Math.floor(S.queue.length * 0.04));
+      S.queue.splice(at, 0, { comp: "MUN", opp: oppClub.id, home: home });
+      S.mundial = { opp: oppClub.id, done: false, champion: null };
+    }
   }
 
   function cupField(g, rngS) {
@@ -857,6 +915,31 @@ window.CQ = window.CQ || {};
       const home = stageIdx % 2 === 0;
       return mkNatFix(g, T.kind, T.name + " · " + STAGE_NAMES[slot.stage], oppTeam, home, { decisive: true, sel: "tourKO", stage: slot.stage });
     }
+    if (slot.comp === "MUN") {
+      const M = S.mundial;
+      if (!M || M.done) return null;
+      const pair = slot.home ? [p.clubId, slot.opp] : [slot.opp, p.clubId];
+      return mkFix(g, "MUN", "Mundial de Clubes · Confronto único", pair, { decisive: true, knock: true });
+    }
+    if (slot.comp === "SUPER") {
+      const T = S.super;
+      if (!T) return null;
+      if (slot.phase === "G") {
+        if (!T.alive) return null;
+        const pair = slot.home ? [p.clubId, slot.opp] : [slot.opp, p.clubId];
+        return mkFix(g, "SUPER", "Supermundial · Grupo, jogo " + slot.n, pair, { decisive: true, superPhase: "G", n: slot.n });
+      }
+      if (!T.alive) return null;
+      const koKeys = T.koKeys;
+      if (slot.stage === koKeys[0] && T.groupDone !== true) {
+        T.groupDone = true;
+        if (T.groupPts < 4) { T.alive = false; T.eliminatedAt = "G"; return null; }
+      }
+      const stageIdx = koKeys.indexOf(slot.stage);
+      const oppId = bracketOpp(g, T.koTeams, stageIdx, "superbracket");
+      const home = stageIdx % 2 === 0;
+      return mkFix(g, "SUPER", "Supermundial · " + STAGE_NAMES[slot.stage], home ? [p.clubId, oppId] : [oppId, p.clubId], { stage: slot.stage, knock: true, decisive: true, superPhase: "KO", ko: slot.ko });
+    }
     return null;
   }
 
@@ -1105,6 +1188,18 @@ window.CQ = window.CQ || {};
     } else if (fx.compKey === "CONTI" || (S.comps.CONTI && fx.compKey === S.comps.CONTI.id && fx.phase === "G")) {
       recordLeagueResult(g, S.comps.CONTI.group, fx, res);
       ensureRound(g, S.comps.CONTI.group, fx.round);
+    } else if (fx.compKey === "MUN") {
+      const M = S.mundial;
+      if (M) {
+        M.done = true;
+        if (advanced) { winTitle(g, "MUN", "Mundial de Clubes"); M.champion = myClub(g).name; }
+      }
+    } else if (fx.superPhase === "KO") {
+      const T = S.super;
+      if (advanced === false) { T.alive = false; T.eliminatedAt = fx.stage; }
+      else if (fx.stage === "F") { T.champion = myClub(g).name; T.alive = false; winTitle(g, "SUPER", "Supermundial"); }
+    } else if (fx.superPhase === "G") {
+      S.super.groupPts += res.win ? 3 : res.draw ? 1 : 0;
     } else if (fx.isNatMatch) {
       applyNatMatch(g, res);
     }
@@ -1223,9 +1318,9 @@ window.CQ = window.CQ || {};
     const isNat = ["WC", "CA", "EU", "GC", "AC"].indexOf(key) >= 0;
     const withName = isNat ? D.NATIONS[p.nat].name : myClub(g).name;
     p.titles.push({ year: g.year, key: key, name: name, club: withName });
-    p.fame = U.clamp(p.fame + ({ WC: 15, UCL: 12, LIB: 10, CA: 8, EU: 8, LIGA: 8, BRA: 8, CDB: 6, COPA: 5, EST: 3 }[key] || 5), 0, 100);
+    p.fame = U.clamp(p.fame + ({ SUPER: 22, WC: 15, MUN: 13, UCL: 12, LIB: 10, CA: 8, EU: 8, LIGA: 8, BRA: 8, CDB: 6, COPA: 5, EST: 3 }[key] || 5), 0, 100);
     p.morale = U.clamp(p.morale + 12, 5, 100);
-    const bonus = ({ WC: 2500000, UCL: 2000000, LIB: 1200000, BRA: 900000, LIGA: 900000, CDB: 500000, COPA: 400000, CA: 800000, EU: 800000, EST: 150000 }[key] || 300000);
+    const bonus = ({ SUPER: 4000000, WC: 2500000, UCL: 2000000, MUN: 1500000, LIB: 1200000, BRA: 900000, LIGA: 900000, CDB: 500000, COPA: 400000, CA: 800000, EU: 800000, EST: 150000 }[key] || 300000);
     p.money += bonus;
     g.season.lastTitle = { key: key, name: name, bonus: bonus };
   }

@@ -1283,7 +1283,7 @@ window.CQ = window.CQ || {};
 
   // taças vetoriais próprias por tipo de competição (não são réplicas oficiais)
   function trophyIcon(key) {
-    const tier = ["WC", "UCL", "LIB"].indexOf(key) >= 0 ? "big" : ["CA", "EU", "BRA", "LIGA", "SUL", "UEL", "ESP", "ENG", "ITA", "GER", "FRA", "POR"].indexOf(key) >= 0 ? "mid" : "small";
+    const tier = ["SUPER", "MUN", "WC", "UCL", "LIB"].indexOf(key) >= 0 ? "big" : ["CA", "EU", "BRA", "LIGA", "SUL", "UEL", "ESP", "ENG", "ITA", "GER", "FRA", "POR"].indexOf(key) >= 0 ? "mid" : "small";
     const c = tier === "big" ? "var(--gold)" : tier === "mid" ? "var(--ink-2)" : "var(--ink-3)";
     if (tier === "big") return `<svg viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="1.6" style="width:1.15em;height:1.15em"><path d="M7 3h10v4a5 5 0 01-10 0V3z"/><path d="M7 4H4v2a3 3 0 003 3M17 4h3v2a3 3 0 01-3 3M9 13h6l-1 4h-4z"/><path d="M8 21h8M12 17v4"/><circle cx="12" cy="6" r="1.4" fill="${c}" stroke="none"/></svg>`;
     return `<svg viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="1.7"><path d="M8 4h8v4a4 4 0 01-8 0V4z"/><path d="M8 5H5v1.5A3 3 0 008 9M16 5h3v1.5A3 3 0 0116 9M10 14h4l-.5 3h-3z"/><path d="M9 21h6M12 17v4"/></svg>`;
@@ -1318,9 +1318,9 @@ window.CQ = window.CQ || {};
   }
   function ttab(t) { CQ.state.ttab = t; render(); }
 
-  const COMP_ABBR = { EST: "EST", LIGA: "LIGA", BRA: "LIGA", BRB: "SÉRIE B", CDB: "COPA BR", COPA: "COPA", LIB: "LIBERT", SUL: "SULA", UCL: "UCL", UEL: "UEL", SEL: "SELEÇÃO", WC: "COPA", CA: "COPA AM", EU: "EURO" };
+  const COMP_ABBR = { EST: "EST", LIGA: "LIGA", BRA: "LIGA", BRB: "SÉRIE B", CDB: "COPA BR", COPA: "COPA", LIB: "LIBERT", SUL: "SULA", UCL: "UCL", UEL: "UEL", SEL: "SELEÇÃO", WC: "COPA", CA: "COPA AM", EU: "EURO", MUN: "MUNDIAL", SUPER: "SUPERMUNDIAL" };
   // classe de cor por competição (para diferenciar no calendário/panorama)
-  const COMP_COLOR = { EST: "c-est", LIGA: "c-liga", BRA: "c-liga", BRB: "c-serieb", CDB: "c-copa", COPA: "c-copa", LIB: "c-lib", SUL: "c-sula", UCL: "c-ucl", UEL: "c-uel", SEL: "c-sel", WC: "c-sel", CA: "c-sel", EU: "c-sel" };
+  const COMP_COLOR = { EST: "c-est", LIGA: "c-liga", BRA: "c-liga", BRB: "c-serieb", CDB: "c-copa", COPA: "c-copa", LIB: "c-lib", SUL: "c-sula", UCL: "c-ucl", UEL: "c-uel", SEL: "c-sel", WC: "c-sel", CA: "c-sel", EU: "c-sel", MUN: "c-mun", SUPER: "c-mun" };
   function compTag(comp) {
     return `<span class="cal-tag ${COMP_COLOR[comp] || ""}">${esc(COMP_ABBR[comp] || comp)}</span>`;
   }

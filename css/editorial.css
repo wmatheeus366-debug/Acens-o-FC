@@ -460,6 +460,7 @@ main.page, .cover { animation: pageIn 0.26s ease both; }
 .cal-tag.c-ucl   { border-left-color: #1b2a6b; }
 .cal-tag.c-uel   { border-left-color: #d97a1e; }
 .cal-tag.c-sel   { border-left-color: #c9a227; }
+.cal-tag.c-mun   { border-left-color: var(--gold); }
 :root[data-theme="dark"] .cal-tag.c-ucl { border-left-color: #6b7ad0; }
 
 /* ================= MODAIS REPAGINADOS (eventos / entrevistas) ================= */
