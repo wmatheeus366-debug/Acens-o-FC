@@ -326,6 +326,26 @@ vetorial de reserva (espaço em branco).
   cai corretamente no vetor procedural.
 - Regressão: **23/23**.
 
+## Seleção: mais eliminatórias + boa campanha protege a convocação
+Reportado: uma boa temporada pela seleção não impedia o corte na temporada seguinte, e
+faltavam jogos de eliminatórias.
+- **Mais eliminatórias** (`js/engine.js` · `buildNationalCycle`): de **2 janelas de 2 jogos
+  (4/ano)** para **4 janelas de 2 jogos (8/ano)**. Pool de adversários agora repete de forma
+  segura quando a confederação tem poucas seleções disponíveis (CONCACAF/AFC, só 7-8
+  nações) — testado isoladamente, sem `undefined` nem travar.
+- **Convocação passa a considerar o desempenho PELA seleção** (`endSeason`): antes, o corte
+  olhava só overall/nota do CLUBE — uma campanha ótima nas eliminatórias não segurava a vaga
+  se o clube tivesse ano fraco. Agora, quem já estava convocado e teve uma temporada forte
+  pela seleção (≥2 jogos, ≥2 gols+assistências somando eliminatórias/torneio) mantém a vaga
+  com um critério de overall mais largo — **sem depender de lesão**, porque uma contusão
+  sofrida nas últimas rodadas (dura 3-8 jogos) não tem relação com o quanto a campanha foi
+  boa e não deveria zerar a temporada inteira.
+- Validado por simulação (473 amostras de temporadas já convocadas): **antes** parte dos
+  destaques pela seleção eram cortados por causa só do timing de uma lesão; **depois**,
+  **0 dos 399 casos** com boa campanha pela seleção foram cortados. O critério normal
+  (baseado no clube) continua igual para quem não se destacou pela seleção.
+- Regressão: **23/23**.
+
 ## Próximos passos (fase seguinte — Mundo Real 2026)
 1. Terminar a sincronização de elencos europeus (Alemanha, França, Portugal, resto da
    Itália — 59 clubes, mecanismo já pronto em `scripts/sync-squads.mjs`).

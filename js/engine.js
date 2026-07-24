@@ -557,16 +557,19 @@ window.CQ = window.CQ || {};
     const rng = U.rngFor(g.seed, "sel", g.year);
     const pool = D.CONFED_POOL[nat.confed].filter(function (n) { return n !== nat.name; });
     if (!tour) {
-      // eliminatórias: 2 janelas de 2 jogos
-      const opps = U.shuffle(pool, rng).slice(0, 4);
-      const positions = [Math.floor(S.queue.length * 0.35), Math.floor(S.queue.length * 0.7)];
-      // injeta na fila em posições aproximadas (de trás pra frente)
-      S.queue.splice(positions[1], 0,
-        { comp: "SEL", kind: "elim", opp: "nat:" + opps[2], home: true },
-        { comp: "SEL", kind: "elim", opp: "nat:" + opps[3], home: false });
-      S.queue.splice(positions[0], 0,
-        { comp: "SEL", kind: "elim", opp: "nat:" + opps[0], home: true },
-        { comp: "SEL", kind: "elim", opp: "nat:" + opps[1], home: false });
+      // eliminatórias: 4 janelas de 2 jogos (antes eram só 2 janelas — pouco pra render
+      // uma campanha de verdade e dar chance real de se firmar na seleção)
+      const need = 8;
+      let opps = U.shuffle(pool, rng).slice(0, Math.min(need, pool.length));
+      while (opps.length < need) opps = opps.concat(pool.slice(0, need - opps.length));
+      const fracs = [0.15, 0.35, 0.55, 0.75];
+      const positions = fracs.map(function (f) { return Math.floor(S.queue.length * f); });
+      // injeta de trás pra frente pra não bagunçar os índices das janelas já calculadas
+      for (let w = fracs.length - 1; w >= 0; w--) {
+        S.queue.splice(positions[w], 0,
+          { comp: "SEL", kind: "elim", opp: "nat:" + opps[w * 2], home: true },
+          { comp: "SEL", kind: "elim", opp: "nat:" + opps[w * 2 + 1], home: false });
+      }
       S.sel = { kind: "elim", record: [] };
     } else {
       // torneio no meio do ano
@@ -1476,7 +1479,19 @@ window.CQ = window.CQ || {};
     // convocação para a seleção
     const nat = D.NATIONS[p.nat];
     const wasConv = p.natTeam.convocado;
-    p.natTeam.convocado = p.overall >= nat.str - 13 && avg >= 6.6 && p.stats.j >= 10 && p.injury <= 2;
+    // desempenho PELA seleção nesta temporada (eliminatórias ou torneio) — antes o corte
+    // olhava só pra forma no clube, então uma boa campanha nas eliminatórias não segurava
+    // a vaga se o clube tivesse uma temporada fraca. Agora, quem já estava convocado e se
+    // destacou pela seleção ganha um critério mais largo pra continuar.
+    const natKeys = ["SEL", "WC", "CA", "EU"];
+    let natJ = 0, natG = 0, natA = 0;
+    natKeys.forEach(function (k) { const s = p.stats.byComp[k]; if (s) { natJ += s.j; natG += s.g; natA += s.a; } });
+    const strongForNat = natJ >= 2 && (natG + natA) >= 2;
+    // sem trava de lesão aqui: uma contusão sofrida nas rodadas finais da temporada dura
+    // 3-8 jogos e não tem relação nenhuma com o quanto a campanha pela seleção foi boa —
+    // não deve zerar de graça o que a temporada inteira mostrou.
+    p.natTeam.convocado = (p.overall >= nat.str - 13 && avg >= 6.6 && p.stats.j >= 10 && p.injury <= 2)
+      || (wasConv && strongForNat && p.overall >= nat.str - 18 && p.stats.j >= 6);
     const convNews = p.natTeam.convocado && !wasConv ? "convocado" : (!p.natTeam.convocado && wasConv ? "cortado" : null);
 
     // snapshot da carreira
