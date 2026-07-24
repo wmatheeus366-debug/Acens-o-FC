@@ -311,6 +311,21 @@ registrada aqui para contexto futuro. Ver `README.md` § Direitos de imagem.
 - Regressão: **23/23**. Validado visualmente (Flamengo, Volta Redonda, Boavista, Botafogo
   com escudo oficial correto na tela; River Plate — ainda sem ID — caindo no vetorial).
 
+## Correção — escudos reais somem para quem usa bloqueador de anúncio
+Reportado: um amigo que recebeu o link (`wmatheeus366-debug.github.io/Acens-o-FC`) via
+bloqueador de anúncio via não via os escudos aparecerem — nem a imagem real, nem o brasão
+vetorial de reserva (espaço em branco).
+- **Causa:** o fallback só reagia ao evento `onerror` da `<img>`. Muitos bloqueadores não
+  bloqueiam a requisição de rede (o que dispararia erro) — em vez disso, escondem via CSS
+  ou trocam a resposta por um pixel transparente "carregado com sucesso". Nesses casos
+  `onerror` nunca dispara, e a imagem "carrega" vazia.
+- **Correção** (`js/util.js` · `crestSVG`): adicionado um segundo gatilho no `onload` que
+  confere se a imagem realmente veio com conteúdo (`naturalWidth < 10` → trata como falha e
+  cai no brasão vetorial, igual ao `onerror`). Testado isolando um `<img>` com a `src` trocada
+  por um pixel 1×1 (mesmo comportamento de bloqueador real): antes ficava em branco, agora
+  cai corretamente no vetor procedural.
+- Regressão: **23/23**.
+
 ## Próximos passos (fase seguinte — Mundo Real 2026)
 1. Terminar a sincronização de elencos europeus (Alemanha, França, Portugal, resto da
    Itália — 59 clubes, mecanismo já pronto em `scripts/sync-squads.mjs`).

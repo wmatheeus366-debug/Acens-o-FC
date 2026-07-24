@@ -1403,7 +1403,13 @@ window.CQ = window.CQ || {};
     const custom = CQ.state && CQ.state.game && CQ.state.game.customLogos && CQ.state.game.customLogos[club.id];
     if (custom) return `<span class="crest ${cls || ""}"><img src="${esc(custom)}" alt=""></span>`;
     const realId = CQ.DATA && CQ.DATA.CREST_MAP && CQ.DATA.CREST_MAP[club.id];
-    if (realId) return `<span class="crest ${cls || ""}"><img src="https://media.api-sports.io/football/teams/${realId}.png" alt="" loading="lazy" onerror="this.parentElement.outerHTML=CQ.util.crestSVGFallback('${esc(club.id)}','${esc(cls || "")}')"></span>`;
+    if (realId) {
+      // alguns bloqueadores de anúncio não disparam erro de rede (só escondem via CSS,
+      // ou trocam por um pixel em branco "carregado com sucesso") — por isso o onload
+      // também confere se a imagem realmente veio com conteúdo, não só o onerror.
+      const fb = `CQ.util.crestSVGFallback('${esc(club.id)}','${esc(cls || "")}')`;
+      return `<span class="crest ${cls || ""}"><img src="https://media.api-sports.io/football/teams/${realId}.png" alt="" loading="lazy" onerror="this.parentElement.outerHTML=${fb}" onload="if(this.naturalWidth<10)this.parentElement.outerHTML=${fb}"></span>`;
+    }
     return crestSVGProcedural(club, cls);
   }
   // brasão vetorial procedural (sem depender de imagem externa) — usado quando o clube
