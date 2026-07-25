@@ -1473,6 +1473,7 @@ window.CQ = window.CQ || {};
     const goalsHere = p.clubGoals[p.clubId] || 0;
     if (g.manager.conf >= 72 && (p.fame >= 55 || (p.idolClubs || []).indexOf(p.clubId) >= 0) && (goalsHere >= 20 || p.overall >= myClub(g).str)) {
       p.captain = p.clubId;
+      p.captainYear = g.year;
       p.morale = U.clamp(p.morale + 6, 5, 100);
       return myClub(g).name;
     }
@@ -1559,8 +1560,10 @@ window.CQ = window.CQ || {};
     const clubGoals = p.clubGoals[p.clubId] || 0;
     const clubTitles = p.titles.filter(function (t) { return t.club === myClub(g).name; }).length;
     if (!p.idolClubs) p.idolClubs = [];
+    if (!p.idolYears) p.idolYears = {};
     if (p.idolClubs.indexOf(p.clubId) < 0 && ((clubGoals >= 60 && clubTitles >= 2) || clubGoals >= 100 || (clubTitles >= 4))) {
       p.idolClubs.push(p.clubId);
+      p.idolYears[p.clubId] = g.year;
       becameIdol = myClub(g).name;
       p.fame = U.clamp(p.fame + 5, 0, 100);
     }

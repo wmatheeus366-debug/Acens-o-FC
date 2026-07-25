@@ -16,7 +16,7 @@ window.CQ = window.CQ || {};
   const MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 14.5A8 8 0 019.5 4 7 7 0 1020 14.5z"/></svg>';
 
   function getTheme() {
-    try { return localStorage.getItem(THEME_KEY) || "light"; } catch (e) { return "light"; }
+    try { return localStorage.getItem(THEME_KEY) || "dark"; } catch (e) { return "dark"; }
   }
   function applyTheme(t) {
     document.documentElement.setAttribute("data-theme", t);

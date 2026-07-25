@@ -1139,6 +1139,21 @@ main.page, .cover { animation: pageIn 0.26s ease both; }
 .trophy-cell.big { background: linear-gradient(var(--gold-soft), var(--paper-2)); }
 .trophy-cell.big svg { width: 42px; height: 46px; }
 
+/* linha do tempo da carreira */
+.timeline { position: relative; padding-left: 26px; }
+.timeline::before { content: ""; position: absolute; left: 6px; top: 4px; bottom: 4px; width: 2px; background: var(--rule); }
+.tl-item { position: relative; padding: 0 0 20px; }
+.tl-item:last-child { padding-bottom: 0; }
+.tl-dot { position: absolute; left: -26px; top: 3px; width: 11px; height: 11px; border-radius: 50%; background: var(--newsprint); border: 2px solid var(--verm); }
+.tl-item.tl-title .tl-dot, .tl-item.tl-ballon .tl-dot { background: var(--gold); border-color: var(--gold); }
+.tl-item.tl-idol .tl-dot, .tl-item.tl-captain .tl-dot { background: var(--green); border-color: var(--green); }
+.tl-item.tl-transfer .tl-dot { background: var(--newsprint); border-color: var(--ink-3); }
+.tl-item.tl-retire .tl-dot { background: var(--ink); border-color: var(--ink); }
+.tl-year { font-family: var(--cond); font-size: 11px; font-weight: 700; letter-spacing: 0.12em; color: var(--ink-3); text-transform: uppercase; }
+.tl-body { margin-top: 2px; }
+.tl-body b { font-family: var(--serif); font-size: 16px; font-weight: 700; display: block; }
+.tl-body span { font-size: 13px; color: var(--ink-2); }
+
 /* pódio da Bola de Ouro */
 .podium { display: grid; grid-template-columns: 1fr 1fr 1fr; align-items: end; gap: 8px; margin: 12px 0; }
 .podium .pod { text-align: center; }
@@ -3608,6 +3623,7 @@ window.CQ = window.CQ || {};
     const goalsHere = p.clubGoals[p.clubId] || 0;
     if (g.manager.conf >= 72 && (p.fame >= 55 || (p.idolClubs || []).indexOf(p.clubId) >= 0) && (goalsHere >= 20 || p.overall >= myClub(g).str)) {
       p.captain = p.clubId;
+      p.captainYear = g.year;
       p.morale = U.clamp(p.morale + 6, 5, 100);
       return myClub(g).name;
     }
@@ -3694,8 +3710,10 @@ window.CQ = window.CQ || {};
     const clubGoals = p.clubGoals[p.clubId] || 0;
     const clubTitles = p.titles.filter(function (t) { return t.club === myClub(g).name; }).length;
     if (!p.idolClubs) p.idolClubs = [];
+    if (!p.idolYears) p.idolYears = {};
     if (p.idolClubs.indexOf(p.clubId) < 0 && ((clubGoals >= 60 && clubTitles >= 2) || clubGoals >= 100 || (clubTitles >= 4))) {
       p.idolClubs.push(p.clubId);
+      p.idolYears[p.clubId] = g.year;
       becameIdol = myClub(g).name;
       p.fame = U.clamp(p.fame + 5, 0, 100);
     }
@@ -4224,15 +4242,37 @@ window.CQ = window.CQ || {};
     { by: "mesa", q: "Convocação: {name} merece vaga na Seleção?", opts: [
       { t: "Titular absoluto", fx: { fame: 2 } }, { t: "Merece ser lembrado", fx: { fame: 1 } }, { t: "Ainda não", fx: {} } ] },
     { by: "torcida", q: "Camisa 10 do coração: {name} entra na galeria de ídolos?", opts: [
-      { t: "Já é ídolo", fx: { rep: 2, morale: 2 } }, { t: "Caminho certo", fx: { morale: 1 } }, { t: "Cedo pra dizer", fx: {} } ] }
+      { t: "Já é ídolo", fx: { rep: 2, morale: 2 } }, { t: "Caminho certo", fx: { morale: 1 } }, { t: "Cedo pra dizer", fx: {} } ] },
+    { by: "mesa", q: "Duelo de gerações: hoje, quem está melhor — {name} ou {rival}?", opts: [
+      { t: "{name}, disparado", fx: { fame: 1 } }, { t: "Tá de igual pra igual", fx: {} }, { t: "{rival} está na frente", fx: { morale: -1 } } ] },
+    { by: "imprensa", q: "Rumor do mercado: {name} teria sondagem da Europa. Você acredita?", opts: [
+      { t: "Acredito, é hora de voar", fx: { fame: 1 } }, { t: "Fumaça sem fogo", fx: {} }, { t: "Espero que fique", fx: { morale: 1 } } ] },
+    { by: "torcida", q: "O {club} vai brigar pelo título este ano?", opts: [
+      { t: "Vamos ser campeões!", fx: { morale: 1 } }, { t: "Briga por vaga na Libertadores", fx: {} }, { t: "Ano de reconstrução", fx: {} } ] },
+    { by: "mesa", q: "{name} tem perfil pra vestir a braçadeira de capitão do {club}?", opts: [
+      { t: "Já devia ser capitão", fx: { rep: 2 } }, { t: "Com mais tempo de casa, sim", fx: {} }, { t: "Ainda não tem liderança pra isso", fx: { rep: -1 } } ] },
+    { by: "zoeira", q: "Sincerão: a cobrança em cima do {name} é exagerada?", opts: [
+      { t: "É demais, deixem o menino em paz", fx: { morale: 1 } }, { t: "Na medida certa", fx: {} }, { t: "Podia cobrar mais", fx: { morale: -1 } } ] },
+    { by: "imprensa", q: "Debate: quem leva a Bola de Ouro deste ano?", opts: [
+      { t: "{name} tem estatísticas pra isso", fx: { fame: 1 } }, { t: "É cedo pra apostar", fx: {} }, { t: "Tem craque melhor por aí", fx: {} } ] },
+    { by: "mesa", q: "Qual é mais dura de ganhar: uma Libertadores ou uma Champions League?", opts: [
+      { t: "Libertadores, sem dúvida", fx: {} }, { t: "Champions, o nível é outro", fx: {} }, { t: "Empatadas em dificuldade", fx: {} } ] },
+    { by: "torcida", q: "O técnico do {club} está fazendo um bom trabalho?", opts: [
+      { t: "Time joga bem sob o comando dele", fx: {} }, { t: "Já deu o que tinha que dar", fx: {} }, { t: "Precisa de mais tempo", fx: {} } ] },
+    { by: "zoeira", q: "Se o {name} fosse embora amanhã, o {club} sentiria falta?", opts: [
+      { t: "Muito, é peça-chave", fx: { rep: 2 } }, { t: "Um pouco, mas o time segue", fx: {} }, { t: "Sinceramente, não tanto", fx: { morale: -2 } } ] },
+    { by: "mesa", q: "Qual traço melhor descreve o momento de {name}?", opts: [
+      { t: "Em ascensão, só cresce", fx: { fame: 1 } }, { t: "Estável, cumprindo tabela", fx: {} }, { t: "Precisa reagir logo", fx: { morale: -1 } } ] }
   ];
 
   function injectPoll(g, tmpl) {
     const p = g.player;
     const club = CQ.engine.myClub(g).name;
+    const rivalName = first(g.rival.name);
     const P = PROFILES[tmpl.by] || PROFILES.mesa;
-    const q = tmpl.q.replace(/\{name\}/g, first(p.name)).replace(/\{club\}/g, club);
-    const opts = tmpl.opts.map(function (o) { return { label: o.t, fx: o.fx || {}, base: U.ri(80, 900) }; });
+    function fill(s) { return s.replace(/\{name\}/g, first(p.name)).replace(/\{club\}/g, club).replace(/\{rival\}/g, rivalName); }
+    const q = fill(tmpl.q);
+    const opts = tmpl.opts.map(function (o) { return { label: fill(o.t), fx: o.fx || {}, base: U.ri(80, 900) }; });
     g.feed.unshift({
       id: SEQ++, k: tmpl.by, name: tmpl.by === "torcida" ? "Central da Torcida" : tmpl.by === "zoeira" ? "Zoeira FC" : "Mesa Redonda 90",
       handle: P.handle, tag: P.tag, text: "", poll: { id: POLL_SEQ++, q: q, opts: opts, voted: null, total: 0 },
@@ -4248,6 +4288,44 @@ window.CQ = window.CQ || {};
     if (g.feed.slice(0, 6).some(function (f) { return f.poll && f.poll.voted == null; })) return;
     const tmpl = U.choice(POLL_TEMPLATES);
     injectPoll(g, tmpl);
+  }
+
+  // ---------- matérias de mundo (bastidores do futebol, sem ser sobre você) ----------
+  function maybeWorldNews(g) {
+    if (!U.chance(0.22)) return;
+    const p = g.player;
+    const lg = CQ.engine.leagueOf(g, p.clubId);
+    const others = (D.clubsOf(lg) || []).filter(function (c) { return c.id !== p.clubId; });
+    if (others.length < 2) return;
+    const clubA = U.choice(others);
+    const clubB = U.choice(others.filter(function (c) { return c.id !== clubA.id; }));
+    const compKeys = Object.keys(D.CHAMPS_SEED || {});
+    let histLine = "";
+    if (compKeys.length) {
+      const histKey = U.choice(compKeys);
+      const histYears = Object.keys(D.CHAMPS_SEED[histKey] || {});
+      if (histYears.length) {
+        const histYear = U.choice(histYears);
+        const histChamp = D.CHAMPS_SEED[histKey][histYear];
+        const histCompName = (D.COMP_NAMES && D.COMP_NAMES[histKey]) || histKey;
+        histLine = "Relembre: em " + histYear + ", o " + histChamp + " levantou a taça da " + histCompName + ".";
+      }
+    }
+    const templates = [
+      { by: "imprensa", text: "Mercado da bola: " + clubA.name + " negocia a contratação de um reforço estrangeiro para a próxima janela." },
+      { by: "mesa", text: "Pressão aumenta no " + clubA.name + ": torcida cobra o técnico após sequência de resultados ruins." },
+      { by: "imprensa", text: "Base do " + clubA.name + " revela uma joia de 17 anos que já chama atenção de olheiros europeus." },
+      { by: "torcida", text: "Público recorde neste fim de semana: " + clubA.name + " x " + clubB.name + " lotou as arquibancadas." },
+      { by: "mesa", text: "A arbitragem da rodada dá o que falar de novo — dessa vez o alvo é o jogo do " + clubA.name + "." },
+      { by: "zoeira", text: clubA.name + " perde mais um e a zoeira já começou nas redes." },
+      { by: "mesa", text: "Analistas debatem: o nível técnico do campeonato está mais equilibrado do que em anos anteriores." },
+      { by: "imprensa", text: "Bastidores: " + clubA.name + " estuda renovar o contrato do capitão para blindar o elenco." },
+      { by: "torcida", text: "Enquete informal nas redes: torcedores rivais já discutem quem é o favorito da temporada." },
+      { by: "imprensa", text: "Boato do dia: " + clubB.name + " estaria de olho num treinador estrangeiro para o próximo ano." }
+    ];
+    if (histLine) templates.push({ by: "mesa", text: histLine });
+    const tmpl = U.choice(templates);
+    post(g, tmpl.by, tmpl.text, {});
   }
 
   function applyVote(g, feedId, optIdx) {
@@ -4326,7 +4404,7 @@ window.CQ = window.CQ || {};
     }
 
     // de vez em quando, uma enquete quente aparece no feed
-    if (res.plays) maybePoll(g);
+    if (res.plays) { maybePoll(g); maybeWorldNews(g); }
   }
 
   // hype antes de duelo com o rival de geração
@@ -5960,7 +6038,7 @@ window.CQ = window.CQ || {};
     const G = g(), p = G.player;
     const tab = CQ.state.ctab || "attrs";
     const nat = D.NATIONS[p.nat];
-    const tabs = [["attrs", "Atributos"], ["marcos", "Marcos"], ["evo", "Evolução"], ["hist", "Temporadas"], ["troph", "Conquistas"], ["duel", "Duelo"]];
+    const tabs = [["attrs", "Atributos"], ["marcos", "Marcos"], ["evo", "Evolução"], ["linha", "Linha do tempo"], ["hist", "Temporadas"], ["troph", "Conquistas"], ["duel", "Duelo"]];
     const head = `<div class="player-card mb12">
       <div class="player-face">${U.portraitSVG(p.name + G.seed, 96)}</div>
       <div>
@@ -5977,6 +6055,7 @@ window.CQ = window.CQ || {};
     if (tab === "attrs") body = attrsHTML(p);
     else if (tab === "marcos") body = marcosHTML(G);
     else if (tab === "evo") body = evoHTML(p);
+    else if (tab === "linha") body = timelineHTML(G);
     else if (tab === "hist") body = histHTML(p);
     else if (tab === "troph") body = trophHTML(p);
     else body = duelHTML(G);
@@ -6031,6 +6110,58 @@ window.CQ = window.CQ || {};
       </div>
     </div>`;
   }
+
+  // ---------------- LINHA DO TEMPO DA CARREIRA ----------------
+  function timelineHTML(G) {
+    const p = G.player;
+    const events = [];
+    if (p.career.length) {
+      const first = p.career[0];
+      events.push({ year: first.year, order: 0, cls: "debut", label: "Estreia profissional", detail: "Começou a carreira no " + esc(first.clubName) + "." });
+    }
+    for (let i = 1; i < p.career.length; i++) {
+      if (p.career[i].clubId !== p.career[i - 1].clubId) {
+        events.push({ year: p.career[i].year, order: 1, cls: "transfer", label: "Transferência", detail: "Saiu do " + esc(p.career[i - 1].clubName) + " e assinou com o " + esc(p.career[i].clubName) + "." });
+      }
+    }
+    (p.titles || []).forEach(function (t) {
+      events.push({ year: t.year, order: 2, cls: "title", label: esc(t.name), detail: "Conquistado pelo " + esc(t.club) + "." });
+    });
+    (p.awards || []).filter(function (a) { return a.name !== "Bola de Ouro"; }).forEach(function (a) {
+      events.push({ year: a.year, order: 3, cls: "award", label: esc(a.name), detail: "Prêmio individual — " + esc(a.club) + "." });
+    });
+    (p.ballon || []).filter(function (b) { return b.rank === 1; }).forEach(function (b) {
+      events.push({ year: b.year, order: 4, cls: "ballon", label: "Bola de Ouro", detail: "Eleito o melhor jogador do mundo em " + b.year + "." });
+    });
+    (p.idolClubs || []).forEach(function (clubId) {
+      const yr = p.idolYears && p.idolYears[clubId];
+      const cName = D.CLUBS[clubId] ? D.CLUBS[clubId].name : clubId;
+      if (yr) events.push({ year: yr, order: 5, cls: "idol", label: "Virou ídolo do " + esc(cName), detail: "Nome eternizado na história do clube." });
+    });
+    if (p.captain && p.captainYear) {
+      const cName = D.CLUBS[p.captain] ? D.CLUBS[p.captain].name : p.captain;
+      events.push({ year: p.captainYear, order: 6, cls: "captain", label: "Vestiu a braçadeira", detail: "Nomeado capitão do " + esc(cName) + "." });
+    }
+    if (G.retired && p.career.length) {
+      const lastYear = p.career[p.career.length - 1].year;
+      events.push({ year: lastYear, order: 9, cls: "retire", label: "Aposentadoria", detail: "Encerrou a carreira aos " + p.age + " anos." });
+    }
+    events.sort(function (a, b) { return (a.year - b.year) || (a.order - b.order); });
+
+    if (!events.length) {
+      return '<div class="card"><div class="card-b muted center" style="padding:30px">A linha do tempo vai se preenchendo conforme sua carreira acontece.</div></div>';
+    }
+    const rows = events.map(function (e) {
+      return `<div class="tl-item tl-${e.cls}">
+        <div class="tl-dot"></div>
+        <div class="tl-year">${e.year}</div>
+        <div class="tl-body"><b>${e.label}</b><span>${e.detail}</span></div>
+      </div>`;
+    }).join("");
+    return `<div class="section-banner"><span class="sb-title">Linha do tempo</span><span class="sb-meta">${events.length} ${U.plural(events.length, "marco", "marcos")}</span></div>
+      <div class="card" style="border-top:none"><div class="card-b"><div class="timeline">${rows}</div></div></div>`;
+  }
+
   function archName(p) {
     const a = D.POSITIONS[p.pos].archs.find(function (x) { return x.id === p.archId; });
     return a ? a.name : "";
@@ -7101,7 +7232,7 @@ window.CQ = window.CQ || {};
   const MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 14.5A8 8 0 019.5 4 7 7 0 1020 14.5z"/></svg>';
 
   function getTheme() {
-    try { return localStorage.getItem(THEME_KEY) || "light"; } catch (e) { return "light"; }
+    try { return localStorage.getItem(THEME_KEY) || "dark"; } catch (e) { return "dark"; }
   }
   function applyTheme(t) {
     document.documentElement.setAttribute("data-theme", t);

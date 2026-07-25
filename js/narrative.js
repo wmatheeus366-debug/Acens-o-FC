@@ -76,15 +76,37 @@ window.CQ = window.CQ || {};
     { by: "mesa", q: "Convocação: {name} merece vaga na Seleção?", opts: [
       { t: "Titular absoluto", fx: { fame: 2 } }, { t: "Merece ser lembrado", fx: { fame: 1 } }, { t: "Ainda não", fx: {} } ] },
     { by: "torcida", q: "Camisa 10 do coração: {name} entra na galeria de ídolos?", opts: [
-      { t: "Já é ídolo", fx: { rep: 2, morale: 2 } }, { t: "Caminho certo", fx: { morale: 1 } }, { t: "Cedo pra dizer", fx: {} } ] }
+      { t: "Já é ídolo", fx: { rep: 2, morale: 2 } }, { t: "Caminho certo", fx: { morale: 1 } }, { t: "Cedo pra dizer", fx: {} } ] },
+    { by: "mesa", q: "Duelo de gerações: hoje, quem está melhor — {name} ou {rival}?", opts: [
+      { t: "{name}, disparado", fx: { fame: 1 } }, { t: "Tá de igual pra igual", fx: {} }, { t: "{rival} está na frente", fx: { morale: -1 } } ] },
+    { by: "imprensa", q: "Rumor do mercado: {name} teria sondagem da Europa. Você acredita?", opts: [
+      { t: "Acredito, é hora de voar", fx: { fame: 1 } }, { t: "Fumaça sem fogo", fx: {} }, { t: "Espero que fique", fx: { morale: 1 } } ] },
+    { by: "torcida", q: "O {club} vai brigar pelo título este ano?", opts: [
+      { t: "Vamos ser campeões!", fx: { morale: 1 } }, { t: "Briga por vaga na Libertadores", fx: {} }, { t: "Ano de reconstrução", fx: {} } ] },
+    { by: "mesa", q: "{name} tem perfil pra vestir a braçadeira de capitão do {club}?", opts: [
+      { t: "Já devia ser capitão", fx: { rep: 2 } }, { t: "Com mais tempo de casa, sim", fx: {} }, { t: "Ainda não tem liderança pra isso", fx: { rep: -1 } } ] },
+    { by: "zoeira", q: "Sincerão: a cobrança em cima do {name} é exagerada?", opts: [
+      { t: "É demais, deixem o menino em paz", fx: { morale: 1 } }, { t: "Na medida certa", fx: {} }, { t: "Podia cobrar mais", fx: { morale: -1 } } ] },
+    { by: "imprensa", q: "Debate: quem leva a Bola de Ouro deste ano?", opts: [
+      { t: "{name} tem estatísticas pra isso", fx: { fame: 1 } }, { t: "É cedo pra apostar", fx: {} }, { t: "Tem craque melhor por aí", fx: {} } ] },
+    { by: "mesa", q: "Qual é mais dura de ganhar: uma Libertadores ou uma Champions League?", opts: [
+      { t: "Libertadores, sem dúvida", fx: {} }, { t: "Champions, o nível é outro", fx: {} }, { t: "Empatadas em dificuldade", fx: {} } ] },
+    { by: "torcida", q: "O técnico do {club} está fazendo um bom trabalho?", opts: [
+      { t: "Time joga bem sob o comando dele", fx: {} }, { t: "Já deu o que tinha que dar", fx: {} }, { t: "Precisa de mais tempo", fx: {} } ] },
+    { by: "zoeira", q: "Se o {name} fosse embora amanhã, o {club} sentiria falta?", opts: [
+      { t: "Muito, é peça-chave", fx: { rep: 2 } }, { t: "Um pouco, mas o time segue", fx: {} }, { t: "Sinceramente, não tanto", fx: { morale: -2 } } ] },
+    { by: "mesa", q: "Qual traço melhor descreve o momento de {name}?", opts: [
+      { t: "Em ascensão, só cresce", fx: { fame: 1 } }, { t: "Estável, cumprindo tabela", fx: {} }, { t: "Precisa reagir logo", fx: { morale: -1 } } ] }
   ];
 
   function injectPoll(g, tmpl) {
     const p = g.player;
     const club = CQ.engine.myClub(g).name;
+    const rivalName = first(g.rival.name);
     const P = PROFILES[tmpl.by] || PROFILES.mesa;
-    const q = tmpl.q.replace(/\{name\}/g, first(p.name)).replace(/\{club\}/g, club);
-    const opts = tmpl.opts.map(function (o) { return { label: o.t, fx: o.fx || {}, base: U.ri(80, 900) }; });
+    function fill(s) { return s.replace(/\{name\}/g, first(p.name)).replace(/\{club\}/g, club).replace(/\{rival\}/g, rivalName); }
+    const q = fill(tmpl.q);
+    const opts = tmpl.opts.map(function (o) { return { label: fill(o.t), fx: o.fx || {}, base: U.ri(80, 900) }; });
     g.feed.unshift({
       id: SEQ++, k: tmpl.by, name: tmpl.by === "torcida" ? "Central da Torcida" : tmpl.by === "zoeira" ? "Zoeira FC" : "Mesa Redonda 90",
       handle: P.handle, tag: P.tag, text: "", poll: { id: POLL_SEQ++, q: q, opts: opts, voted: null, total: 0 },
@@ -100,6 +122,44 @@ window.CQ = window.CQ || {};
     if (g.feed.slice(0, 6).some(function (f) { return f.poll && f.poll.voted == null; })) return;
     const tmpl = U.choice(POLL_TEMPLATES);
     injectPoll(g, tmpl);
+  }
+
+  // ---------- matérias de mundo (bastidores do futebol, sem ser sobre você) ----------
+  function maybeWorldNews(g) {
+    if (!U.chance(0.22)) return;
+    const p = g.player;
+    const lg = CQ.engine.leagueOf(g, p.clubId);
+    const others = (D.clubsOf(lg) || []).filter(function (c) { return c.id !== p.clubId; });
+    if (others.length < 2) return;
+    const clubA = U.choice(others);
+    const clubB = U.choice(others.filter(function (c) { return c.id !== clubA.id; }));
+    const compKeys = Object.keys(D.CHAMPS_SEED || {});
+    let histLine = "";
+    if (compKeys.length) {
+      const histKey = U.choice(compKeys);
+      const histYears = Object.keys(D.CHAMPS_SEED[histKey] || {});
+      if (histYears.length) {
+        const histYear = U.choice(histYears);
+        const histChamp = D.CHAMPS_SEED[histKey][histYear];
+        const histCompName = (D.COMP_NAMES && D.COMP_NAMES[histKey]) || histKey;
+        histLine = "Relembre: em " + histYear + ", o " + histChamp + " levantou a taça da " + histCompName + ".";
+      }
+    }
+    const templates = [
+      { by: "imprensa", text: "Mercado da bola: " + clubA.name + " negocia a contratação de um reforço estrangeiro para a próxima janela." },
+      { by: "mesa", text: "Pressão aumenta no " + clubA.name + ": torcida cobra o técnico após sequência de resultados ruins." },
+      { by: "imprensa", text: "Base do " + clubA.name + " revela uma joia de 17 anos que já chama atenção de olheiros europeus." },
+      { by: "torcida", text: "Público recorde neste fim de semana: " + clubA.name + " x " + clubB.name + " lotou as arquibancadas." },
+      { by: "mesa", text: "A arbitragem da rodada dá o que falar de novo — dessa vez o alvo é o jogo do " + clubA.name + "." },
+      { by: "zoeira", text: clubA.name + " perde mais um e a zoeira já começou nas redes." },
+      { by: "mesa", text: "Analistas debatem: o nível técnico do campeonato está mais equilibrado do que em anos anteriores." },
+      { by: "imprensa", text: "Bastidores: " + clubA.name + " estuda renovar o contrato do capitão para blindar o elenco." },
+      { by: "torcida", text: "Enquete informal nas redes: torcedores rivais já discutem quem é o favorito da temporada." },
+      { by: "imprensa", text: "Boato do dia: " + clubB.name + " estaria de olho num treinador estrangeiro para o próximo ano." }
+    ];
+    if (histLine) templates.push({ by: "mesa", text: histLine });
+    const tmpl = U.choice(templates);
+    post(g, tmpl.by, tmpl.text, {});
   }
 
   function applyVote(g, feedId, optIdx) {
@@ -178,7 +238,7 @@ window.CQ = window.CQ || {};
     }
 
     // de vez em quando, uma enquete quente aparece no feed
-    if (res.plays) maybePoll(g);
+    if (res.plays) { maybePoll(g); maybeWorldNews(g); }
   }
 
   // hype antes de duelo com o rival de geração

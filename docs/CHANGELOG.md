@@ -394,6 +394,32 @@ Pedido: a temporada estava lenta demais de jogar porque quase toda partida impor
   Mundial de Clubes/Supermundial — agora aparecem corretamente na agenda.
 - Regressão: **23/23**.
 
+## Linha do tempo, mais matérias/enquetes, tema escuro padrão
+Quatro pedidos numa leva: a ideia nº5 da lista de imersão (linha do tempo da carreira),
+mais variedade de matérias e enquetes no feed, e o layout abrir no tema escuro por padrão.
+- **Linha do tempo da carreira** (nova aba "Linha do tempo" em Carreira, `timelineHTML` em
+  `js/ui.js`): filete vertical com marcos reais — estreia, transferências (detectadas
+  comparando o clube entre temporadas consecutivas em `p.career`), títulos, prêmios
+  individuais, Bolas de Ouro conquistadas, virada de ídolo, capitania e aposentadoria.
+  Sem dado novo pesado: só 2 campos mínimos adicionados (`p.captainYear`, `p.idolYears`)
+  pra poder datar eventos que já existiam sem ano associado.
+- **Matérias de mundo** (`maybeWorldNews` em `js/narrative.js`): antes, 100% dos posts do
+  feed giravam em torno do próprio jogador. Agora, ~22% das partidas jogadas também podem
+  gerar uma matéria de bastidores sobre **outros clubes** — mercado, pressão no técnico,
+  base revelando joia, público recorde, arbitragem polêmica, e trivia histórica puxada de
+  `CHAMPS_SEED` real ("Relembre: em X, o Y levantou a taça da Z").
+- **Mais enquetes**: de 6 para 16 modelos (`POLL_TEMPLATES`), cobrindo tópicos novos —
+  comparação com o rival de geração, rumor de mercado, corrida pelo título, capitania,
+  Bola de Ouro, e até uma opinião geral sobre futebol mundial sem ser sobre você
+  (Libertadores vs. Champions). Enquetes agora suportam `{rival}` no texto, além de
+  `{name}`/`{club}`.
+- **Tema escuro como padrão** (`js/main.js`): quem abre o jogo pela primeira vez agora vê o
+  tema escuro de cara — o alternador continua lá pra quem preferir claro. Quem já tinha uma
+  preferência salva (inclusive claro) mantém exatamente o que já tinha escolhido.
+- Regressão: **23/23**. Validado com simulação real (timeline com estreia/títulos/prêmios
+  renderizando certo; matérias mencionando clubes de verdade tipo Fluminense/Chapecoense;
+  enquete nova "O técnico do Flamengo está fazendo um bom trabalho?" aparecendo no feed).
+
 ## Próximos passos (fase seguinte — Mundo Real 2026)
 1. Terminar a sincronização de elencos europeus (Alemanha, França, Portugal, resto da
    Itália — 59 clubes, mecanismo já pronto em `scripts/sync-squads.mjs`).

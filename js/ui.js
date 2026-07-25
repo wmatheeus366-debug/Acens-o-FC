@@ -1061,7 +1061,7 @@ window.CQ = window.CQ || {};
     const G = g(), p = G.player;
     const tab = CQ.state.ctab || "attrs";
     const nat = D.NATIONS[p.nat];
-    const tabs = [["attrs", "Atributos"], ["marcos", "Marcos"], ["evo", "Evolução"], ["hist", "Temporadas"], ["troph", "Conquistas"], ["duel", "Duelo"]];
+    const tabs = [["attrs", "Atributos"], ["marcos", "Marcos"], ["evo", "Evolução"], ["linha", "Linha do tempo"], ["hist", "Temporadas"], ["troph", "Conquistas"], ["duel", "Duelo"]];
     const head = `<div class="player-card mb12">
       <div class="player-face">${U.portraitSVG(p.name + G.seed, 96)}</div>
       <div>
@@ -1078,6 +1078,7 @@ window.CQ = window.CQ || {};
     if (tab === "attrs") body = attrsHTML(p);
     else if (tab === "marcos") body = marcosHTML(G);
     else if (tab === "evo") body = evoHTML(p);
+    else if (tab === "linha") body = timelineHTML(G);
     else if (tab === "hist") body = histHTML(p);
     else if (tab === "troph") body = trophHTML(p);
     else body = duelHTML(G);
@@ -1132,6 +1133,58 @@ window.CQ = window.CQ || {};
       </div>
     </div>`;
   }
+
+  // ---------------- LINHA DO TEMPO DA CARREIRA ----------------
+  function timelineHTML(G) {
+    const p = G.player;
+    const events = [];
+    if (p.career.length) {
+      const first = p.career[0];
+      events.push({ year: first.year, order: 0, cls: "debut", label: "Estreia profissional", detail: "Começou a carreira no " + esc(first.clubName) + "." });
+    }
+    for (let i = 1; i < p.career.length; i++) {
+      if (p.career[i].clubId !== p.career[i - 1].clubId) {
+        events.push({ year: p.career[i].year, order: 1, cls: "transfer", label: "Transferência", detail: "Saiu do " + esc(p.career[i - 1].clubName) + " e assinou com o " + esc(p.career[i].clubName) + "." });
+      }
+    }
+    (p.titles || []).forEach(function (t) {
+      events.push({ year: t.year, order: 2, cls: "title", label: esc(t.name), detail: "Conquistado pelo " + esc(t.club) + "." });
+    });
+    (p.awards || []).filter(function (a) { return a.name !== "Bola de Ouro"; }).forEach(function (a) {
+      events.push({ year: a.year, order: 3, cls: "award", label: esc(a.name), detail: "Prêmio individual — " + esc(a.club) + "." });
+    });
+    (p.ballon || []).filter(function (b) { return b.rank === 1; }).forEach(function (b) {
+      events.push({ year: b.year, order: 4, cls: "ballon", label: "Bola de Ouro", detail: "Eleito o melhor jogador do mundo em " + b.year + "." });
+    });
+    (p.idolClubs || []).forEach(function (clubId) {
+      const yr = p.idolYears && p.idolYears[clubId];
+      const cName = D.CLUBS[clubId] ? D.CLUBS[clubId].name : clubId;
+      if (yr) events.push({ year: yr, order: 5, cls: "idol", label: "Virou ídolo do " + esc(cName), detail: "Nome eternizado na história do clube." });
+    });
+    if (p.captain && p.captainYear) {
+      const cName = D.CLUBS[p.captain] ? D.CLUBS[p.captain].name : p.captain;
+      events.push({ year: p.captainYear, order: 6, cls: "captain", label: "Vestiu a braçadeira", detail: "Nomeado capitão do " + esc(cName) + "." });
+    }
+    if (G.retired && p.career.length) {
+      const lastYear = p.career[p.career.length - 1].year;
+      events.push({ year: lastYear, order: 9, cls: "retire", label: "Aposentadoria", detail: "Encerrou a carreira aos " + p.age + " anos." });
+    }
+    events.sort(function (a, b) { return (a.year - b.year) || (a.order - b.order); });
+
+    if (!events.length) {
+      return '<div class="card"><div class="card-b muted center" style="padding:30px">A linha do tempo vai se preenchendo conforme sua carreira acontece.</div></div>';
+    }
+    const rows = events.map(function (e) {
+      return `<div class="tl-item tl-${e.cls}">
+        <div class="tl-dot"></div>
+        <div class="tl-year">${e.year}</div>
+        <div class="tl-body"><b>${e.label}</b><span>${e.detail}</span></div>
+      </div>`;
+    }).join("");
+    return `<div class="section-banner"><span class="sb-title">Linha do tempo</span><span class="sb-meta">${events.length} ${U.plural(events.length, "marco", "marcos")}</span></div>
+      <div class="card" style="border-top:none"><div class="card-b"><div class="timeline">${rows}</div></div></div>`;
+  }
+
   function archName(p) {
     const a = D.POSITIONS[p.pos].archs.find(function (x) { return x.id === p.archId; });
     return a ? a.name : "";

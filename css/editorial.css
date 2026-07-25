@@ -437,6 +437,21 @@ main.page, .cover { animation: pageIn 0.26s ease both; }
 .trophy-cell.big { background: linear-gradient(var(--gold-soft), var(--paper-2)); }
 .trophy-cell.big svg { width: 42px; height: 46px; }
 
+/* linha do tempo da carreira */
+.timeline { position: relative; padding-left: 26px; }
+.timeline::before { content: ""; position: absolute; left: 6px; top: 4px; bottom: 4px; width: 2px; background: var(--rule); }
+.tl-item { position: relative; padding: 0 0 20px; }
+.tl-item:last-child { padding-bottom: 0; }
+.tl-dot { position: absolute; left: -26px; top: 3px; width: 11px; height: 11px; border-radius: 50%; background: var(--newsprint); border: 2px solid var(--verm); }
+.tl-item.tl-title .tl-dot, .tl-item.tl-ballon .tl-dot { background: var(--gold); border-color: var(--gold); }
+.tl-item.tl-idol .tl-dot, .tl-item.tl-captain .tl-dot { background: var(--green); border-color: var(--green); }
+.tl-item.tl-transfer .tl-dot { background: var(--newsprint); border-color: var(--ink-3); }
+.tl-item.tl-retire .tl-dot { background: var(--ink); border-color: var(--ink); }
+.tl-year { font-family: var(--cond); font-size: 11px; font-weight: 700; letter-spacing: 0.12em; color: var(--ink-3); text-transform: uppercase; }
+.tl-body { margin-top: 2px; }
+.tl-body b { font-family: var(--serif); font-size: 16px; font-weight: 700; display: block; }
+.tl-body span { font-size: 13px; color: var(--ink-2); }
+
 /* pódio da Bola de Ouro */
 .podium { display: grid; grid-template-columns: 1fr 1fr 1fr; align-items: end; gap: 8px; margin: 12px 0; }
 .podium .pod { text-align: center; }
