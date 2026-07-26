@@ -200,7 +200,24 @@ const CLUB_TEAM_MAP = {
   farn: { id: 231, name: "Farense" },
   estr: { id: 15130, name: "Estrela da Amadora" },
   nacp: { id: 225, name: "Nacional" },
-  ton: { id: 218, name: "Tondela" }
+  ton: { id: 218, name: "Tondela" },
+  // América do Sul (Libertadores/Sula) — 16
+  riv: { id: 435, name: "River Plate" },
+  boc: { id: 451, name: "Boca Juniors" },
+  rac: { id: 436, name: "Racing" },
+  ind: { id: 453, name: "Independiente" },
+  est: { id: 450, name: "Estudiantes" },
+  pen: { id: 2348, name: "Peñarol" },
+  nac: { id: 2356, name: "Nacional-URU" },
+  col: { id: 2315, name: "Colo-Colo" },
+  udc: { id: 2323, name: "U. de Chile" },
+  cer: { id: 1176, name: "Cerro Porteño" },
+  oli: { id: 1182, name: "Olimpia" },
+  ldu: { id: 1158, name: "LDU Quito" },
+  bce: { id: 1152, name: "Barcelona-EQU" },
+  bol: { id: 3702, name: "Bolívar" },
+  mil: { id: 1125, name: "Millonarios" },
+  atn: { id: 1137, name: "Atlético Nacional" }
 };
 
 // ---------------- fetch com cache local (reruns não gastam cota) ----------------

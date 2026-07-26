@@ -420,13 +420,23 @@ mais variedade de matérias e enquetes no feed, e o layout abrir no tema escuro 
   renderizando certo; matérias mencionando clubes de verdade tipo Fluminense/Chapecoense;
   enquete nova "O técnico do Flamengo está fazendo um bom trabalho?" aparecendo no feed).
 
+## Sincronização de elencos e escudos — 100% concluída (187/187 clubes)
+Com a cota diária renovada, terminada a sincronização que ficou pendente: resto da Itália,
+Alemanha, França e Portugal inteiros (151/151 do lote europeu), mais os 16 clubes
+sul-americanos de Libertadores/Sul-Americana (River Plate, Boca Juniors, Racing,
+Independiente, Estudiantes, Peñarol, Nacional-URU, Colo-Colo, U. de Chile, Cerro Porteño,
+Olimpia, LDU Quito, Barcelona-EQU, Bolívar, Millonarios, Atlético Nacional).
+- IDs de time confirmados manualmente (nome + cidade da sede) antes de sincronizar —
+  ex.: LDU Quito não aparecia direto na busca (só a categoria de base), achado buscando
+  por "Liga" no país (id 1158, "LDU de Quito").
+- **Todos os 187 clubes do jogo agora têm elenco real E escudo oficial real** — cobertura
+  completa, de 20 clubes com elenco/escudo no início da fase de sincronização.
+- Validado: River Plate (Salas, Driussi, Beltrán no ataque), Boca Juniors (Marchesín no gol),
+  escudo do River carregando de verdade (`naturalWidth: 150`, não quebrado).
+- Regressão: **23/23**.
+
 ## Próximos passos (fase seguinte — Mundo Real 2026)
-1. Terminar a sincronização de elencos europeus (Alemanha, França, Portugal, resto da
-   Itália — 59 clubes, mecanismo já pronto em `scripts/sync-squads.mjs`).
-1b. Mapear os 16 clubes sul-americanos (River Plate, Boca Juniors, etc.) — elenco real +
-    `CREST_MAP` — precisa de `/teams?country=X` para Argentina/Uruguai/Chile/Paraguai/
-    Equador/Colômbia/Bolívia (novas chamadas, aguardar reset de cota).
-2. **Arquitetura do mundo** (`CQ.world`): snapshot versionado + modelo de jogador estruturado;
+1. **Arquitetura do mundo** (`CQ.world`): snapshot versionado + modelo de jogador estruturado;
    `squadOf` lendo do mundo com fallback para geração.
-3. Envelhecimento/aposentadoria global, base e mercado de NPCs; telas editoriais do mundo.
-4. **Ajuste opcional:** Bola de Ouro ocasional para defensores/goleiros de elite (hoje ~0).
+2. Envelhecimento/aposentadoria global, base e mercado de NPCs; telas editoriais do mundo.
+3. **Ajuste opcional:** Bola de Ouro ocasional para defensores/goleiros de elite (hoje ~0).
