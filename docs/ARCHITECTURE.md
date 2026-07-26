@@ -9,7 +9,8 @@ Desenvolvimento com arquivos separados; distribuição num arquivo único `CRAQU
 |---|---|---|---|
 | `js/util.js` | `CQ.util` | RNG por seed, formatação, sanitização, retratos/escudos/bandeiras SVG, ícones | — |
 | `js/data.js` | `CQ.DATA` | Clubes, ligas, seleções, lendas, posições, elencos reais, recordes | util |
-| `js/engine.js` | `CQ.engine` | Modelo, calendário, simulação, prêmios, mercado, técnico, traços, aposentadoria | util, DATA, (nar) |
+| `js/world.js` | `CQ.world` | Mundo persistente: identidade estável de NPCs nos 187 clubes, envelhecimento/aposentadoria ano a ano | util, DATA |
+| `js/engine.js` | `CQ.engine` | Modelo, calendário, simulação, prêmios, mercado, técnico, traços, aposentadoria | util, DATA, world, (nar) |
 | `js/narrative.js` | `CQ.nar` | Feed, entrevistas, eventos de vida, enquetes, rival | util, DATA, engine |
 | `js/live.js` | `CQ.live` | Partidas ao vivo: cronologia, decisões, pênaltis lance a lance | util, engine |
 | `js/ui.js` | `CQ.ui` | Todas as telas, overlays, render | util, DATA, engine, nar, live, save |
@@ -41,10 +42,11 @@ Fontes (Google Fonts) e bandeiras (flagcdn) vêm da web com fallback; todo o res
 
 ```
 # no navegador (index.html ou CRAQUE.html aberto), console:
-CQ.tests.run()             # tests/regression.js — 22 checagens
+CQ.tests.run()             # tests/regression.js — 27 checagens
 
 # balanceamento (Node, motor real num shim vm):
 node scripts/balance-runner.mjs 100   # gera docs/BALANCE_BASELINE.md + .json
+node scripts/world-check.mjs 20       # diagnóstico do mundo persistente (idade/reposição/tamanho)
 ```
 
 ## Estado e persistência
@@ -59,11 +61,26 @@ node scripts/balance-runner.mjs 100   # gera docs/BALANCE_BASELINE.md + .json
   (`"post"`) e `spendXP` (`"xp"`). Mesmo estado + mesmas ações ⇒ mesmo resultado.
 - Pendente: decisões interativas do modo ao vivo.
 
-## Pontos de extensão para o Mundo Real 2026 (fase seguinte)
-- **Dados:** `js/data.js` (`REAL_SQUADS`) tem consumidor único (`ui.js › squadOf`).
-  Introduzir `CQ.world` (snapshot + modelo de jogador estruturado) e fazer `squadOf` ler
-  dele, com fallback para geração — sem tocar no gameplay principal.
-- **Provider/sync:** `scripts/sync-football-data.mjs` (Node, chave por env var no build)
-  → `src/data/snapshots/world-YYYY-MM-DD.json`. Nunca no frontend.
-- **Escudos/fotos:** manter `generatedCrest` como fallback; `officialLogoUrl`/
-  `cachedLogoPath`/`brandingMode` só com permissão explícita.
+## Mundo Real 2026 — status
+
+- ✅ **Fatia 1 (feita): identidade persistente de NPCs.** `js/world.js` (`CQ.world`) dá aos
+  187 elencos (`REAL_SQUADS`) uma identidade estável (`g.world.clubs[clubId].roster`) que
+  envelhece de verdade uma vez por temporada (`advanceWorld`, chamado de `endSeason`) e se
+  aposenta/repõe por promessa gerada quando idade/decadência justificar (mesmos limiares do
+  próprio jogador). `squadOf`/`topAttackerName` leem daí, com fallback pro gerador antigo
+  (save em migração, ou clube sem dado no mundo). Migração de save antigo é invisível: o
+  mundo é semeado com a mesma chave de RNG que `squadOf` sempre usou, reproduzindo byte a
+  byte o que a tela já mostrava um instante antes.
+- **Próximo:** mercado de transferências entre NPCs (clubes comprando/vendendo jogadores
+  entre si, usando `makeOffers`/`calcSalary` como referência), telas de mundo (tabelas/
+  resultados de ligas que o jogador não disputa), olheiro de base / geração de promessas
+  com mais destaque.
+- **Escudos/fotos:** já resolvido por fora desta fase — `CQ.DATA.CREST_MAP` (escudo real
+  via API-Football, `media.api-sports.io`, uso pessoal) com fallback pro brasão vetorial
+  (`crestSVG`) quando não mapeado ou se a imagem falhar. Ver `README.md` § Direitos de
+  imagem pro contexto da decisão de usar escudo real.
+- **Sync de dados:** o script real é `scripts/sync-squads.mjs` (API-Football, chave só em
+  `.env`/build, nunca no frontend) — sincroniza nome/posição pros 187 elencos e os IDs de
+  escudo. Não existe (nem é necessário) um snapshot JSON versionado separado — os dados já
+  vivem direto em `js/data.js` (`REAL_SQUADS`, `CREST_MAP`), reexecutar o script quando
+  quiser atualizar.

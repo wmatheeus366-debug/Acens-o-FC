@@ -1834,6 +1834,13 @@ window.CQ = window.CQ || {};
   // ---------------- CLUBE ----------------
   function squadOf(G) {
     const cl = E().myClub(G);
+    // lê do mundo persistente (identidade estável, envelhece de verdade) quando existir;
+    // fallback pro gerador antigo (save em migração, ou clube sem dado no mundo)
+    if (G.world && G.world.clubs[cl.id]) {
+      return G.world.clubs[cl.id].roster.map(function (pl) {
+        return { name: pl.name, pos: pl.pos, age: pl.age, ov: pl.ovr, real: pl.real };
+      }).sort(function (a, b) { return b.ov - a.ov; });
+    }
     const rng = U.rngFor(G.seed, "squad", cl.id, G.year);
     const real = D.REAL_SQUADS && D.REAL_SQUADS[cl.id];
     if (real) {

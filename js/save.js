@@ -57,6 +57,7 @@ window.CQ = window.CQ || {};
       for (let i = 0; i < 12; i++) g.worldStars.push({ name: CQ.util.nameGen(rng, "BR"), pos: "ATA", clubName: clubs[i], ovr: 93 - i });
     }
     if (g.season && !g.season.scorers) g.season.scorers = [];
+    if (!g.world) g.world = CQ.world.buildWorld(g);
     g.schemaVersion = SCHEMA_VERSION;
     return g;
   }

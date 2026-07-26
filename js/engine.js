@@ -104,6 +104,7 @@ window.CQ = window.CQ || {};
     });
     g.rival = makeRival(g, rng);
     g.worldStars = makeWorldStars(g, rng);
+    g.world = CQ.world.buildWorld(g);
     g.player.marketValue = marketValue(g.player);
     startSeason(g);
     return g;
@@ -318,8 +319,16 @@ window.CQ = window.CQ || {};
   }
 
   // gera os artilheiros/garçons NPC da liga do jogador
-  // melhor atacante REAL de um clube (do mesmo elenco mostrado em Clube→Elenco)
-  function topAttackerName(clubId, rng) {
+  // melhor atacante REAL de um clube (do mesmo elenco mostrado em Clube→Elenco) —
+  // lê do mundo persistente (maior overall entre ATA/PON/MEI) quando existir;
+  // fallback pro comportamento antigo (primeiro por ordem de posição) senão.
+  function topAttackerName(g, clubId, rng) {
+    const roster = g.world && g.world.clubs[clubId] && g.world.clubs[clubId].roster;
+    if (roster) {
+      const ord = ["ATA", "PON", "MEI"];
+      const cands = roster.filter(function (pl) { return ord.indexOf(pl.pos) >= 0; });
+      if (cands.length) return cands.reduce(function (a, b) { return b.ovr > a.ovr ? b : a; }).name;
+    }
     const sq = D.REAL_SQUADS && D.REAL_SQUADS[clubId];
     if (sq) {
       const ord = ["ATA", "PON", "MEI"];
@@ -342,7 +351,7 @@ window.CQ = window.CQ || {};
     for (let i = 0; i < Math.min(12, clubs.length); i++) {
       const cl = clubs[i];
       const gTarget = Math.max(6, Math.round(top - i * U.rf(1.4, 2.4, rng)));
-      scorers.push({ name: topAttackerName(cl.id, rng), clubId: cl.id, g: gTarget, a: U.ri(4, 13, rng) });
+      scorers.push({ name: topAttackerName(g, cl.id, rng), clubId: cl.id, g: gTarget, a: U.ri(4, 13, rng) });
     }
     // projeção do rival para a corrida ao vivo
     const rbase = { GOL: 0, ZAG: 2, LAT: 3, VOL: 4, MEI: 9, PON: 14, ATA: 18 }[g.rival.pos] || 8;
@@ -1546,6 +1555,7 @@ window.CQ = window.CQ || {};
     // rival evolui
     rivalSeasonEnd(g, notes);
     worldStarsEnd(g);
+    if (g.world) CQ.world.advanceWorld(g);
 
     // renda passiva de negócios / estilo de vida
     const income = assetIncome(g);

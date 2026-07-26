@@ -435,8 +435,40 @@ Olimpia, LDU Quito, Barcelona-EQU, Bolívar, Millonarios, Atlético Nacional).
   escudo do River carregando de verdade (`naturalWidth: 150`, não quebrado).
 - Regressão: **23/23**.
 
+## Mundo Real 2026 — Fatia 1: identidade persistente de NPCs (`CQ.world`)
+Primeira fatia da fase "Mundo Real 2026" (planejada desde o início do projeto). Antes,
+`squadOf` recalculava idade/overall de cada jogador do REAL_SQUADS **do zero a cada
+chamada** via RNG determinística — determinístico, mas sem memória real: o mesmo jogador
+aparecia com idades diferentes em anos diferentes, nunca envelhecia de fato, nunca se
+aposentava, nunca era substituído por uma base.
+- **Novo `js/world.js`** (`CQ.world`): cada um dos 187 clubes ganha um elenco com
+  **identidade estável** (`g.world.clubs[clubId].roster`) que avança uma vez por temporada
+  (`advanceWorld`, chamado de `endSeason`) — envelhece, ganha/perde overall conforme a
+  mesma curva de idade do próprio jogador (`applyAging`), e se aposenta nos mesmos limiares
+  (`age>=40 || (age>=37&&ovr<80) || (age>=35&&ovr<74) || (age>=33&&ovr<66)`), sendo
+  substituído por uma promessa gerada (nunca reaproveita nome real).
+- **Migração de save antigo é invisível**: o mundo é semeado com a **mesma chave de RNG**
+  que `squadOf` sempre usou (`seed, "squad", clubId, ano`) — carregar um save em andamento
+  reproduz byte a byte o que a tela de elenco já mostrava um instante antes. Validado:
+  18/18 jogadores do elenco do Flamengo bateram exatamente com a fórmula antiga ao migrar.
+- **`squadOf`, `topAttackerName` e `buildScorers` recableados** pra ler do mundo
+  persistente, com fallback pro gerador antigo preservado (save em migração, ou clube sem
+  dado no mundo). `topAttackerName` agora escolhe o de **maior overall** entre ATA/PON/MEI
+  do elenco (antes pegava só o primeiro por ordem de posição).
+- **Validado por simulação** (`scripts/world-check.mjs`, novo — mesmo padrão do
+  `balance-runner.mjs`): 20 temporadas simuladas, `g.world` de 187 clubes serializa a
+  **~270 KB** (bate com a estimativa do plano), idade avança exatamente 1/temporada pra
+  quem não se aposenta, aposentadoria+reposição confirmada (por volta da 2ª década de
+  carreira simulada, praticamente todo o elenco original já passou por reposição — esperado,
+  não bug, dado que quase 20 anos passam).
+- Regressão: de 23 pra **27 checagens** (migração de save cobre `g.world` agora; novo teste
+  `testWorldAging` confere envelhecimento e reposição ao longo de temporadas simuladas).
+- **Fora desta fatia** (próximos passos explícitos): mercado de transferências entre NPCs
+  (clubes comprando/vendendo jogadores entre si), telas de mundo (tabelas de ligas que o
+  jogador não disputa), olheiro de base / geração de promessas com mais destaque.
+
 ## Próximos passos (fase seguinte — Mundo Real 2026)
-1. **Arquitetura do mundo** (`CQ.world`): snapshot versionado + modelo de jogador estruturado;
-   `squadOf` lendo do mundo com fallback para geração.
-2. Envelhecimento/aposentadoria global, base e mercado de NPCs; telas editoriais do mundo.
-3. **Ajuste opcional:** Bola de Ouro ocasional para defensores/goleiros de elite (hoje ~0).
+1. Mercado de transferências entre NPCs (clubes negociando entre si, não só com o jogador).
+2. Telas de mundo: tabelas/resultados de ligas e competições que o jogador não disputa.
+3. Olheiro de base / geração de promessas com mais destaque narrativo.
+4. **Ajuste opcional:** Bola de Ouro ocasional para defensores/goleiros de elite (hoje ~0).
