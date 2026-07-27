@@ -107,6 +107,42 @@
       assert("mundo: pelo menos uma reposição (aposentadoria) em " + guard + " temporadas", totalSwapped > 0, "reais=" + totalReal + " repostos=" + totalSwapped);
     });
   }
+  // ---- Mercado autônomo entre NPCs: transfere sem estourar tamanho de elenco nem duplicar id ----
+  function testMarketTransfers() {
+    withTempGame(function () {
+      const g = newCareer("ATA");
+      const initialSizes = {};
+      Object.keys(g.world.clubs).forEach(function (cid) { initialSizes[cid] = g.world.clubs[cid].roster.length; });
+      const allNotes = [];
+      let guard = 0;
+      while (guard++ < 15) {
+        let n = 0; while (E().currentFixture(g) && n++ < 160) E().applyMatch(g, E().resolveMatch(g, E().currentFixture(g), {}));
+        const hadPending = !!g.pendingSummary;
+        const sum = g.pendingSummary || E().endSeason(g);
+        if (!hadPending && sum.notes) allNotes.push.apply(allNotes, sum.notes);
+        if (sum.retiring) break;
+        if (sum.offers) {
+          if (sum.offers.renew) E().acceptRenew(g, sum.offers.renew);
+          else if (sum.offers.list && sum.offers.list[0]) E().acceptOffer(g, sum.offers.list[0]);
+        }
+        E().nextSeason(g);
+      }
+      let sizeOk = true, sizeDetail = "";
+      Object.keys(g.world.clubs).forEach(function (cid) {
+        if (g.world.clubs[cid].roster.length !== initialSizes[cid]) { sizeOk = false; sizeDetail = cid; }
+      });
+      assert("mercado: tamanho de cada elenco não muda com transferências", sizeOk, sizeDetail);
+      let dupOk = true, dupDetail = "";
+      Object.keys(g.world.clubs).forEach(function (cid) {
+        const ids = g.world.clubs[cid].roster.map(function (pl) { return pl.id; });
+        if (new Set(ids).size !== ids.length) { dupOk = false; dupDetail = cid; }
+      });
+      assert("mercado: nenhum id duplicado dentro do mesmo elenco", dupOk, dupDetail);
+      const transferNews = allNotes.filter(function (n) { return n.t === "world-transfer"; });
+      assert("mercado: pelo menos 1 notícia de transferência em 15 temporadas", transferNews.length > 0, "n=" + transferNews.length);
+    });
+  }
+
   function testImportRejectsInvalid() {
     withTempGame(function () {
       const raw = localStorage.getItem("craque-save-v1");
@@ -210,6 +246,7 @@
     testLiveDeterminism();
     testPositionRatings();
     testWorldAging();
+    testMarketTransfers();
     testAllPositionsSmoke();
     const pass = results.filter(function (r) { return r.pass; }).length;
     console.log("%cCRAQUE regressão: " + pass + "/" + results.length + " passaram", "font-weight:bold");

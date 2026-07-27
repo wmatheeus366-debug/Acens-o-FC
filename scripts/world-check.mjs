@@ -22,7 +22,7 @@ const ctx = {
 ctx.window = ctx;
 ctx.globalThis = ctx;
 vm.createContext(ctx);
-for (const f of ["util", "data", "world", "engine", "narrative"]) {
+for (const f of ["util", "data", "world", "engine", "market", "narrative"]) {
   const code = fs.readFileSync(path.join(root, "js", f + ".js"), "utf8");
   vm.runInContext(code, ctx, { filename: "js/" + f + ".js" });
 }
@@ -53,14 +53,31 @@ function ageHistogram(g) {
   return buckets;
 }
 const histBefore = ageHistogram(g);
+const initialRosterSizes = {};
+Object.keys(g.world.clubs).forEach(function (cid) { initialRosterSizes[cid] = g.world.clubs[cid].roster.length; });
+
+// intercepta advanceMarket só pra registrar o "moved" real de cada temporada
+// (contar ids "_t" no mundo não serve de proxy: um jogador transferido pode se
+// aposentar depois, e aí some da contagem sem que isso seja um "recuo" de verdade)
+const realAdvanceMarket = CQ.market.advanceMarket;
+let lastMoved = 0;
+CQ.market.advanceMarket = function (g, notes) {
+  const r = realAdvanceMarket(g, notes);
+  lastMoved = r.moved;
+  return r;
+};
 
 let guard = 0, seasons = 0;
+const transfersPerSeason = [];
 while (guard++ < N) {
   let n = 0;
   while (E.currentFixture(g) && n++ < 160) E.applyMatch(g, E.resolveMatch(g, E.currentFixture(g), {}));
   const hadPending = !!g.pendingSummary;
   const sum = g.pendingSummary || E.endSeason(g);
-  if (!hadPending) seasons++;
+  if (!hadPending) {
+    seasons++;
+    transfersPerSeason.push(lastMoved);
+  }
   if (sum.retiring) break;
   if (sum.offers) {
     if (sum.offers.renew) E.acceptRenew(g, sum.offers.renew);
@@ -69,11 +86,16 @@ while (guard++ < N) {
   E.nextSeason(g);
 }
 
-let totalPlayers = 0, totalReal = 0, totalReplaced = 0;
+let totalPlayers = 0, totalReal = 0, totalReplaced = 0, totalTransferred = 0, totalRetired = 0;
+let rosterSizeMismatch = 0;
 Object.keys(g.world.clubs).forEach(function (cid) {
-  g.world.clubs[cid].roster.forEach(function (pl) {
+  const roster = g.world.clubs[cid].roster;
+  if (roster.length !== initialRosterSizes[cid]) rosterSizeMismatch++;
+  roster.forEach(function (pl) {
     totalPlayers++;
     if (pl.real) totalReal++; else totalReplaced++;
+    if (pl.id.indexOf("_t") >= 0) totalTransferred++;
+    else if (pl.id.indexOf("_r") >= 0) totalRetired++;
   });
 });
 const histAfter = ageHistogram(g);
@@ -83,6 +105,16 @@ console.log("\ntemporadas de fato avançadas: " + seasons);
 console.log("total de jogadores no mundo: " + totalPlayers);
 console.log("ainda reais (REAL_SQUADS): " + totalReal + " (" + (totalReal / totalPlayers * 100).toFixed(1) + "%)");
 console.log("já substituídos (aposentaram e foram repostos): " + totalReplaced + " (" + (totalReplaced / totalPlayers * 100).toFixed(1) + "%)");
+console.log("  dos quais por aposentadoria (_r): " + totalRetired);
+console.log("  dos quais por transferência (_t): " + totalTransferred);
+console.log("elencos com tamanho diferente do inicial: " + rosterSizeMismatch + (rosterSizeMismatch === 0 ? " (OK)" : " (PROBLEMA)"));
+
+if (transfersPerSeason.length) {
+  const min = Math.min.apply(null, transfersPerSeason);
+  const max = Math.max.apply(null, transfersPerSeason);
+  const avg = transfersPerSeason.reduce(function (a, b) { return a + b; }, 0) / transfersPerSeason.length;
+  console.log("\ntransferências por temporada: min " + min + " | média " + avg.toFixed(1) + " | máx " + max + " (cap=18)");
+}
 
 console.log("\ndistribuição de idade ANTES (faixas de 5 anos):");
 Object.keys(histBefore).sort((a, b) => a - b).forEach((b) => console.log("  " + b + "-" + (+b + 4) + ": " + histBefore[b]));

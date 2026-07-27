@@ -11,6 +11,7 @@ Desenvolvimento com arquivos separados; distribuição num arquivo único `CRAQU
 | `js/data.js` | `CQ.DATA` | Clubes, ligas, seleções, lendas, posições, elencos reais, recordes | util |
 | `js/world.js` | `CQ.world` | Mundo persistente: identidade estável de NPCs nos 187 clubes, envelhecimento/aposentadoria ano a ano | util, DATA |
 | `js/engine.js` | `CQ.engine` | Modelo, calendário, simulação, prêmios, mercado, técnico, traços, aposentadoria | util, DATA, world, (nar) |
+| `js/market.js` | `CQ.market` | Mercado autônomo entre NPCs: clubes comprando/vendendo jogadores entre si a cada temporada | util, DATA, world, engine |
 | `js/narrative.js` | `CQ.nar` | Feed, entrevistas, eventos de vida, enquetes, rival | util, DATA, engine |
 | `js/live.js` | `CQ.live` | Partidas ao vivo: cronologia, decisões, pênaltis lance a lance | util, engine |
 | `js/ui.js` | `CQ.ui` | Todas as telas, overlays, render | util, DATA, engine, nar, live, save |
@@ -42,7 +43,7 @@ Fontes (Google Fonts) e bandeiras (flagcdn) vêm da web com fallback; todo o res
 
 ```
 # no navegador (index.html ou CRAQUE.html aberto), console:
-CQ.tests.run()             # tests/regression.js — 27 checagens
+CQ.tests.run()             # tests/regression.js — 30 checagens
 
 # balanceamento (Node, motor real num shim vm):
 node scripts/balance-runner.mjs 100   # gera docs/BALANCE_BASELINE.md + .json
@@ -71,10 +72,15 @@ node scripts/world-check.mjs 20       # diagnóstico do mundo persistente (idade
   (save em migração, ou clube sem dado no mundo). Migração de save antigo é invisível: o
   mundo é semeado com a mesma chave de RNG que `squadOf` sempre usou, reproduzindo byte a
   byte o que a tela já mostrava um instante antes.
-- **Próximo:** mercado de transferências entre NPCs (clubes comprando/vendendo jogadores
-  entre si, usando `makeOffers`/`calcSalary` como referência), telas de mundo (tabelas/
-  resultados de ligas que o jogador não disputa), olheiro de base / geração de promessas
-  com mais destaque.
+- ✅ **Fatia 2 (feita): mercado autônomo entre NPCs.** `js/market.js` (`CQ.market`) move
+  jogadores entre clubes NPCs a cada temporada (`advanceMarket`, chamado de `endSeason` logo
+  após `advanceWorld`), reaproveitando o raciocínio de "encaixe" de `makeOffers`. Mecânica
+  "troca-e-repõe": origem ganha promessa gerada (id `_t`), destino perde o mais fraco na
+  mesma posição — tamanho de elenco nunca muda, sem novo campo por NPC, sem mudança de
+  esquema de save. Notícia no feed reaproveita o array `notes` já usado por
+  `rival-transfer`/`rival-retire`, só para transferências grandes o bastante.
+- **Próximo:** telas de mundo (tabelas/resultados de ligas que o jogador não disputa),
+  olheiro de base / geração de promessas com mais destaque.
 - **Escudos/fotos:** já resolvido por fora desta fase — `CQ.DATA.CREST_MAP` (escudo real
   via API-Football, `media.api-sports.io`, uso pessoal) com fallback pro brasão vetorial
   (`crestSVG`) quando não mapeado ou se a imagem falhar. Ver `README.md` § Direitos de

@@ -467,8 +467,34 @@ aposentava, nunca era substituído por uma base.
   (clubes comprando/vendendo jogadores entre si), telas de mundo (tabelas de ligas que o
   jogador não disputa), olheiro de base / geração de promessas com mais destaque.
 
+## Mundo Real 2026 — Fatia 2: mercado de transferências autônomo entre NPCs (`CQ.market`)
+Segunda fatia da fase "Mundo Real 2026", entregando o item 1 dos próximos passos da Fatia 1:
+clubes NPCs agora compram e vendem jogadores **entre si**, sem envolver o jogador — distinto
+do sistema de ofertas que já existia só pro próprio jogador (`makeOffers`/`acceptOffer`,
+intocado).
+- **Novo `js/market.js`** (`CQ.market`): a cada virada de temporada, `advanceMarket` identifica
+  jogadores do mundo persistente claramente acima do nível do clube atual (mesmo raciocínio de
+  "encaixe" que `makeOffers` já usa: `gap = overall - (clubStr - 4)`), e os move pra um clube
+  mais forte compatível (mesma liga, ou liga europeia se overall ≥78, 50% de chance). Limite de
+  18 transferências/temporada no mundo inteiro, 1 clube por temporada (só compra ou só vende).
+- **Mecânica "troca-e-repõe"**: o clube de origem repõe a saída com uma promessa gerada (mesma
+  fórmula da reposição por aposentadoria, id marcado com `_t` em vez de `_r`); o clube de
+  destino perde o jogador mais fraco na mesma posição (ou o mais fraco do elenco), sem sobra —
+  tamanho de cada elenco nunca muda, nenhum campo novo em `{id,name,pos,age,ovr,real}`. Nenhuma
+  mudança de esquema de save.
+- **Notícia no feed**: reaproveita o mesmo mecanismo de `notes` que já gerava
+  `rival-transfer`/`rival-retire` (array já passado por `endSeason` → `sum.notes` →
+  `CQ.nar.onSeasonEnd`). Só transferências grandes o bastante viram notícia (jogador real,
+  overall ≥80, ou liga do jogador envolvida), com valor de mercado estimado (`estimateValue`,
+  mesma curva de `marketValue`, sem persistir nada).
+- **Validado por simulação** (`scripts/world-check.mjs`, estendido): 19 temporadas simuladas,
+  1–18 transferências/temporada (média 11,8), nenhum elenco muda de tamanho, ~150 jogadores
+  transferidos entre clubes ao longo da simulação. Textos de notícia lidos manualmente —
+  nomes indo pra clubes coerentes, valores plausíveis pro overall.
+- Regressão: de 27 pra **30 checagens** (`testMarketTransfers`: tamanho de elenco constante,
+  nenhum id duplicado, pelo menos 1 notícia de transferência em 15 temporadas simuladas).
+
 ## Próximos passos (fase seguinte — Mundo Real 2026)
-1. Mercado de transferências entre NPCs (clubes negociando entre si, não só com o jogador).
-2. Telas de mundo: tabelas/resultados de ligas e competições que o jogador não disputa.
-3. Olheiro de base / geração de promessas com mais destaque narrativo.
-4. **Ajuste opcional:** Bola de Ouro ocasional para defensores/goleiros de elite (hoje ~0).
+1. Telas de mundo: tabelas/resultados de ligas e competições que o jogador não disputa.
+2. Olheiro de base / geração de promessas com mais destaque narrativo.
+3. **Ajuste opcional:** Bola de Ouro ocasional para defensores/goleiros de elite (hoje ~0).

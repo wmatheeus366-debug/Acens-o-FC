@@ -458,6 +458,7 @@ window.CQ = window.CQ || {};
     sum.notes.forEach(function (n) {
       if (n.t === "rival-transfer") post(g, "imprensa", "Mercado: " + g.rival.name + ", rival de geração de " + p.name + ", é anunciado pelo " + n.club + ".");
       if (n.t === "rival-retire") post(g, "imprensa", n.old + " anuncia aposentadoria. A imprensa já aponta o novo rival de geração de " + p.name + ": " + n.novo + ".", { hot: true });
+      if (n.t === "world-transfer") post(g, "imprensa", "Mercado: " + n.player + " (" + n.ovr + " de overall) é anunciado pelo " + n.toClub + ", que teria pago cerca de " + U.fmtBRL(n.valueHint) + " ao " + n.fromClub + ".", { hot: n.ovr >= 84 });
     });
     if (sum.convNews === "convocado") post(g, "selecao", "CONVOCADO! " + p.name + " está na lista para o próximo ciclo da Seleção. 🎽", { hot: true });
     if (sum.convNews === "cortado") post(g, "imprensa", p.name + " fica fora da nova lista da Seleção. Queda de rendimento pesou.");
