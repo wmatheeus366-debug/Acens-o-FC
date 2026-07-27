@@ -85,6 +85,7 @@ function checkWorldLeagues(g) {
 
 let guard = 0, seasons = 0;
 const transfersPerSeason = [];
+const allNotes = [];
 while (guard++ < N) {
   let n = 0;
   while (E.currentFixture(g) && n++ < 160) E.applyMatch(g, E.resolveMatch(g, E.currentFixture(g), {}));
@@ -94,6 +95,7 @@ while (guard++ < N) {
     seasons++;
     transfersPerSeason.push(lastMoved);
     checkWorldLeagues(g);
+    if (sum.notes) allNotes.push.apply(allNotes, sum.notes);
   }
   if (sum.retiring) break;
   if (sum.offers) {
@@ -142,5 +144,11 @@ console.log("\ntamanho de g.world: " + (initialSize / 1024).toFixed(1) + " KB �
 
 console.log("\ntabelas do mundo: " + leagueChecks + " verificações, " + leagueProblems + " problema(s)" + (leagueProblems === 0 ? " (OK)" : ""));
 console.log("tamanho de g.world.leagues: " + (JSON.stringify(g.world.leagues).length / 1024).toFixed(1) + " KB");
+
+const breakouts = allNotes.filter(function (n) { return n.t === "prospect-breakout"; });
+console.log("\npromessas de base notáveis (prospect-breakout): " + breakouts.length + " em " + seasons + " temporadas");
+if (breakouts.length) {
+  breakouts.slice(0, 5).forEach(function (n) { console.log("  " + n.player + " (" + n.age + "a, " + n.pos + ", ovr " + n.ovr + ") — " + n.club); });
+}
 
 console.log("\nOK (" + ((Date.now() - t0) / 1000).toFixed(1) + "s)");

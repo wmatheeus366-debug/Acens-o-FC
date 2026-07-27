@@ -1557,7 +1557,7 @@ window.CQ = window.CQ || {};
     // rival evolui
     rivalSeasonEnd(g, notes);
     worldStarsEnd(g);
-    if (g.world) CQ.world.advanceWorld(g);
+    if (g.world) CQ.world.advanceWorld(g, notes);
     if (g.world && CQ.market) CQ.market.advanceMarket(g, notes);
 
     // renda passiva de negócios / estilo de vida

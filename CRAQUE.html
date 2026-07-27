@@ -2310,7 +2310,7 @@ window.CQ = window.CQ || {};
 
   // avança o mundo inteiro em uma temporada: envelhece todo mundo, aposenta e repõe
   // quem passou do ponto (chamado 1x por virada de temporada, em endSeason)
-  function advanceWorld(g) {
+  function advanceWorld(g, notes) {
     const year = g.year;
     Object.keys(g.world.clubs).forEach(function (clubId) {
       const cl = D.CLUBS[clubId];
@@ -2321,12 +2321,18 @@ window.CQ = window.CQ || {};
         if (isRetiring(pl)) {
           // substitui no mesmo índice (mantém o equilíbrio posicional do elenco);
           // NUNCA reaproveita nome do REAL_SQUADS — sempre passa por nameGen.
-          roster[idx] = {
+          const repl = {
             id: clubId + "_r" + year + "_" + idx,
             name: U.nameGen(rng, natHintForClub(clubId)), pos: pl.pos,
             age: U.ri(17, 20, rng), ovr: U.clamp((cl ? cl.str : 70) - 14 + U.ri(-4, 6, rng), 45, 84),
             real: false
           };
+          roster[idx] = repl;
+          // promessa notável (olheiro de base): rolagem próxima do teto da faixa +
+          // relevante pro jogador (mesma liga) — vira notícia em onSeasonEnd
+          if (notes && repl.ovr >= (cl ? cl.str : 70) - 9 && CQ.engine.leagueOf(g, clubId) === CQ.engine.leagueOf(g, g.player.clubId)) {
+            notes.push({ t: "prospect-breakout", player: repl.name, pos: repl.pos, ovr: repl.ovr, age: repl.age, club: cl ? cl.name : clubId });
+          }
         }
       });
     });
@@ -3895,7 +3901,7 @@ window.CQ = window.CQ || {};
     // rival evolui
     rivalSeasonEnd(g, notes);
     worldStarsEnd(g);
-    if (g.world) CQ.world.advanceWorld(g);
+    if (g.world) CQ.world.advanceWorld(g, notes);
     if (g.world && CQ.market) CQ.market.advanceMarket(g, notes);
 
     // renda passiva de negócios / estilo de vida
@@ -4464,6 +4470,12 @@ window.CQ = window.CQ || {};
       age: U.ri(17, 20, rng), ovr: U.clamp((cand.cl ? cand.cl.str : 70) - 14 + U.ri(-4, 6, rng), 45, 84),
       real: false
     };
+    // promessa notável (olheiro de base) no backfill da saída, independente da
+    // notícia de transferência abaixo — mesmo limiar de world.js
+    const repl = origin[cand.idx];
+    if (repl.ovr >= (cand.cl ? cand.cl.str : 70) - 9 && CQ.engine.leagueOf(g, cand.clubId) === CQ.engine.leagueOf(g, g.player.clubId)) {
+      notes.push({ t: "prospect-breakout", player: repl.name, pos: repl.pos, ovr: repl.ovr, age: repl.age, club: cand.cl ? cand.cl.name : cand.clubId });
+    }
 
     const samePos = target.map(function (p, i) { return { p: p, i: i }; }).filter(function (x) { return x.p.pos === pl.pos; });
     const pool = samePos.length ? samePos : target.map(function (p, i) { return { p: p, i: i }; });
@@ -4962,6 +4974,7 @@ window.CQ = window.CQ || {};
       if (n.t === "rival-transfer") post(g, "imprensa", "Mercado: " + g.rival.name + ", rival de geração de " + p.name + ", é anunciado pelo " + n.club + ".");
       if (n.t === "rival-retire") post(g, "imprensa", n.old + " anuncia aposentadoria. A imprensa já aponta o novo rival de geração de " + p.name + ": " + n.novo + ".", { hot: true });
       if (n.t === "world-transfer") post(g, "imprensa", "Mercado: " + n.player + " (" + n.ovr + " de overall) é anunciado pelo " + n.toClub + ", que teria pago cerca de " + U.fmtBRL(n.valueHint) + " ao " + n.fromClub + ".", { hot: n.ovr >= 84 });
+      if (n.t === "prospect-breakout") post(g, "imprensa", "Base: " + n.player + " (" + n.age + " anos, " + n.pos + ") chama atenção nas categorias de base do " + n.club + " — overall de " + n.ovr + " já impressiona para a idade.");
     });
     if (sum.convNews === "convocado") post(g, "selecao", "CONVOCADO! " + p.name + " está na lista para o próximo ciclo da Seleção. 🎽", { hot: true });
     if (sum.convNews === "cortado") post(g, "imprensa", p.name + " fica fora da nova lista da Seleção. Queda de rendimento pesou.");
@@ -7185,11 +7198,25 @@ window.CQ = window.CQ || {};
     }).sort(function (a, b) { return b.ov - a.ov; });
   }
 
+  function baseHTML(G) {
+    const cl = E().myClub(G);
+    const rows = squadOf(G)
+      .filter(function (j) { return j.age <= 20; })
+      .sort(function (a, b) { return b.ov - a.ov || a.age - b.age; })
+      .map(function (j) {
+        return `<tr><td>${esc(j.name)}</td><td>${D.POSITIONS[j.pos].name}</td><td class="num">${j.age}</td><td class="num"><b>${j.ov}</b></td></tr>`;
+      }).join("");
+    return `<div class="card"><div class="card-h"><h3>Base ${esc(cl.name)}</h3><span class="kicker-side">jogadores até 20 anos</span></div>
+      <div class="card-b tight" style="overflow-x:auto"><table class="tbl tbl-zebra"><thead><tr><th>Jogador</th><th>Posição</th><th class="num">Idade</th><th class="num">OVR</th></tr></thead>
+      <tbody>${rows || `<tr><td colspan="4" class="small muted" style="padding:10px 14px">Nenhum jogador de base (≤20 anos) no elenco no momento.</td></tr>`}</tbody></table></div>
+      <p class="small muted" style="padding:8px 14px">Promessas da base envelhecem e evoluem normalmente — fique de olho, algumas podem virar peças importantes com o tempo.</p></div>`;
+  }
+
   function clubHTML() {
     const G = g(), p = G.player, cl = E().myClub(G);
     const lg = E().leagueOf(G, p.clubId);
     const tab = CQ.state.clubTab || "info";
-    const tabs = [["info", "Visão geral"], ["elenco", "Elenco"], ["vida", "Estilo de vida"], ["fin", "Contrato & mercado"], ["save", "Save & dados"]];
+    const tabs = [["info", "Visão geral"], ["elenco", "Elenco"], ["base", "Base"], ["vida", "Estilo de vida"], ["fin", "Contrato & mercado"], ["save", "Save & dados"]];
     const subtabs = `<div class="subtabs">${tabs.map(function (t) {
       return `<button class="${tab === t[0] ? "on" : ""}" onclick="CQ.state.clubTab='${t[0]}';CQ.ui.render()">${t[1]}</button>`;
     }).join("")}</div>`;
@@ -7249,6 +7276,8 @@ window.CQ = window.CQ || {};
         <div class="card-b tight" style="overflow-x:auto"><table class="tbl tbl-zebra"><thead><tr><th>Jogador</th><th>Posição</th><th class="num">Idade</th><th class="num">OVR</th></tr></thead>
         <tbody>${meRow}${rows}</tbody></table></div>
         <p class="small muted" style="padding:8px 14px">Se o seu overall ficar muito abaixo do nível do elenco, o técnico vai te deixar no banco — titularidade se conquista.</p></div>`;
+    } else if (tab === "base") {
+      body = baseHTML(G);
     } else if (tab === "vida") {
       const inc = E().assetIncome(G);
       const items = E().LIFESTYLE.map(function (it) {

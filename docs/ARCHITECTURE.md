@@ -43,7 +43,7 @@ Fontes (Google Fonts) e bandeiras (flagcdn) vêm da web com fallback; todo o res
 
 ```
 # no navegador (index.html ou CRAQUE.html aberto), console:
-CQ.tests.run()             # tests/regression.js — 35 checagens
+CQ.tests.run()             # tests/regression.js — 38 checagens
 
 # balanceamento (Node, motor real num shim vm):
 node scripts/balance-runner.mjs 100   # gera docs/BALANCE_BASELINE.md + .json
@@ -87,7 +87,14 @@ node scripts/world-check.mjs 20       # diagnóstico do mundo persistente (idade
   histórico). Nova aba "Mundo" em Torneios (`js/ui.js`) reaproveita `leagueTableHTML`
   sem CSS novo. Independente do sorteio de campeão de `recordChampions` (`g.champs`) —
   os dois processos usam RNGs separados por design.
-- **Próximo:** olheiro de base / geração de promessas com mais destaque narrativo.
+- ✅ **Fatia 4 (feita): olheiro de base.** Promessas notáveis (recém-geradas por
+  aposentadoria em `world.js` ou transferência em `market.js`, rolagem próxima do teto
+  da faixa e relevante pra liga do jogador) viram notícia no feed via o mesmo pipeline
+  `notes`/`onSeasonEnd`. Nova aba "Base" na tela do Clube (`js/ui.js`) mostra os
+  jogadores ≤20 anos do próprio elenco, reaproveitando `squadOf`. Sem stat de potencial
+  nova nos NPCs, sem navegação por outros clubes — escopo confirmado com o usuário.
+- **Fase "Mundo Real 2026" concluída** (Fatias 1-4). Próximas extensões ficam por conta
+  de necessidades futuras, sem item pendente documentado nesta fase.
 - **Escudos/fotos:** já resolvido por fora desta fase — `CQ.DATA.CREST_MAP` (escudo real
   via API-Football, `media.api-sports.io`, uso pessoal) com fallback pro brasão vetorial
   (`crestSVG`) quando não mapeado ou se a imagem falhar. Ver `README.md` § Direitos de

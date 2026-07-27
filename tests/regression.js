@@ -190,6 +190,40 @@
     });
   }
 
+  // ---- Olheiro de base: promessa notável vira notícia + aba Base bem formada ----
+  function testProspectBreakout() {
+    withTempGame(function () {
+      const g = newCareer("ATA");
+      const allNotes = [];
+      let guard = 0;
+      while (guard++ < 20) {
+        let n = 0; while (E().currentFixture(g) && n++ < 160) E().applyMatch(g, E().resolveMatch(g, E().currentFixture(g), {}));
+        const hadPending = !!g.pendingSummary;
+        const sum = g.pendingSummary || E().endSeason(g);
+        if (!hadPending && sum.notes) allNotes.push.apply(allNotes, sum.notes);
+        if (sum.retiring) break;
+        if (sum.offers) {
+          if (sum.offers.renew) E().acceptRenew(g, sum.offers.renew);
+          else if (sum.offers.list && sum.offers.list[0]) E().acceptOffer(g, sum.offers.list[0]);
+        }
+        E().nextSeason(g);
+      }
+      const breakouts = allNotes.filter(function (n) { return n.t === "prospect-breakout"; });
+      assert("base: pelo menos 1 notícia de promessa de base em 20 temporadas", breakouts.length > 0, "n=" + breakouts.length);
+      let shapeOk = true;
+      breakouts.forEach(function (n) {
+        if (!n.player || !n.pos || typeof n.ovr !== "number" || typeof n.age !== "number" || !n.club) shapeOk = false;
+      });
+      assert("base: shape da nota prospect-breakout está completo", shapeOk);
+
+      const myClubId = g.player.clubId;
+      const base = g.world.clubs[myClubId].roster.filter(function (pl) { return pl.age <= 20; });
+      let baseOk = true;
+      base.forEach(function (pl) { if (!(pl.ovr >= 40 && pl.ovr <= 96) || !pl.pos || !pl.name) baseOk = false; });
+      assert("base: dados da aba Base (idade<=20) bem formados", baseOk, "n=" + base.length);
+    });
+  }
+
   function testImportRejectsInvalid() {
     withTempGame(function () {
       const raw = localStorage.getItem("craque-save-v1");
@@ -294,6 +328,7 @@
     testPositionRatings();
     testWorldAging();
     testMarketTransfers();
+    testProspectBreakout();
     testWorldLeagueTables();
     testAllPositionsSmoke();
     const pass = results.filter(function (r) { return r.pass; }).length;

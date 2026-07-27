@@ -82,7 +82,7 @@ window.CQ = window.CQ || {};
 
   // avança o mundo inteiro em uma temporada: envelhece todo mundo, aposenta e repõe
   // quem passou do ponto (chamado 1x por virada de temporada, em endSeason)
-  function advanceWorld(g) {
+  function advanceWorld(g, notes) {
     const year = g.year;
     Object.keys(g.world.clubs).forEach(function (clubId) {
       const cl = D.CLUBS[clubId];
@@ -93,12 +93,18 @@ window.CQ = window.CQ || {};
         if (isRetiring(pl)) {
           // substitui no mesmo índice (mantém o equilíbrio posicional do elenco);
           // NUNCA reaproveita nome do REAL_SQUADS — sempre passa por nameGen.
-          roster[idx] = {
+          const repl = {
             id: clubId + "_r" + year + "_" + idx,
             name: U.nameGen(rng, natHintForClub(clubId)), pos: pl.pos,
             age: U.ri(17, 20, rng), ovr: U.clamp((cl ? cl.str : 70) - 14 + U.ri(-4, 6, rng), 45, 84),
             real: false
           };
+          roster[idx] = repl;
+          // promessa notável (olheiro de base): rolagem próxima do teto da faixa +
+          // relevante pro jogador (mesma liga) — vira notícia em onSeasonEnd
+          if (notes && repl.ovr >= (cl ? cl.str : 70) - 9 && CQ.engine.leagueOf(g, clubId) === CQ.engine.leagueOf(g, g.player.clubId)) {
+            notes.push({ t: "prospect-breakout", player: repl.name, pos: repl.pos, ovr: repl.ovr, age: repl.age, club: cl ? cl.name : clubId });
+          }
         }
       });
     });

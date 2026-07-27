@@ -521,6 +521,26 @@ reais — em vez do sorteio de campeão por força que já existia (`recordChamp
   na criação da carreira, aritmética de jogos/pontos/gols correta, snapshot renovado a
   cada temporada; migração de save antigo cobre `g.world.leagues` também).
 
-## Próximos passos (fase seguinte — Mundo Real 2026)
-1. Olheiro de base / geração de promessas com mais destaque narrativo.
-3. **Ajuste opcional:** Bola de Ouro ocasional para defensores/goleiros de elite (hoje ~0).
+## Mundo Real 2026 — Fatia 4: olheiro de base (notícia + aba "Base")
+Quarta e última fatia planejada da fase "Mundo Real 2026". O jogo já gerava promessas em
+segundo plano (reposição por aposentadoria em `world.js`, backfill de transferência em
+`market.js`) — 100% invisível até aqui. Escopo menor confirmado com o usuário (sem stat de
+potencial nova, sem navegação pelos 187 clubes): só notícia + uma aba de visualização.
+- **Notícia de promessa notável**: quando uma promessa recém-gerada (aposentadoria OU
+  transferência) rola próxima do teto da sua faixa (`ovr >= clubStr - 9`, ~18% das
+  rolagens) E é da liga do jogador, vira notícia no feed (`"Base: <nome> (<idade> anos,
+  <posição>) chama atenção nas categorias de base do <clube>..."`). Reaproveita o mesmo
+  pipeline `notes` → `sum.notes` → `onSeasonEnd` já usado por `world-transfer`.
+- **Nova aba "Base"** na tela do Clube: jogadores ≤20 anos do próprio elenco, ordenados
+  por overall, reaproveitando `squadOf` (herda o fallback de saves em migração de graça).
+  Sem stat nova, sem interação — só visualização.
+- `advanceWorld(g)` ganhou o parâmetro `notes` (único call site de produção, em
+  `endSeason`; testes/diagnóstico só chegam lá indiretamente via `endSeason`, sem
+  ajuste necessário).
+- **Validado por simulação**: 20 temporadas, 83 promessas notáveis geradas (todas na
+  liga do jogador, por design), textos e tabela conferidos manualmente no navegador.
+- Regressão: de 35 pra **38 checagens** (`testProspectBreakout`: pelo menos 1 notícia em
+  20 temporadas, shape da nota completo, dados da aba Base bem formados).
+
+## Próximos passos
+1. **Ajuste opcional:** Bola de Ouro ocasional para defensores/goleiros de elite (hoje ~0).

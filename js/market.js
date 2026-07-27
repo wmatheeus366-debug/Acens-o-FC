@@ -76,6 +76,12 @@ window.CQ = window.CQ || {};
       age: U.ri(17, 20, rng), ovr: U.clamp((cand.cl ? cand.cl.str : 70) - 14 + U.ri(-4, 6, rng), 45, 84),
       real: false
     };
+    // promessa notável (olheiro de base) no backfill da saída, independente da
+    // notícia de transferência abaixo — mesmo limiar de world.js
+    const repl = origin[cand.idx];
+    if (repl.ovr >= (cand.cl ? cand.cl.str : 70) - 9 && CQ.engine.leagueOf(g, cand.clubId) === CQ.engine.leagueOf(g, g.player.clubId)) {
+      notes.push({ t: "prospect-breakout", player: repl.name, pos: repl.pos, ovr: repl.ovr, age: repl.age, club: cand.cl ? cand.cl.name : cand.clubId });
+    }
 
     const samePos = target.map(function (p, i) { return { p: p, i: i }; }).filter(function (x) { return x.p.pos === pl.pos; });
     const pool = samePos.length ? samePos : target.map(function (p, i) { return { p: p, i: i }; });

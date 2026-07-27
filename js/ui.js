@@ -1870,11 +1870,25 @@ window.CQ = window.CQ || {};
     }).sort(function (a, b) { return b.ov - a.ov; });
   }
 
+  function baseHTML(G) {
+    const cl = E().myClub(G);
+    const rows = squadOf(G)
+      .filter(function (j) { return j.age <= 20; })
+      .sort(function (a, b) { return b.ov - a.ov || a.age - b.age; })
+      .map(function (j) {
+        return `<tr><td>${esc(j.name)}</td><td>${D.POSITIONS[j.pos].name}</td><td class="num">${j.age}</td><td class="num"><b>${j.ov}</b></td></tr>`;
+      }).join("");
+    return `<div class="card"><div class="card-h"><h3>Base ${esc(cl.name)}</h3><span class="kicker-side">jogadores até 20 anos</span></div>
+      <div class="card-b tight" style="overflow-x:auto"><table class="tbl tbl-zebra"><thead><tr><th>Jogador</th><th>Posição</th><th class="num">Idade</th><th class="num">OVR</th></tr></thead>
+      <tbody>${rows || `<tr><td colspan="4" class="small muted" style="padding:10px 14px">Nenhum jogador de base (≤20 anos) no elenco no momento.</td></tr>`}</tbody></table></div>
+      <p class="small muted" style="padding:8px 14px">Promessas da base envelhecem e evoluem normalmente — fique de olho, algumas podem virar peças importantes com o tempo.</p></div>`;
+  }
+
   function clubHTML() {
     const G = g(), p = G.player, cl = E().myClub(G);
     const lg = E().leagueOf(G, p.clubId);
     const tab = CQ.state.clubTab || "info";
-    const tabs = [["info", "Visão geral"], ["elenco", "Elenco"], ["vida", "Estilo de vida"], ["fin", "Contrato & mercado"], ["save", "Save & dados"]];
+    const tabs = [["info", "Visão geral"], ["elenco", "Elenco"], ["base", "Base"], ["vida", "Estilo de vida"], ["fin", "Contrato & mercado"], ["save", "Save & dados"]];
     const subtabs = `<div class="subtabs">${tabs.map(function (t) {
       return `<button class="${tab === t[0] ? "on" : ""}" onclick="CQ.state.clubTab='${t[0]}';CQ.ui.render()">${t[1]}</button>`;
     }).join("")}</div>`;
@@ -1934,6 +1948,8 @@ window.CQ = window.CQ || {};
         <div class="card-b tight" style="overflow-x:auto"><table class="tbl tbl-zebra"><thead><tr><th>Jogador</th><th>Posição</th><th class="num">Idade</th><th class="num">OVR</th></tr></thead>
         <tbody>${meRow}${rows}</tbody></table></div>
         <p class="small muted" style="padding:8px 14px">Se o seu overall ficar muito abaixo do nível do elenco, o técnico vai te deixar no banco — titularidade se conquista.</p></div>`;
+    } else if (tab === "base") {
+      body = baseHTML(G);
     } else if (tab === "vida") {
       const inc = E().assetIncome(G);
       const items = E().LIFESTYLE.map(function (it) {
