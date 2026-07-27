@@ -542,5 +542,34 @@ potencial nova, sem navegação pelos 187 clubes): só notícia + uma aba de vis
 - Regressão: de 35 pra **38 checagens** (`testProspectBreakout`: pelo menos 1 notícia em
   20 temporadas, shape da nota completo, dados da aba Base bem formados).
 
+## Imersão: ritual de jogo, cerimônia de temporada, rivalidade de clubes, alerta de olheiro
+Quatro melhorias de imersão escolhidas pelo usuário numa lista de sugestões, independentes
+entre si (não fazem parte de "Mundo Real 2026", já concluída).
+- **Ritual de dia de jogo**: nova `matchdayBanner(G, fx)` na home, entre o confronto e o
+  botão de jogar — clima/torcida fictícios (determinísticos via `rngFor(seed,"matchday",
+  year,season.idx)`, nunca piscam entre renders) e uma "escalação provável" derivada de
+  `squadOf`, com o próprio jogador encaixado na sua posição quando disponível. 100% aditivo,
+  nenhuma mudança no botão de jogar.
+- **Balanço de temporada como cerimônia**: `showSummary()` deixou de ser um overlay único
+  e virou uma sequência de passos ("envelopes") — título/abertura → números da temporada →
+  prêmios individuais → Bola de Ouro (sempre por último, o maior reveal) → administrativo
+  (fecha no mesmo botão de sempre, `summaryNext()`, inalterado). Passos sem conteúdo são
+  pulados dinamicamente. Confete/som de troféu movidos pro passo certo (título e/ou Bola de
+  Ouro) em vez de disparar tudo no topo. Reaproveita o mecanismo de reabrir `overlay()`
+  já usado por `showTitleCelebration`/`closeTitle`.
+- **Rivalidade de clubes**: o campo `rivals` já existia (46/187 clubes com clássico real
+  cadastrado) mas cobria só os pares curados. Agora todo clube ganha ao menos um rival —
+  brasileiro sem par real pega o mais forte do mesmo estado, europeu sem par pega o mais
+  forte da mesma liga, nunca sobrescrevendo rivalidade real. Novo `g.clubRivalry[clubId]`
+  (placar V-E-D por rival, distinto do `g.h2h` do rival de geração pessoal), atualizado em
+  `applyMatch` quando `fx.classic`, mostrado num novo card na aba Duelo.
+- **Alerta de "clube na mira"**: quando uma promessa notável (`prospect-breakout`, já
+  existente) tem overall Europa-relevante (`>=78`, mesmo limiar de `EURO_UNLOCK_OVR` em
+  `market.js`), um post extra de olheiros europeus de olho é adicionado — sem estado novo
+  persistido, puramente narrativo.
+- Regressão: de 38 pra **46 checagens** (cobertura/simetria de rivais, placar do clássico
+  simulado via `applyMatch` real, rumor de olheiro europeu presente pra cada promessa
+  Europa-relevante, migração de `g.clubRivalry`).
+
 ## Próximos passos
 1. **Ajuste opcional:** Bola de Ouro ocasional para defensores/goleiros de elite (hoje ~0).

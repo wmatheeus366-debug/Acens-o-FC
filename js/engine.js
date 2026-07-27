@@ -96,6 +96,7 @@ window.CQ = window.CQ || {};
       boardFail: 0, retired: false, transferRequested: false,
       trainingFocus: "equil", manager: null,
       h2h: { v: 0, e: 0, d: 0 },
+      clubRivalry: {},
       pendingOffers: null, pendingSummary: null
     };
     // histórico real pré-carregado
@@ -1274,6 +1275,13 @@ window.CQ = window.CQ || {};
     // rival: retrospecto de confronto direto
     if (fx.rivalDuel && !fx.isNatMatch) {
       if (res.win) g.h2h.v++; else if (res.draw) g.h2h.e++; else g.h2h.d++;
+    }
+
+    // clássico de clube: retrospecto por rival (distinto do rival de geração acima)
+    if (fx.classic && !fx.isNatMatch) {
+      g.clubRivalry = g.clubRivalry || {};
+      const rec = g.clubRivalry[fx.oppId] || (g.clubRivalry[fx.oppId] = { v: 0, e: 0, d: 0 });
+      if (res.win) rec.v++; else if (res.draw) rec.e++; else rec.d++;
     }
 
     // salário (≈ semanal)

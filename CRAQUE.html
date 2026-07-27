@@ -1809,6 +1809,27 @@ window.CQ = window.CQ || {};
   riv("intm", "mln"); riv("juve", "tor"); riv("rom", "laz"); riv("bay", "bvb"); riv("psg", "mars"); riv("ben", "porto"); riv("scp", "ben");
   riv("riv", "boc"); riv("pen", "nac");
 
+  // cobertura total: todo clube ganha ao menos um rival (real ou de reposição).
+  // Clube sem par curado pega o mais forte do mesmo estado (uf); sem uf compatível
+  // (alguns estados só têm 1 clube no jogo), cai pro mais forte da mesma liga.
+  // Nunca sobrescreve rivalidade real já cadastrada.
+  (function assignFallbackRivals() {
+    const ids = Object.keys(CLUBS).sort(function (a, b) {
+      return CLUBS[b].str - CLUBS[a].str || a.localeCompare(b);
+    });
+    ids.forEach(function (id) {
+      const cl = CLUBS[id];
+      if (cl.rivals.length > 0) return; // real, ou já ganhou rival nesta mesma passada
+      let pool = Object.keys(CLUBS).filter(function (oid) {
+        return oid !== id && cl.uf && CLUBS[oid].uf === cl.uf;
+      });
+      if (!pool.length) pool = Object.keys(CLUBS).filter(function (oid) { return oid !== id && CLUBS[oid].league === cl.league; });
+      if (!pool.length) return;
+      pool.sort(function (a, b) { return CLUBS[b].str - CLUBS[a].str || a.localeCompare(b); });
+      riv(id, pool[0]);
+    });
+  })();
+
   const LEAGUES = {
     BRA: { id: "BRA", name: "Brasileirão Série A", short: "Série A", country: "BR", cupName: "Copa do Brasil", rounds: 38 },
     BRB: { id: "BRB", name: "Brasileirão Série B", short: "Série B", country: "BR", cupName: "Copa do Brasil", rounds: 30 },
@@ -2440,6 +2461,7 @@ window.CQ = window.CQ || {};
       boardFail: 0, retired: false, transferRequested: false,
       trainingFocus: "equil", manager: null,
       h2h: { v: 0, e: 0, d: 0 },
+      clubRivalry: {},
       pendingOffers: null, pendingSummary: null
     };
     // histórico real pré-carregado
@@ -3618,6 +3640,13 @@ window.CQ = window.CQ || {};
     // rival: retrospecto de confronto direto
     if (fx.rivalDuel && !fx.isNatMatch) {
       if (res.win) g.h2h.v++; else if (res.draw) g.h2h.e++; else g.h2h.d++;
+    }
+
+    // clássico de clube: retrospecto por rival (distinto do rival de geração acima)
+    if (fx.classic && !fx.isNatMatch) {
+      g.clubRivalry = g.clubRivalry || {};
+      const rec = g.clubRivalry[fx.oppId] || (g.clubRivalry[fx.oppId] = { v: 0, e: 0, d: 0 });
+      if (res.win) rec.v++; else if (res.draw) rec.e++; else rec.d++;
     }
 
     // salário (≈ semanal)
@@ -4974,7 +5003,13 @@ window.CQ = window.CQ || {};
       if (n.t === "rival-transfer") post(g, "imprensa", "Mercado: " + g.rival.name + ", rival de geração de " + p.name + ", é anunciado pelo " + n.club + ".");
       if (n.t === "rival-retire") post(g, "imprensa", n.old + " anuncia aposentadoria. A imprensa já aponta o novo rival de geração de " + p.name + ": " + n.novo + ".", { hot: true });
       if (n.t === "world-transfer") post(g, "imprensa", "Mercado: " + n.player + " (" + n.ovr + " de overall) é anunciado pelo " + n.toClub + ", que teria pago cerca de " + U.fmtBRL(n.valueHint) + " ao " + n.fromClub + ".", { hot: n.ovr >= 84 });
-      if (n.t === "prospect-breakout") post(g, "imprensa", "Base: " + n.player + " (" + n.age + " anos, " + n.pos + ") chama atenção nas categorias de base do " + n.club + " — overall de " + n.ovr + " já impressiona para a idade.");
+      if (n.t === "prospect-breakout") {
+        post(g, "imprensa", "Base: " + n.player + " (" + n.age + " anos, " + n.pos + ") chama atenção nas categorias de base do " + n.club + " — overall de " + n.ovr + " já impressiona para a idade.");
+        const EURO_SCOUT_OVR = 78; // mesmo limiar de EURO_UNLOCK_OVR em market.js (privado lá — duplicar é o padrão já usado no projeto)
+        if (n.ovr >= EURO_SCOUT_OVR) {
+          post(g, "imprensa", "De olho na Europa: clubes do continente já monitoram " + n.player + " após a boa fase nas categorias de base do " + n.club + ".", { hot: n.ovr >= EURO_SCOUT_OVR + 4 });
+        }
+      }
     });
     if (sum.convNews === "convocado") post(g, "selecao", "CONVOCADO! " + p.name + " está na lista para o próximo ciclo da Seleção. 🎽", { hot: true });
     if (sum.convNews === "cortado") post(g, "imprensa", p.name + " fica fora da nova lista da Seleção. Queda de rendimento pesou.");
@@ -5631,6 +5666,69 @@ window.CQ = window.CQ || {};
     return bits;
   }
 
+  // agrupa squadOf por posição e monta uma escalação provável (11 nomes), encaixando
+  // o próprio jogador na sua posição quando ele está disponível pra jogar
+  function probableLineup(G, fx) {
+    const p = G.player;
+    const buckets = { GOL: 1, ZAG: 2, LAT: 2, VOL: 2, MEI: 2, PON: 1, ATA: 1 };
+    const squad = squadOf(G);
+    const out = [];
+    Object.keys(buckets).forEach(function (pos) {
+      out.push.apply(out, squad.filter(function (j) { return j.pos === pos; }).slice(0, buckets[pos]));
+    });
+    if (p.injury === 0 && (p.susp === 0 || (fx && fx.isNatMatch))) {
+      const idx = out.findIndex(function (j) { return j.pos === p.pos; });
+      const me = { name: p.name, pos: p.pos, ov: p.overall, isMe: true };
+      if (idx >= 0) out[idx] = me; else out.push(me);
+    }
+    return out;
+  }
+
+  // banner de ritual pré-jogo: clima/torcida deterministicamente sorteados (mesma
+  // seed a cada render, pra não "piscar" enquanto a partida ainda não foi jogada) +
+  // escalação provável — 100% flavor, não afeta simulação nem CTA
+  function matchdayBanner(G, fx) {
+    const p = G.player;
+    const rng = U.rngFor(G.seed, "matchday", G.year, G.season.idx);
+    const big = !!(fx.classic || fx.rivalDuel || fx.decisive || fx.knock || fx.stage === "F");
+    const last5 = (G.season.history || []).slice(-5);
+    const wins = last5.filter(function (h) { return h.win; }).length;
+    const goodForm = last5.length >= 3 && wins >= Math.ceil(last5.length * 0.6);
+    const badForm = last5.length >= 3 && wins <= Math.floor(last5.length * 0.2);
+
+    const bigPool = [
+      "O clima no entorno do estádio já é de decisão — bandeiras e cânticos desde cedo.",
+      "A torcida lota os arredores horas antes; hoje não é um jogo qualquer.",
+      "Imprensa lotada, tensão no ar: é o tipo de jogo que fica na memória.",
+      "Faltam poucas horas — já dá pra sentir o peso da partida no ar."
+    ];
+    const calmPool = [
+      "Tarde de sol ameno, movimento tranquilo nos arredores do estádio.",
+      "Noite fria, torcida de sempre chegando aos poucos às catracas.",
+      "Céu limpo, expectativa normal de rodada — mais um capítulo da temporada.",
+      "Chuva fina no horizonte, mas nada que assuste quem já está a caminho do estádio."
+    ];
+    const weather = U.choice(big ? bigPool : calmPool, rng);
+
+    let mood;
+    if (big && goodForm) mood = "A torcida chega confiante — o time embalado por uma boa sequência.";
+    else if (big && badForm) mood = "Ambiente tenso: a torcida cobra uma resposta depois de resultados ruins.";
+    else if (p.morale >= 75) mood = "Moral alta no elenco depois das últimas atuações.";
+    else if (p.morale < 40) mood = "Grupo abalado — a cobrança aumenta a cada rodada.";
+    else if (goodForm) mood = "Boa fase recente mantém o ambiente positivo no clube.";
+    else if (badForm) mood = "A sequência ruim deixa a torcida impaciente.";
+    else mood = "Ambiente normal de rodada, sem climas especiais.";
+
+    const lineupHTML = probableLineup(G, fx).map(function (j) {
+      return `<span class="badge ${j.isMe ? "badge-gold" : "badge-soft"}">${j.pos} ${esc(j.name.split(" ")[0])}</span>`;
+    }).join(" ");
+
+    return `<div class="notice mt12" style="border-left-color:var(--gold)">
+      <div class="small">${esc(weather)} ${esc(mood)}</div>
+      <div class="mt8" style="display:flex;gap:6px;flex-wrap:wrap">${lineupHTML}</div>
+    </div>`;
+  }
+
   function homeHTML() {
     const G = g(), p = G.player, S = G.season;
     const fx = E().currentFixture(G);
@@ -5662,6 +5760,7 @@ window.CQ = window.CQ || {};
           <div class="lm-vs">×</div>
           <div class="lm-team">${crest(fx.home ? fx.opp : fx.myTeam, "")}<span class="lm-name">${esc(fx.home ? fx.opp.name : fx.myTeam.name)}</span><span class="lm-role">Visitante</span></div>
         </div>
+        ${matchdayBanner(G, fx)}
         ${notices.length ? `<div class="stack mt12" style="gap:8px">${notices.join("")}</div>` : ""}
         <div class="lead-cta"><div class="btnrow">
           <button class="btn btn-pri btn-big" onclick="CQ.ui.actionPlay()">${fx.decisive ? "Entrar em campo — ao vivo" : "Jogar a partida"}</button>
@@ -6269,47 +6368,77 @@ window.CQ = window.CQ || {};
     return `<hr class="rule"><div class="flex-b mb8"><div class="kicker" style="flex:1">Ranking mundial (Bola de Ouro)</div>${verdict}</div>${podium}${rows}`;
   }
 
-  function showSummary() {
-    const G = g(), sum = G.pendingSummary, p = G.player;
-    const aw = sum.awards;
-    // celebração: Bola de Ouro ou títulos na temporada
-    const bolaDeOuro = sum.ballon && sum.ballon.rank === 1;
-    if (bolaDeOuro || (sum.titles && sum.titles.length)) {
-      dropConfetti(bolaDeOuro ? ["#c9a227", "#9c7c1e", "#f5efdf"] : [E().myClub(G).c1 || "#b8330f", E().myClub(G).c2 || "#f5efdf", "#9c7c1e"]);
-      if (CQ.audio) CQ.audio.play("trophy");
-    }
-    const awardRows = aw.won.map(function (a) {
-      return `<div class="flex-b" style="padding:6px 0;border-bottom:1px dashed var(--rule-soft)"><span class="flex">${I.star} <b>${esc(a.name)}</b></span><span class="small muted">${esc(a.detail || "")}</span></div>`;
-    }).join("") || '<p class="muted small">Sem prêmios individuais nesta temporada.</p>';
-    const lostRows = aw.lost.map(function (a) {
-      return `<p class="small muted">· ${esc(a.name)} ficou com ${esc(a.by || (a.num + " do concorrente"))}.</p>`;
-    }).join("");
+  // monta a cerimônia de fim de temporada como uma sequência de "envelopes" — cada
+  // passo só entra se tiver conteúdo (mesmas condições que a versão monolítica antiga
+  // já checava), e o botão do último passo é o mesmo summaryNext() de sempre, intocado
+  function buildSummarySteps(G, sum) {
+    const p = G.player, aw = sum.awards;
+    const head = `<div class="live-head"><span class="lh-comp">Balanço da temporada ${sum.year}</span>${I.calendar}</div>`;
+    const nextBtn = `<div class="btnrow mt16"><button class="btn btn-pri btn-big btn-block" onclick="CQ.ui.summaryNextStep()">Próximo ${I.arrowR}</button></div>`;
+    const steps = [];
+
     const titles = sum.titles.length ? `<div class="notice ok mb8">${I.trophy} Títulos: <b>${sum.titles.map(esc).join(", ")}</b></div>` : "";
+    const idol = sum.becameIdol ? `<div class="notice ok mb8">${I.star} <b>Você virou ÍDOLO do ${esc(sum.becameIdol)}!</b> Estátua na entrada do estádio e nome eternizado na história do clube.</div>` : "";
+    const capt = sum.newCaptain ? `<div class="notice ok mb8">${I.trophy} <b>Você é o novo capitão do ${esc(sum.newCaptain)}!</b> A braçadeira reconhece sua liderança.</div>` : "";
+    const traitsN = sum.newTraits && sum.newTraits.length ? `<div class="notice ok mb8">${I.star} Novo traço desbloqueado: ${sum.newTraits.map(function (k) { return "<b>" + esc(CQ.engine.TRAITS[k].name) + "</b>"; }).join(", ")}.</div>` : "";
     const moves = [];
     if (sum.moves.myMove === "down") moves.push('<div class="notice">Rebaixado! Na próxima temporada, o clube disputa a divisão de baixo.</div>');
     if (sum.moves.myMove === "up") moves.push('<div class="notice ok">ACESSO! Na próxima temporada, o clube sobe de divisão.</div>');
     const convo = sum.convNews === "convocado" ? '<div class="notice ok">Convocado para a Seleção! O ciclo internacional entra no seu calendário.</div>'
       : sum.convNews === "cortado" ? '<div class="notice warn">Você perdeu a vaga na Seleção. Rendimento manda.</div>' : "";
-    const idol = sum.becameIdol ? `<div class="notice ok mb8">${I.star} <b>Você virou ÍDOLO do ${esc(sum.becameIdol)}!</b> Estátua na entrada do estádio e nome eternizado na história do clube.</div>` : "";
-    const capt = sum.newCaptain ? `<div class="notice ok mb8">${I.trophy} <b>Você é o novo capitão do ${esc(sum.newCaptain)}!</b> A braçadeira reconhece sua liderança.</div>` : "";
-    const traitsN = sum.newTraits && sum.newTraits.length ? `<div class="notice ok mb8">${I.star} Novo traço desbloqueado: ${sum.newTraits.map(function (k) { return "<b>" + esc(CQ.engine.TRAITS[k].name) + "</b>"; }).join(", ")}.</div>` : "";
-    overlay(`<div class="live-head"><span class="lh-comp">Balanço da temporada ${sum.year}</span>${I.calendar}</div>
-      <div style="padding:16px">
-        ${titles}${idol}${capt}${traitsN}${moves.join("")}${convo}
+    if (sum.titles.length || sum.becameIdol || sum.newCaptain || (sum.newTraits && sum.newTraits.length) || moves.length || convo) {
+      steps.push({
+        confetti: sum.titles.length ? [E().myClub(G).c1 || "#b8330f", E().myClub(G).c2 || "#f5efdf", "#9c7c1e"] : null,
+        sound: sum.titles.length ? "trophy" : null,
+        html: `${head}<div style="padding:16px">${titles}${idol}${capt}${traitsN}${moves.join("")}${convo}${nextBtn}</div>`
+      });
+    }
+
+    // números da temporada: sempre aparece
+    steps.push({
+      confetti: null, sound: null,
+      html: `${head}<div style="padding:16px">
         <div class="kicker mb8">Números da temporada</div>
         <div class="tiles mb12">
           <div class="tile"><b class="tnum">${sum.stats.j}</b><span>Jogos</span></div>
           ${p.pos === "GOL"
-        ? `<div class="tile"><b class="tnum">${sum.stats.cs}</b><span>Sem sofrer</span></div><div class="tile"><b class="tnum">${sum.stats.saves}</b><span>Defesas</span></div>`
-        : `<div class="tile"><b class="tnum">${sum.stats.g}</b><span>Gols</span></div><div class="tile"><b class="tnum">${sum.stats.a}</b><span>Assist.</span></div>`}
+          ? `<div class="tile"><b class="tnum">${sum.stats.cs}</b><span>Sem sofrer</span></div><div class="tile"><b class="tnum">${sum.stats.saves}</b><span>Defesas</span></div>`
+          : `<div class="tile"><b class="tnum">${sum.stats.g}</b><span>Gols</span></div><div class="tile"><b class="tnum">${sum.stats.a}</b><span>Assist.</span></div>`}
           <div class="tile"><b class="tnum">${sum.stats.avg ? U.fmtNota(sum.stats.avg) : "—"}</b><span>Nota média</span></div>
           <div class="tile"><b class="tnum">${sum.pos}º</b><span>Na liga</span></div>
         </div>
         ${sum.vitima ? `<p class="small muted mb8">Maior vítima: <b>${esc(sum.vitima.name)}</b> (${sum.vitima.gols} gols sofridos de você).</p>` : ""}
-        <div class="kicker mb8">Prêmios</div>
-        ${awardRows}${lostRows}
-        ${ballonBlock(sum)}
-        <hr class="rule">
+        ${nextBtn}</div>`
+    });
+
+    // prêmios individuais: só se houver algo a mostrar
+    if ((aw.won && aw.won.length) || (aw.lost && aw.lost.length)) {
+      const awardRows = aw.won.map(function (a) {
+        return `<div class="flex-b" style="padding:6px 0;border-bottom:1px dashed var(--rule-soft)"><span class="flex">${I.star} <b>${esc(a.name)}</b></span><span class="small muted">${esc(a.detail || "")}</span></div>`;
+      }).join("") || '<p class="muted small">Sem prêmios individuais nesta temporada.</p>';
+      const lostRows = aw.lost.map(function (a) {
+        return `<p class="small muted">· ${esc(a.name)} ficou com ${esc(a.by || (a.num + " do concorrente"))}.</p>`;
+      }).join("");
+      steps.push({
+        confetti: null, sound: null,
+        html: `${head}<div style="padding:16px"><div class="kicker mb8">Prêmios</div>${awardRows}${lostRows}${nextBtn}</div>`
+      });
+    }
+
+    // Bola de Ouro: sempre por último antes do passo administrativo — o maior reveal
+    if (sum.ballon) {
+      const bolaDeOuro = sum.ballon.rank === 1;
+      steps.push({
+        confetti: bolaDeOuro ? ["#c9a227", "#9c7c1e", "#f5efdf"] : null,
+        sound: bolaDeOuro ? "trophy" : null,
+        html: `${head}<div style="padding:16px">${ballonBlock(sum)}${nextBtn}</div>`
+      });
+    }
+
+    // administrativo (final): sempre aparece, termina no botão já existente, sem mudança
+    steps.push({
+      confetti: null, sound: null,
+      html: `${head}<div style="padding:16px">
         <div class="flex-b wrap mb8">
           <span class="small">Valor de mercado: <b>${U.fmtBRL(sum.marketValue || p.marketValue)}</b></span>
           ${sum.income ? `<span class="badge badge-green">Renda de negócios: ${U.fmtBRL(sum.income)}</span>` : ""}
@@ -6326,12 +6455,35 @@ window.CQ = window.CQ || {};
         <div class="btnrow mt16">
           <button class="btn btn-pri btn-big btn-block" onclick="CQ.ui.summaryNext()">${sum.retiring ? "Encerrar carreira" : sum.offers ? "Ir ao mercado da bola" : "Próxima temporada"}</button>
         </div>
-      </div>`, true);
+      </div>`
+    });
+
+    return steps;
+  }
+
+  function showSummary() {
+    const G = g(), sum = G.pendingSummary;
+    CQ.state.summary = { steps: buildSummarySteps(G, sum), idx: 0 };
+    summaryStepRender();
+  }
+
+  function summaryStepRender() {
+    const s = CQ.state.summary, step = s.steps[s.idx];
+    const cf = document.querySelector(".confetti"); if (cf) cf.remove(); // evita empilhar confete entre passos
+    if (step.confetti) dropConfetti(step.confetti);
+    if (step.sound && CQ.audio) CQ.audio.play(step.sound);
+    overlay(step.html, true);
+  }
+
+  function summaryNextStep() {
+    CQ.state.summary.idx++;
+    summaryStepRender();
   }
 
   function summaryNext() {
     const G = g(), sum = G.pendingSummary;
     closeOverlay();
+    CQ.state.summary = null;
     if (sum.retiring) { G.retired = true; CQ.main.save(); go("retro"); return; }
     if (sum.offers) { showMarket(); return; }
     E().nextSeason(G);
@@ -6619,6 +6771,23 @@ window.CQ = window.CQ || {};
     </div>`;
   }
 
+  function clubRivalryCard(G) {
+    const cr = G.clubRivalry || {};
+    const keys = Object.keys(cr);
+    if (!keys.length) return "";
+    const rows = keys.map(function (oppId) {
+      const rec = cr[oppId], oc = D.CLUBS[oppId];
+      if (!oc) return "";
+      const total = rec.v + rec.e + rec.d;
+      const verdict = rec.v > rec.d ? "vantagem" : rec.v < rec.d ? "desvantagem" : "equilibrado";
+      return `<tr><td><span class="clubcell">${crest(oc, "crest-20")} ${esc(oc.name)}</span></td>
+        <td class="num tnum">${rec.v}-${rec.e}-${rec.d}</td>
+        <td class="small ${rec.v > rec.d ? "green" : rec.v < rec.d ? "verm" : "muted"}">${total ? verdict : "sem duelos"}</td></tr>`;
+    }).join("");
+    return `<div class="card" style="grid-column:1/-1"><div class="section-banner"><span class="sb-title">Rivalidade de clube</span><span class="sb-meta">${esc(E().myClub(G).name)}</span></div>
+      <div class="card-b tight" style="overflow-x:auto"><table class="tbl"><thead><tr><th>Rival</th><th class="num">V-E-D</th><th>Balanço</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  }
+
   function duelHTML(G) {
     const r = G.rival, p = G.player, h = G.h2h;
     const rc = D.CLUBS[r.clubId];
@@ -6658,6 +6827,7 @@ window.CQ = window.CQ || {};
           </div>
           <p class="small muted mt12">Confrontos diretos em jogos de clube contra o rival atual.</p>
         </div></div>
+      ${clubRivalryCard(G)}
       ${histCard ? '<div style="grid-column:1/-1">' + histCard + '</div>' : ""}
     </div>`;
   }
@@ -7453,7 +7623,7 @@ window.CQ = window.CQ || {};
     actionPlay: actionPlay, actionRest: actionRest, actionSim: actionSim,
     liveStep: liveStep, liveDecide: liveDecide, shootPick: shootPick, shootReveal: shootReveal, finishLive: finishLive,
     pickInterview: pickInterview, pickLife: pickLife,
-    seasonEndFlow: seasonEndFlow, summaryNext: summaryNext, pickOffer: pickOffer, pickRenew: pickRenew,
+    seasonEndFlow: seasonEndFlow, summaryNext: summaryNext, summaryNextStep: summaryNextStep, pickOffer: pickOffer, pickRenew: pickRenew,
     ctab: ctab, ttab: ttab, closeTitle: closeTitle, closeDraw: closeDraw, closeCapa: closeCapa, votePoll: votePoll,
     setLogo: setLogo, clearLogo: clearLogo, toast: toast,
     requestTransfer: requestTransfer, cancelTransfer: cancelTransfer,
@@ -7513,6 +7683,7 @@ window.CQ = window.CQ || {};
     if (g.manager === undefined) g.manager = null;
     if (CQ.engine && CQ.engine.ensureManager) CQ.engine.ensureManager(g);
     if (!g.rivalHistory) g.rivalHistory = [];
+    if (!g.clubRivalry) g.clubRivalry = {};
     if (!g.trainingFocus) g.trainingFocus = "equil";
     if (!g.worldStars || !g.worldStars.length) {
       const rng = CQ.util.mulberry32((g.seed || 1) ^ 0x9e3779b9);
@@ -7615,7 +7786,7 @@ window.CQ = window.CQ || {};
   CQ.state = {
     game: null, screen: "cover",
     ctab: "attrs", ttab: "liga", clubTab: "info", feedFilter: "all",
-    draft: null, live: null, itv: null, lifeEv: null, champFilter: "BRA"
+    draft: null, live: null, itv: null, lifeEv: null, champFilter: "BRA", summary: null
   };
 
   // ---------- tema (claro / escuro) ----------

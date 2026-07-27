@@ -459,7 +459,13 @@ window.CQ = window.CQ || {};
       if (n.t === "rival-transfer") post(g, "imprensa", "Mercado: " + g.rival.name + ", rival de geração de " + p.name + ", é anunciado pelo " + n.club + ".");
       if (n.t === "rival-retire") post(g, "imprensa", n.old + " anuncia aposentadoria. A imprensa já aponta o novo rival de geração de " + p.name + ": " + n.novo + ".", { hot: true });
       if (n.t === "world-transfer") post(g, "imprensa", "Mercado: " + n.player + " (" + n.ovr + " de overall) é anunciado pelo " + n.toClub + ", que teria pago cerca de " + U.fmtBRL(n.valueHint) + " ao " + n.fromClub + ".", { hot: n.ovr >= 84 });
-      if (n.t === "prospect-breakout") post(g, "imprensa", "Base: " + n.player + " (" + n.age + " anos, " + n.pos + ") chama atenção nas categorias de base do " + n.club + " — overall de " + n.ovr + " já impressiona para a idade.");
+      if (n.t === "prospect-breakout") {
+        post(g, "imprensa", "Base: " + n.player + " (" + n.age + " anos, " + n.pos + ") chama atenção nas categorias de base do " + n.club + " — overall de " + n.ovr + " já impressiona para a idade.");
+        const EURO_SCOUT_OVR = 78; // mesmo limiar de EURO_UNLOCK_OVR em market.js (privado lá — duplicar é o padrão já usado no projeto)
+        if (n.ovr >= EURO_SCOUT_OVR) {
+          post(g, "imprensa", "De olho na Europa: clubes do continente já monitoram " + n.player + " após a boa fase nas categorias de base do " + n.club + ".", { hot: n.ovr >= EURO_SCOUT_OVR + 4 });
+        }
+      }
     });
     if (sum.convNews === "convocado") post(g, "selecao", "CONVOCADO! " + p.name + " está na lista para o próximo ciclo da Seleção. 🎽", { hot: true });
     if (sum.convNews === "cortado") post(g, "imprensa", p.name + " fica fora da nova lista da Seleção. Queda de rendimento pesou.");

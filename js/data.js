@@ -214,6 +214,27 @@ window.CQ = window.CQ || {};
   riv("intm", "mln"); riv("juve", "tor"); riv("rom", "laz"); riv("bay", "bvb"); riv("psg", "mars"); riv("ben", "porto"); riv("scp", "ben");
   riv("riv", "boc"); riv("pen", "nac");
 
+  // cobertura total: todo clube ganha ao menos um rival (real ou de reposição).
+  // Clube sem par curado pega o mais forte do mesmo estado (uf); sem uf compatível
+  // (alguns estados só têm 1 clube no jogo), cai pro mais forte da mesma liga.
+  // Nunca sobrescreve rivalidade real já cadastrada.
+  (function assignFallbackRivals() {
+    const ids = Object.keys(CLUBS).sort(function (a, b) {
+      return CLUBS[b].str - CLUBS[a].str || a.localeCompare(b);
+    });
+    ids.forEach(function (id) {
+      const cl = CLUBS[id];
+      if (cl.rivals.length > 0) return; // real, ou já ganhou rival nesta mesma passada
+      let pool = Object.keys(CLUBS).filter(function (oid) {
+        return oid !== id && cl.uf && CLUBS[oid].uf === cl.uf;
+      });
+      if (!pool.length) pool = Object.keys(CLUBS).filter(function (oid) { return oid !== id && CLUBS[oid].league === cl.league; });
+      if (!pool.length) return;
+      pool.sort(function (a, b) { return CLUBS[b].str - CLUBS[a].str || a.localeCompare(b); });
+      riv(id, pool[0]);
+    });
+  })();
+
   const LEAGUES = {
     BRA: { id: "BRA", name: "Brasileirão Série A", short: "Série A", country: "BR", cupName: "Copa do Brasil", rounds: 38 },
     BRB: { id: "BRB", name: "Brasileirão Série B", short: "Série B", country: "BR", cupName: "Copa do Brasil", rounds: 30 },

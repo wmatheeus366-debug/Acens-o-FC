@@ -7,7 +7,7 @@ window.CQ = window.CQ || {};
   CQ.state = {
     game: null, screen: "cover",
     ctab: "attrs", ttab: "liga", clubTab: "info", feedFilter: "all",
-    draft: null, live: null, itv: null, lifeEv: null, champFilter: "BRA"
+    draft: null, live: null, itv: null, lifeEv: null, champFilter: "BRA", summary: null
   };
 
   // ---------- tema (claro / escuro) ----------

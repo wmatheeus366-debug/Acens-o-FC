@@ -53,7 +53,7 @@
       const g = newCareer("MEI");
       const old = JSON.parse(JSON.stringify(g));
       ["traits", "compGoals", "idolClubs", "clubGoals", "ballon", "milestones", "assets", "records", "captain", "squadRole"].forEach(function (k) { delete old.player[k]; });
-      delete old.manager; delete old.worldStars; delete old.schemaVersion; delete old.world;
+      delete old.manager; delete old.worldStars; delete old.schemaVersion; delete old.world; delete old.clubRivalry;
       const raw = localStorage.getItem("craque-save-v1");
       localStorage.setItem("craque-save-v1", JSON.stringify(old));
       const loaded = CQ.main.load();
@@ -68,6 +68,7 @@
       assert("save: migra g.world.leagues (tabelas das outras ligas)",
         loaded && loaded.world && loaded.world.leagues && Object.keys(loaded.world.leagues).length === 7,
         "n=" + (loaded && loaded.world && loaded.world.leagues ? Object.keys(loaded.world.leagues).length : -1));
+      assert("save: migra g.clubRivalry", loaded && loaded.clubRivalry && typeof loaded.clubRivalry === "object");
     });
   }
 
@@ -224,6 +225,73 @@
     });
   }
 
+  // ---- Rivalidade de clubes: cobertura total + placar histórico do clássico ----
+  function testRivalsCoverage() {
+    const CLUBS = CQ.DATA.CLUBS;
+    const ids = Object.keys(CLUBS);
+    const allHaveRival = ids.every(function (id) { return CLUBS[id].rivals.length > 0; });
+    assert("rivais: todo clube tem ao menos 1 rival", allHaveRival);
+    let symOk = true, symDetail = "";
+    ids.forEach(function (id) {
+      CLUBS[id].rivals.forEach(function (rid) {
+        if (CLUBS[rid].rivals.indexOf(id) < 0) { symOk = false; symDetail = id + "<->" + rid; }
+      });
+    });
+    assert("rivais: toda relação é simétrica (bidirecional)", symOk, symDetail);
+    const curated = [["fla", "flu"], ["pal", "cor"], ["rma", "bar"], ["riv", "boc"]];
+    const curatedOk = curated.every(function (pr) { return CLUBS[pr[0]].rivals.indexOf(pr[1]) >= 0; });
+    assert("rivais: pares curados reais permanecem intactos", curatedOk);
+  }
+
+  function testClubRivalryScoreboard() {
+    withTempGame(function () {
+      const g = newCareer("ATA"); // fla, já tem rivais reais (flu/vas/bot)
+      let found = false, guard = 0;
+      while (!found && guard++ < 200) {
+        const fx = E().currentFixture(g);
+        if (!fx) break;
+        if (fx.classic) found = true;
+        const res = E().resolveMatch(g, fx, {});
+        E().applyMatch(g, res);
+      }
+      assert("clubRivalry: encontrou pelo menos 1 clássico simulado", found, "guard=" + guard);
+      const total = Object.keys(g.clubRivalry).reduce(function (acc, k) {
+        const r = g.clubRivalry[k]; return acc + r.v + r.e + r.d;
+      }, 0);
+      assert("clubRivalry: contabilizou pelo menos 1 confronto de clássico", total > 0, "total=" + total);
+    });
+  }
+
+  // ---- Olheiro de base: promessa Europa-relevante gera o rumor de olheiro europeu ----
+  // checa o feed logo após CADA temporada (não só no final) — g.feed é limitado a 140
+  // posts, então checar só ao fim de 20 temporadas simuladas deixaria os posts antigos
+  // já descartados antes da checagem, dando falso negativo.
+  function testScoutingRumor() {
+    withTempGame(function () {
+      const g = newCareer("ATA");
+      let euroWorthy = 0, rumorsFound = 0, guard = 0;
+      while (guard++ < 20) {
+        let n = 0; while (E().currentFixture(g) && n++ < 160) E().applyMatch(g, E().resolveMatch(g, E().currentFixture(g), {}));
+        const hadPending = !!g.pendingSummary;
+        const sum = g.pendingSummary || E().endSeason(g);
+        if (!hadPending && sum.notes) {
+          sum.notes.filter(function (n2) { return n2.t === "prospect-breakout" && n2.ovr >= 78; }).forEach(function (n2) {
+            euroWorthy++;
+            if (g.feed.some(function (post) { return post.text.indexOf(n2.player) >= 0 && post.text.indexOf("Europa") >= 0; })) rumorsFound++;
+          });
+        }
+        if (sum.retiring) break;
+        if (sum.offers) {
+          if (sum.offers.renew) E().acceptRenew(g, sum.offers.renew);
+          else if (sum.offers.list && sum.offers.list[0]) E().acceptOffer(g, sum.offers.list[0]);
+        }
+        E().nextSeason(g);
+      }
+      assert("base: há promessas com overall Europa-relevante em 20 temporadas", euroWorthy > 0, "n=" + euroWorthy);
+      assert("base: cada promessa Europa-relevante gera o rumor de olheiro europeu", rumorsFound === euroWorthy, rumorsFound + "/" + euroWorthy);
+    });
+  }
+
   function testImportRejectsInvalid() {
     withTempGame(function () {
       const raw = localStorage.getItem("craque-save-v1");
@@ -330,6 +398,9 @@
     testMarketTransfers();
     testProspectBreakout();
     testWorldLeagueTables();
+    testRivalsCoverage();
+    testClubRivalryScoreboard();
+    testScoutingRumor();
     testAllPositionsSmoke();
     const pass = results.filter(function (r) { return r.pass; }).length;
     console.log("%cCRAQUE regressão: " + pass + "/" + results.length + " passaram", "font-weight:bold");

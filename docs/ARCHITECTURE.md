@@ -43,7 +43,7 @@ Fontes (Google Fonts) e bandeiras (flagcdn) vêm da web com fallback; todo o res
 
 ```
 # no navegador (index.html ou CRAQUE.html aberto), console:
-CQ.tests.run()             # tests/regression.js — 38 checagens
+CQ.tests.run()             # tests/regression.js — 46 checagens
 
 # balanceamento (Node, motor real num shim vm):
 node scripts/balance-runner.mjs 100   # gera docs/BALANCE_BASELINE.md + .json
@@ -95,6 +95,14 @@ node scripts/world-check.mjs 20       # diagnóstico do mundo persistente (idade
   nova nos NPCs, sem navegação por outros clubes — escopo confirmado com o usuário.
 - **Fase "Mundo Real 2026" concluída** (Fatias 1-4). Próximas extensões ficam por conta
   de necessidades futuras, sem item pendente documentado nesta fase.
+
+## Imersão — ritual de jogo, cerimônia de temporada, rivalidade, olheiro
+Quatro melhorias independentes da fase acima (ver CHANGELOG para detalhe completo):
+`matchdayBanner` (banner de dia de jogo na home, `js/ui.js`), cerimônia de balanço de
+temporada em passos (`buildSummarySteps`/`summaryStepRender`/`summaryNextStep`,
+`js/ui.js`), cobertura total de `D.CLUBS[id].rivals` + placar `g.clubRivalry` do
+clássico de clube (`js/data.js`, `js/engine.js`, `js/ui.js`), e alerta de olheiro
+europeu na notícia de promessa notável (`js/narrative.js`).
 - **Escudos/fotos:** já resolvido por fora desta fase — `CQ.DATA.CREST_MAP` (escudo real
   via API-Football, `media.api-sports.io`, uso pessoal) com fallback pro brasão vetorial
   (`crestSVG`) quando não mapeado ou se a imagem falhar. Ver `README.md` § Direitos de
