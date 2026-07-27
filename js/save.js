@@ -58,6 +58,7 @@ window.CQ = window.CQ || {};
     }
     if (g.season && !g.season.scorers) g.season.scorers = [];
     if (!g.world) g.world = CQ.world.buildWorld(g);
+    if (!g.world.leagues) CQ.engine.refreshWorldLeagues(g);
     g.schemaVersion = SCHEMA_VERSION;
     return g;
   }

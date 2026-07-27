@@ -43,7 +43,7 @@ Fontes (Google Fonts) e bandeiras (flagcdn) vêm da web com fallback; todo o res
 
 ```
 # no navegador (index.html ou CRAQUE.html aberto), console:
-CQ.tests.run()             # tests/regression.js — 30 checagens
+CQ.tests.run()             # tests/regression.js — 35 checagens
 
 # balanceamento (Node, motor real num shim vm):
 node scripts/balance-runner.mjs 100   # gera docs/BALANCE_BASELINE.md + .json
@@ -79,8 +79,15 @@ node scripts/world-check.mjs 20       # diagnóstico do mundo persistente (idade
   mesma posição — tamanho de elenco nunca muda, sem novo campo por NPC, sem mudança de
   esquema de save. Notícia no feed reaproveita o array `notes` já usado por
   `rival-transfer`/`rival-retire`, só para transferências grandes o bastante.
-- **Próximo:** telas de mundo (tabelas/resultados de ligas que o jogador não disputa),
-  olheiro de base / geração de promessas com mais destaque.
+- ✅ **Fatia 3 (feita): tabelas reais das outras ligas.** `refreshWorldLeagues`
+  (`js/engine.js`) reaproveita `leagueComp`/`finishLeague`/`tableOf`/`leagueZones` (o
+  mesmo motor da liga do próprio jogador) pra simular, uma vez por temporada, uma tabela
+  de pontos corridos real pras 7 ligas que o jogador não disputa (`D.LEAGUES` menos a
+  própria). Guardado em `g.world.leagues[liga]`, sobrescrito a cada `endSeason` (sem
+  histórico). Nova aba "Mundo" em Torneios (`js/ui.js`) reaproveita `leagueTableHTML`
+  sem CSS novo. Independente do sorteio de campeão de `recordChampions` (`g.champs`) —
+  os dois processos usam RNGs separados por design.
+- **Próximo:** olheiro de base / geração de promessas com mais destaque narrativo.
 - **Escudos/fotos:** já resolvido por fora desta fase — `CQ.DATA.CREST_MAP` (escudo real
   via API-Football, `media.api-sports.io`, uso pessoal) com fallback pro brasão vetorial
   (`crestSVG`) quando não mapeado ou se a imagem falhar. Ver `README.md` § Direitos de

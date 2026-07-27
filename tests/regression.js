@@ -65,6 +65,53 @@
       assert("save: migra g.world (elenco do clube do jogador)",
         loaded && loaded.world && loaded.world.clubs[myClubId] && loaded.world.clubs[myClubId].roster.length === expectLen,
         JSON.stringify({ temMundo: !!(loaded && loaded.world), qtd: loaded && loaded.world && loaded.world.clubs[myClubId] && loaded.world.clubs[myClubId].roster.length, esperado: expectLen }));
+      assert("save: migra g.world.leagues (tabelas das outras ligas)",
+        loaded && loaded.world && loaded.world.leagues && Object.keys(loaded.world.leagues).length === 7,
+        "n=" + (loaded && loaded.world && loaded.world.leagues ? Object.keys(loaded.world.leagues).length : -1));
+    });
+  }
+
+  // ---- Mundo persistente: tabelas reais das ligas que o jogador não disputa ----
+  function testWorldLeagueTables() {
+    withTempGame(function () {
+      const g = newCareer("ATA"); // fla -> BRA
+      const myLg = E().leagueOf(g, g.player.clubId);
+      const otherKeys = Object.keys(CQ.DATA.LEAGUES).filter(function (k) { return k !== myLg; });
+
+      assert("mundo-ligas: todas as 7 outras ligas presentes ao criar carreira",
+        otherKeys.length === 7 && otherKeys.every(function (k) { return !!g.world.leagues[k]; }), "n=" + otherKeys.length);
+
+      let structOk = true, structDetail = "";
+      otherKeys.forEach(function (k) {
+        const L = g.world.leagues[k];
+        const N = L.teamIds.length;
+        const table = E().tableOf(g, L);
+        const totalMatches = N * (N - 1);
+        const sumJ = table.reduce(function (a, t) { return a + t.j; }, 0);
+        const sumPts = table.reduce(function (a, t) { return a + t.pts; }, 0);
+        const sumGp = table.reduce(function (a, t) { return a + t.gp; }, 0);
+        const sumGc = table.reduce(function (a, t) { return a + t.gc; }, 0);
+        if (table.length !== N) { structOk = false; structDetail = k + ":rows"; }
+        if (sumJ !== totalMatches * 2) { structOk = false; structDetail = k + ":j " + sumJ + "!=" + (totalMatches * 2); }
+        if (sumGp !== sumGc) { structOk = false; structDetail = k + ":gp!=gc"; }
+        if (sumPts < totalMatches * 2 || sumPts > totalMatches * 3) { structOk = false; structDetail = k + ":pts " + sumPts; }
+      });
+      assert("mundo-ligas: J/Pts/gols batem para cada liga simulada", structOk, structDetail);
+
+      let n = 0; while (E().currentFixture(g) && n++ < 160) E().applyMatch(g, E().resolveMatch(g, E().currentFixture(g), {}));
+      const sum = g.pendingSummary || E().endSeason(g);
+      const y0 = g.year;
+      const anyStale = otherKeys.some(function (k) { return g.world.leagues[k].year !== y0; });
+      assert("mundo-ligas: snapshot renovado no endSeason (ano bate)", !anyStale, "y0=" + y0);
+      if (sum.offers) {
+        if (sum.offers.renew) E().acceptRenew(g, sum.offers.renew);
+        else if (sum.offers.list && sum.offers.list[0]) E().acceptOffer(g, sum.offers.list[0]);
+      }
+      E().nextSeason(g);
+      const myLg2 = E().leagueOf(g, g.player.clubId);
+      const otherKeys2 = Object.keys(CQ.DATA.LEAGUES).filter(function (k) { return k !== myLg2; });
+      assert("mundo-ligas: ainda 7 outras ligas após virar temporada",
+        otherKeys2.length === 7 && otherKeys2.every(function (k) { return !!g.world.leagues[k]; }), "n=" + otherKeys2.length);
     });
   }
 
@@ -247,6 +294,7 @@
     testPositionRatings();
     testWorldAging();
     testMarketTransfers();
+    testWorldLeagueTables();
     testAllPositionsSmoke();
     const pass = results.filter(function (r) { return r.pass; }).length;
     console.log("%cCRAQUE regressão: " + pass + "/" + results.length + " passaram", "font-weight:bold");

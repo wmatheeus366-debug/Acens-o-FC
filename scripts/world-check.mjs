@@ -67,6 +67,22 @@ CQ.market.advanceMarket = function (g, notes) {
   return r;
 };
 
+// sanidade estrutural das tabelas das outras ligas, a cada temporada de fato avançada
+let leagueChecks = 0, leagueProblems = 0;
+function checkWorldLeagues(g) {
+  const myLg = E.leagueOf(g, g.player.clubId);
+  Object.keys(D.LEAGUES).forEach(function (k) {
+    if (k === myLg) return;
+    leagueChecks++;
+    const L = g.world.leagues[k];
+    if (!L) { leagueProblems++; console.log("  PROBLEMA: " + k + " ausente em g.world.leagues"); return; }
+    const N2 = L.teamIds.length;
+    const table = E.tableOf(g, L);
+    const sumJ = table.reduce(function (a, t) { return a + t.j; }, 0);
+    if (sumJ !== N2 * (N2 - 1) * 2) { leagueProblems++; console.log("  PROBLEMA: " + k + " j=" + sumJ + " esperado=" + (N2 * (N2 - 1) * 2)); }
+  });
+}
+
 let guard = 0, seasons = 0;
 const transfersPerSeason = [];
 while (guard++ < N) {
@@ -77,6 +93,7 @@ while (guard++ < N) {
   if (!hadPending) {
     seasons++;
     transfersPerSeason.push(lastMoved);
+    checkWorldLeagues(g);
   }
   if (sum.retiring) break;
   if (sum.offers) {
@@ -122,4 +139,8 @@ console.log("\ndistribuição de idade DEPOIS de " + seasons + " temporadas:");
 Object.keys(histAfter).sort((a, b) => a - b).forEach((b) => console.log("  " + b + "-" + (+b + 4) + ": " + histAfter[b]));
 
 console.log("\ntamanho de g.world: " + (initialSize / 1024).toFixed(1) + " KB → " + (finalSize / 1024).toFixed(1) + " KB");
+
+console.log("\ntabelas do mundo: " + leagueChecks + " verificações, " + leagueProblems + " problema(s)" + (leagueProblems === 0 ? " (OK)" : ""));
+console.log("tamanho de g.world.leagues: " + (JSON.stringify(g.world.leagues).length / 1024).toFixed(1) + " KB");
+
 console.log("\nOK (" + ((Date.now() - t0) / 1000).toFixed(1) + "s)");

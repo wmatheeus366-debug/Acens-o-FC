@@ -494,7 +494,33 @@ intocado).
 - Regressão: de 27 pra **30 checagens** (`testMarketTransfers`: tamanho de elenco constante,
   nenhum id duplicado, pelo menos 1 notícia de transferência em 15 temporadas simuladas).
 
+## Mundo Real 2026 — Fatia 3: tabelas reais das outras ligas
+Terceira fatia, entregando o item 1 dos próximos passos da Fatia 2: as 7 ligas que o
+jogador não disputa numa temporada (Série B ou 6 ligas europeias, a que sobrar) agora têm
+**tabela de pontos corridos de verdade** — turno e returno, jogo a jogo, V/E/D/SG/Pontos
+reais — em vez do sorteio de campeão por força que já existia (`recordChampions`).
+- **`refreshWorldLeagues`** (novo, em `js/engine.js`): reaproveita **sem nenhuma
+  reinvenção** o mesmo motor que já roda a liga do próprio jogador — `leagueComp` +
+  `finishLeague` (que já existia e, quando nenhum time é o do jogador, degenera
+  exatamente em "resolve toda rodada e devolve a tabela") + `tableOf`/`leagueZones`.
+  Roda uma vez por temporada (fim de temporada, igual a `recordChampions`/
+  `promoteRelegate` — ninguém acompanha rodada a rodada uma liga que não é a sua).
+- **Guardado em `g.world.leagues[liga]`**: um snapshot por liga, sobrescrito a cada
+  temporada (sem histórico acumulado — só a tabela final do ano corrente).
+- **Nova aba "Mundo"** dentro de Torneios: seletor de liga + tabela real com zona de
+  acesso/rebaixamento pintada, reaproveitando `leagueTableHTML` (mesmo componente da
+  tabela da própria liga do jogador, sem CSS novo).
+- **Independente do sorteio de campeão existente** (`g.champs`, tela "Campeões"): os dois
+  processos usam RNGs separados de propósito, então o nome do campeão histórico
+  ocasionalmente pode não bater com o 1º colocado da tabela nova — cosmético, aceito
+  conscientemente pra não mexer numa função já testada que também sorteia CDB/LIB/UCL.
+- **Validado por simulação** (`scripts/world-check.mjs`, estendido): 20 temporadas,
+  140 verificações estruturais (7 ligas × 20 anos), 0 problemas — jogos/pontos/gols
+  batem em todas. ~76 KB adicionados ao save por esse snapshot.
+- Regressão: de 30 pra **35 checagens** (`testWorldLeagueTables`: 7 ligas presentes já
+  na criação da carreira, aritmética de jogos/pontos/gols correta, snapshot renovado a
+  cada temporada; migração de save antigo cobre `g.world.leagues` também).
+
 ## Próximos passos (fase seguinte — Mundo Real 2026)
-1. Telas de mundo: tabelas/resultados de ligas e competições que o jogador não disputa.
-2. Olheiro de base / geração de promessas com mais destaque narrativo.
+1. Olheiro de base / geração de promessas com mais destaque narrativo.
 3. **Ajuste opcional:** Bola de Ouro ocasional para defensores/goleiros de elite (hoje ~0).

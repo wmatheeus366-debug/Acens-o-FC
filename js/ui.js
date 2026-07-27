@@ -1352,6 +1352,7 @@ window.CQ = window.CQ || {};
     if (S.comps.COPA) tabs.push(["cdb", D.LEAGUES[E().leagueOf(G, G.player.clubId)].cupName]);
     if (S.comps.CONTI) tabs.push(["conti", S.comps.CONTI.name]);
     if (S.sel) tabs.push(["sel", "Seleção"]);
+    tabs.push(["mundo", "Mundo"]);
     tabs.push(["champ", "Campeões"]);
     const subtabs = `<div class="subtabs">${tabs.map(function (t) {
       return `<button class="${tab === t[0] ? "on" : ""}" onclick="CQ.ui.ttab('${t[0]}')">${esc(t[1])}</button>`;
@@ -1366,6 +1367,7 @@ window.CQ = window.CQ || {};
     else if (tab === "cdb") body = (S.comps.CDB || S.comps.COPA) ? cupHTML(S.comps.CDB || S.comps.COPA) : none;
     else if (tab === "conti") body = S.comps.CONTI ? contiHTML(S.comps.CONTI) : none;
     else if (tab === "sel") body = selHTML(S);
+    else if (tab === "mundo") body = worldLeaguesHTML(G);
     else body = champsHTML(G);
     return subtabs + body;
   }
@@ -1555,7 +1557,21 @@ window.CQ = window.CQ || {};
     </div>`;
   }
 
-  function leagueTableHTML(L, zones) {
+  function worldLeaguesHTML(G) {
+    const wl = (G.world && G.world.leagues) || {};
+    const keys = Object.keys(wl);
+    if (!keys.length) return '<div class="card"><div class="card-b muted">Tabelas do mundo ainda não disponíveis.</div></div>';
+    let f = CQ.state.worldLeague;
+    if (!f || !wl[f]) f = keys[0];
+    const sel = `<select onchange="CQ.state.worldLeague=this.value;CQ.ui.render()" style="border:1px solid var(--ink);background:#fffdf6;padding:6px 10px;font-size:14px">
+      ${keys.map(function (k) { return `<option value="${k}" ${f === k ? "selected" : ""}>${esc(D.LEAGUES[k].name)}</option>`; }).join("")}</select>`;
+    const comp = wl[f];
+    return `<div class="card mb12"><div class="card-h"><h3>Outras ligas do mundo</h3>${sel}</div>
+      <div class="card-b muted small" style="padding:4px 14px 10px">Temporada simulada partida a partida (mesmo motor da sua liga).</div></div>`
+      + leagueTableHTML(comp, true, comp.year);
+  }
+
+  function leagueTableHTML(L, zones, year) {
     const G = g();
     const table = E().tableOf(G, L);
     const z = zones ? E().leagueZones(G, L) : null;
@@ -1577,7 +1593,7 @@ window.CQ = window.CQ || {};
       <span><i class="lg-lib"></i>Zona continental principal</span>
       ${z.sula > 0 ? '<span><i class="lg-sula"></i>Segunda vaga continental</span>' : ""}
       <span><i class="lg-reb"></i>Rebaixamento</span></div>` : "";
-    return `<div class="card"><div class="card-h"><h3>${esc(L.name)} · ${g().year}</h3></div>
+    return `<div class="card"><div class="card-h"><h3>${esc(L.name)} · ${year != null ? year : g().year}</h3></div>
       <div class="card-b tight" style="overflow-x:auto"><table class="tbl">
       <thead><tr><th>#</th><th>Clube</th><th class="num">J</th><th class="num">V</th><th class="num">E</th><th class="num">D</th><th class="num">SG</th><th class="num">Pts</th></tr></thead>
       <tbody>${rows}</tbody></table>${legend}</div></div>`;

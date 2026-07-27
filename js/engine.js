@@ -105,6 +105,7 @@ window.CQ = window.CQ || {};
     g.rival = makeRival(g, rng);
     g.worldStars = makeWorldStars(g, rng);
     g.world = CQ.world.buildWorld(g);
+    refreshWorldLeagues(g);
     g.player.marketValue = marketValue(g.player);
     startSeason(g);
     return g;
@@ -1521,6 +1522,7 @@ window.CQ = window.CQ || {};
 
     // registra campeões no histórico
     recordChampions(g, table, champName, contiResult);
+    if (g.world) refreshWorldLeagues(g);
 
     // média
     const avg = p.stats.notaN ? p.stats.notaSum / p.stats.notaN : 0;
@@ -1779,6 +1781,26 @@ window.CQ = window.CQ || {};
     return myPos <= b.pos;
   }
 
+  // tabelas reais das ligas que o jogador NÃO disputa nesta temporada — mesmo motor
+  // (leagueComp/finishLeague/tableOf) da liga do próprio jogador, resolvido de uma vez
+  // (ninguém acompanha rodada a rodada uma liga que não é a sua). Sobrescreve o
+  // snapshot do ano anterior a cada temporada — sem histórico acumulado.
+  function refreshWorldLeagues(g) {
+    const myLg = leagueOf(g, g.player.clubId);
+    g.world.leagues = g.world.leagues || {};
+    Object.keys(D.LEAGUES).forEach(function (lgId) {
+      if (lgId === myLg) return; // essa é a S.comps.LIGA real, já simulada pelo próprio jogo
+      const teamIds = leagueTeamIds(g, lgId);
+      const rounds = doubleRR(teamIds, U.rngFor(g.seed, "wliga", lgId, g.year));
+      const comp = leagueComp(g, lgId, D.LEAGUES[lgId].name, teamIds, rounds);
+      finishLeague(g, comp); // resolve ensureRound r=1..nRounds inteiro, sem reinventar nada
+      g.world.leagues[lgId] = {
+        id: comp.id, name: comp.name, teamIds: comp.teamIds,
+        nRounds: comp.nRounds, results: comp.results, year: g.year
+      };
+    });
+  }
+
   function promoteRelegate(g, tableA, lg) {
     const moves = { down: [], up: [], myMove: null };
     if (!isBrazilLeague(lg)) return moves;
@@ -2019,6 +2041,7 @@ window.CQ = window.CQ || {};
     LIFESTYLE: LIFESTYLE, MILESTONE_DEFS: MILESTONE_DEFS, FOCUS_ATTRS: FOCUS_ATTRS,
     TRAITS: TRAITS, hasTrait: hasTrait, managerConf: managerConf, ensureManager: ensureManager,
     leagueOf: leagueOf, myClub: myClub, oppObj: oppObj, natTeamObj: natTeamObj,
+    refreshWorldLeagues: refreshWorldLeagues,
     STAGE_NAMES: STAGE_NAMES, NAT_FLAGS: NAT_FLAGS,
     teamStrength: teamStrength, simScore: simScore
   };
