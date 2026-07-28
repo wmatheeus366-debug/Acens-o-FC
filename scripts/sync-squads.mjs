@@ -66,6 +66,10 @@ const CLUB_TEAM_MAP = {
   ope: { id: 1223, name: "Operário-PR" },
   amz: { id: 10862, name: "Amazonas" },
   ath: { id: 13975, name: "Athletic-MG" },
+  nau: { id: 755, name: "Náutico" },
+  fig: { id: 137, name: "Figueirense" },
+  prc: { id: 122, name: "Paraná Clube" },
+  spc: { id: 155, name: "Sampaio Corrêa" },
   // Estaduais (clubes pequenos/regionais) — 27
   boa: { id: 2206, name: "Boavista-RJ" },
   vre: { id: 7814, name: "Volta Redonda" },

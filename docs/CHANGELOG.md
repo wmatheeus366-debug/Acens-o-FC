@@ -604,10 +604,14 @@ implementado desde o commit inicial do projeto (`main.page, .cover { animation: 
   desde a reformulação de formato. Adicionados Náutico, Figueirense, Paraná Clube e
   Sampaio Corrêa — `LEAGUES.BRB.rounds` ajustado de 30 pra 38 (turno/returno de 20 times).
   De quebra, dois clássicos reais novos: Sport×Náutico e Avaí×Figueirense. Mundo agora tem
-  **191 clubes** (era 187) — os 4 novos ainda usam gerador procedural de elenco/escudo
-  (não sincronizados via API ainda).
+  **191 clubes** (era 187).
+- **Elenco real dos 4 novos clubes da Série B**: sincronizado via `scripts/sync-squads.mjs`
+  (Náutico id=755, Figueirense id=137, Paraná Clube id=122, Sampaio Corrêa id=155) — 20,
+  20, 20 e 19 jogadores reais respectivamente. Escudo real também ativo via `CREST_MAP`
+  (mesmos IDs, CDN pública, sem sync separado).
 - Regressão: contagem de clubes do mundo ajustada de 187 pra 191 (`testWorldAging`).
 
 ## Próximos passos
-1. Ressincronizar elencos com as transferências reais da janela de 2026 (`scripts/sync-squads.mjs`) — escopo a definir com o usuário.
-2. Sincronizar elenco/escudo real dos 4 novos clubes da Série B (Náutico, Figueirense, Paraná Clube, Sampaio Corrêa).
+1. Ressincronizar elencos dos 187 clubes já cobertos com as transferências reais da
+   janela de 2026 (`scripts/sync-squads.mjs`) — escopo maior, a combinar com o usuário
+   (gasta ~187 requisições, cota de 100/dia).

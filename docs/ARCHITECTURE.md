@@ -117,8 +117,8 @@ confiança. Transição suave entre telas já existia desde o commit inicial
   imagem pro contexto da decisão de usar escudo real.
 - **Sync de dados:** o script real é `scripts/sync-squads.mjs` (API-Football, chave só em
   `.env`/build, nunca no frontend) — sincroniza nome/posição e os IDs de escudo. Cobertura
-  atual: 187 dos 191 clubes têm elenco/escudo real sincronizado; os 4 clubes da Série B
-  adicionados depois (Náutico, Figueirense, Paraná Clube, Sampaio Corrêa) ainda usam o
-  gerador procedural (`js/world.js`) até serem sincronizados. Não existe (nem é necessário)
-  um snapshot JSON versionado separado — os dados já vivem direto em `js/data.js`
-  (`REAL_SQUADS`, `CREST_MAP`), reexecutar o script quando quiser atualizar.
+  atual: **191/191 clubes** com elenco/escudo real sincronizado (os 4 clubes da Série B
+  adicionados depois — Náutico, Figueirense, Paraná Clube, Sampaio Corrêa — sincronizados
+  à parte). Não existe (nem é necessário) um snapshot JSON versionado separado — os dados
+  já vivem direto em `js/data.js` (`REAL_SQUADS`, `CREST_MAP`), reexecutar o script quando
+  quiser atualizar (ex.: refletir a janela de transferências de 2026).
