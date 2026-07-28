@@ -384,6 +384,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 main.page, .cover { animation: pageIn 0.26s ease both; }
 @keyframes pageIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
 
+/* barra de progresso que desliza (marcos) — escopado só aqui, não no .bar genérico */
+.bar-anim > i { transition: width .5s ease; }
+
+/* fala curta do técnico, estilo citação */
+.mgr-quote { border-left: 3px solid var(--gold); padding: 6px 0 6px 12px; margin: 8px 0 0; font-family: var(--serif); font-style: italic; font-size: 14px; color: var(--ink-2); }
+
 /* splash de GOL no modo ao vivo */
 .goal-splash {
   position: fixed; inset: 0; z-index: 300; display: flex; align-items: center; justify-content: center;

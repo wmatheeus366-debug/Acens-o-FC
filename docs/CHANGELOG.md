@@ -571,5 +571,26 @@ entre si (não fazem parte de "Mundo Real 2026", já concluída).
   simulado via `applyMatch` real, rumor de olheiro europeu presente pra cada promessa
   Europa-relevante, migração de `g.clubRivalry`).
 
+## Imersão parte 2: Bola de Ouro pra defensores, contadores animados, fala do técnico
+Continuação da lista de imersão. Um item pedido (transição suave entre telas) já estava
+implementado desde o commit inicial do projeto (`main.page, .cover { animation: pageIn
+0.26s ease both; }`, `css/editorial.css`) — confirmado rodando no navegador, nada a fazer.
+- **Bola de Ouro pra defensores/goleiros de elite**: `ballonScore` (`js/engine.js`) tinha
+  dois termos gigantes e sem teto de puro ataque (gols/assistências) e só goleiro tinha
+  compensação (clean sheets). Agora a média de nota (`avg`, já o "equivalente a gol" da
+  posição segundo `docs/RATING_MODEL.md`) pesa mais pra GOL/ZAG/LAT/VOL, e zaga/lateral/
+  volante também ganham crédito por clean sheets (antes só goleiro). Continua raro — não
+  empata com atacante — mas uma temporada defensiva realmente elite agora chega perto da
+  faixa de indicação em vez de ficar estruturalmente fora.
+- **Contadores que sobem**: patrimônio e fama na home, e as barras de progresso da aba
+  Marcos, agora contam/deslizam do valor antigo pro novo (`animateCount`/`animateBarWidth`,
+  novo em `js/ui.js`, `CQ.state.lastSeen` guarda o "antes"). Sem stat/tela nova — só
+  apresentação. Respeita `prefers-reduced-motion` (pula direto pro valor final).
+- **Fala do técnico**: card "Técnico & vestiário" ganhou uma citação curta (`.mgr-quote`)
+  que varia com a mesma faixa de confiança que a UI já mostrava (75/55/35), determinística
+  por rodada (não pisca ao trocar de sub-aba dentro de Clube).
+- Regressão: de 46 pra **58 checagens** (fórmula nova da Bola de Ouro favorece defensores
+  vs a antiga, fala do técnico determinística e no pool certo por faixa).
+
 ## Próximos passos
-1. **Ajuste opcional:** Bola de Ouro ocasional para defensores/goleiros de elite (hoje ~0).
+Nenhum item pendente documentado no momento.

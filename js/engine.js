@@ -179,8 +179,13 @@ window.CQ = window.CQ || {};
     p.titles.filter(function (t) { return t.year === y; }).forEach(function (t) {
       titleBonus += ({ SUPER: 50, WC: 45, UCL: 30, MUN: 26, LIB: 24, EU: 18, CA: 18, BRA: 12, LIGA: 12, CDB: 6, COPA: 6, EST: 2 }[t.key] || 4);
     });
-    let s = p.stats.g * 1.25 + p.stats.a * 0.75 + Math.max(0, avg - 6.8) * 15 + p.fame * 0.25 + titleBonus + (p.overall - 80) * 3;
+    // defensores/goleiros: a média (avg) já é o "equivalente a gol" da posição
+    // (docs/RATING_MODEL.md) — pesa mais aqui pra compensar não ter g/a de peso
+    const avgMult = (p.pos === "GOL" || p.pos === "ZAG" || p.pos === "LAT" || p.pos === "VOL") ? 22 : 15;
+    let s = p.stats.g * 1.25 + p.stats.a * 0.75 + Math.max(0, avg - 6.8) * avgMult + p.fame * 0.25 + titleBonus + (p.overall - 80) * 3;
     if (p.pos === "GOL") s += p.stats.cs * 1.6; // goleiros pontuam por clean sheets
+    else if (p.pos === "ZAG" || p.pos === "LAT") s += p.stats.cs * 1.0; // zaga também
+    else if (p.pos === "VOL") s += p.stats.cs * 0.6; // volante protege a zaga, crédito menor
     // ser artilheiro da liga vale muito na corrida
     if (g.season && (g.season.scorerTop != null) && ligaG > g.season.scorerTop) s += 16;
     return Math.round(s);

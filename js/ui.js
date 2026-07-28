@@ -63,8 +63,8 @@ window.CQ = window.CQ || {};
   function render() {
     const s = CQ.state;
     const app = $("#app");
-    if (s.screen === "create") { app.innerHTML = createHTML(); return; }
-    if (!s.game || s.screen === "cover") { app.innerHTML = coverHTML(); return; }
+    if (s.screen === "create") { app.innerHTML = createHTML(); runEntranceAnimations(); return; }
+    if (!s.game || s.screen === "cover") { app.innerHTML = coverHTML(); runEntranceAnimations(); return; }
     if (s.game.retired && s.screen !== "retro") s.screen = "retro";
     let body = "";
     switch (s.screen) {
@@ -77,6 +77,56 @@ window.CQ = window.CQ || {};
       default: body = homeHTML();
     }
     app.innerHTML = mastheadHTML() + `<main class="page">${body}</main>` + bottomNavHTML();
+    runEntranceAnimations();
+  }
+
+  // conta números-chave de baixo pra cima e desliza barras de progresso — pinta o
+  // valor ANTIGO no HTML (já gerado pelas telas) e troca pro novo em requestAnimationFrame,
+  // já que render() recria o DOM inteiro a cada chamada (não há "de onde" transicionar
+  // sozinho). Não anima nada na primeira vez que um número é visto (lastSeen ainda nulo).
+  function animateCount(el, from, to, ms, fmt) {
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      el.textContent = fmt ? fmt(to) : Math.round(to);
+      return;
+    }
+    const t0 = performance.now();
+    function step(now) {
+      const t = Math.min(1, (now - t0) / ms);
+      const eased = 1 - Math.pow(1 - t, 3);
+      const val = from + (to - from) * eased;
+      el.textContent = fmt ? fmt(val) : Math.round(val);
+      if (t < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+  function animateBarWidth(el, toPct) {
+    if (!el) return;
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) { el.style.width = toPct + "%"; return; }
+    // setTimeout (não rAF): dá tempo do navegador pintar a largura antiga antes de
+    // trocar pra nova, mas sem depender da aba estar em primeiro plano pra disparar
+    setTimeout(function () { el.style.width = toPct + "%"; }, 20);
+  }
+  function runEntranceAnimations() {
+    const ls = CQ.state.lastSeen;
+    if (!ls) return;
+    const elMoney = $("#cnt-money");
+    if (elMoney) {
+      const to = +elMoney.dataset.countTo;
+      animateCount(elMoney, ls.money == null ? to : ls.money, to, 700, U.fmtBRL);
+      ls.money = to;
+    }
+    const elFame = $("#cnt-fame");
+    if (elFame) {
+      const to = +elFame.dataset.countTo;
+      animateCount(elFame, ls.fame == null ? to : ls.fame, to, 700);
+      ls.fame = to;
+    }
+    document.querySelectorAll("[data-bar-to][id^='marco-bar-']").forEach(function (barEl) {
+      const field = barEl.id.replace("marco-bar-", "");
+      const to = +barEl.dataset.barTo;
+      animateBarWidth(barEl.querySelector("i"), to);
+      ls.marcos[field] = to;
+    });
   }
 
   const MONTHS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
@@ -368,6 +418,11 @@ window.CQ = window.CQ || {};
 
   function homeHTML() {
     const G = g(), p = G.player, S = G.season;
+    // valor "antigo" pra nascer no HTML e a animação de contagem ter de onde partir
+    // (sem isso, o texto já nasceria no valor final e o requestAnimationFrame pularia
+    // pra trás antes de recomeçar a contagem — um flash visual, não uma animação limpa)
+    const fromMoney = CQ.state.lastSeen.money == null ? p.money : CQ.state.lastSeen.money;
+    const fromFame = CQ.state.lastSeen.fame == null ? Math.round(p.fame) : CQ.state.lastSeen.fame;
     const fx = E().currentFixture(G);
     if (fx) CQ.nar.preMatch(G, fx);
     if (!G.season.drawShown) setTimeout(function () { maybeDrawCeremony(G); }, 80);
@@ -451,7 +506,7 @@ window.CQ = window.CQ || {};
       <div class="flex-b wrap mb8"><span class="small">${I.whistle} Meta da temporada: <b>${esc(G.board.desc)}</b></span></div>
       <div class="tiles">
         <div class="tile"><b class="tnum">${U.fmtBRL(p.salary)}</b><span>Salário/mês</span></div>
-        <div class="tile"><b class="tnum">${U.fmtBRL(p.money)}</b><span>Patrimônio</span></div>
+        <div class="tile"><b class="tnum" id="cnt-money" data-count-to="${p.money}">${U.fmtBRL(fromMoney)}</b><span>Patrimônio</span></div>
         <div class="tile"><b class="tnum">${p.contractEnd}</b><span>Fim contrato</span></div>
       </div></div></div>`;
 
@@ -474,7 +529,7 @@ window.CQ = window.CQ || {};
             <div style="text-align:right"><div class="dossier-ov">${p.overall}</div><div class="dossier-sub">Overall</div></div>
           </div>
           <hr class="rule">
-          <div class="meter-lbl"><span>Potencial ${p.pot}</span><span>Fama ${Math.round(p.fame)}</span></div>${bar(p.overall, 100, false, p.pot)}
+          <div class="meter-lbl"><span>Potencial ${p.pot}</span><span>Fama <b id="cnt-fame" data-count-to="${Math.round(p.fame)}">${fromFame}</b></span></div>${bar(p.overall, 100, false, p.pot)}
           <div class="meter-lbl mt8"><span>Condição</span><span class="tnum">${Math.round(p.condition)}%</span></div>${bar(p.condition, 100, p.condition < 40)}
           <div class="meter-lbl mt8"><span>Moral</span><span class="tnum">${Math.round(p.morale)}%</span></div>${bar(p.morale, 100, p.morale < 35)}
           <hr class="rule">
@@ -1211,9 +1266,11 @@ window.CQ = window.CQ || {};
       const next = def.steps.find(function (s) { return cur < s; });
       const lastHit = def.steps.filter(function (s) { return cur >= s; }).pop();
       const pct = next ? Math.round(cur / next * 100) : 100;
+      const fromPct = CQ.state.lastSeen.marcos[def.field] != null ? CQ.state.lastSeen.marcos[def.field] : pct;
+      const marcoBar = `<div class="bar bar-anim" id="marco-bar-${def.field}" data-bar-to="${pct}"><i style="width:${fromPct}%"></i></div>`;
       return `<div style="padding:9px 0;border-bottom:1px dashed var(--rule-soft)">
         <div class="flex-b"><span class="condsmall">${esc(def.label)}</span><b class="tnum" style="font-family:var(--serif);font-size:17px">${cur}</b></div>
-        ${next ? `<div class="meter-lbl" style="margin-top:4px"><span>${lastHit ? "último marco " + lastHit : "próximo marco"}</span><span>meta ${next}</span></div>${bar(pct, 100)}`
+        ${next ? `<div class="meter-lbl" style="margin-top:4px"><span>${lastHit ? "último marco " + lastHit : "próximo marco"}</span><span>meta ${next}</span></div>${marcoBar}`
           : `<span class="badge badge-gold mt8">todos os marcos batidos</span>`}
       </div>`;
     }).join("");
@@ -2019,6 +2076,24 @@ window.CQ = window.CQ || {};
       <p class="small muted" style="padding:8px 14px">Promessas da base envelhecem e evoluem normalmente — fique de olho, algumas podem virar peças importantes com o tempo.</p></div>`;
   }
 
+  const MGR_LINES = {
+    3: ["Pode contar comigo até o fim.", "Você é o motivo de eu dormir tranquilo antes do jogo.", "Enquanto eu mandar aqui, sua vaga é garantida."],
+    2: ["Sigo confiando no seu trabalho.", "Você tem meu apoio — continue assim.", "Ainda é minha primeira opção pra escalação."],
+    1: ["Preciso ver mais consistência de você.", "Talento não falta, mas o lugar se conquista toda semana.", "Ainda estou te conhecendo dentro de campo."],
+    0: ["Preciso de mais de você, e rápido.", "Não posso segurar sua vaga pra sempre.", "A cobrança vai aumentar se isso continuar assim."]
+  };
+  // fala curta do técnico, seedada pela faixa de confiança (não pelo número cru, que
+  // pode oscilar ±1 sem evento real) — clubHTML re-renderiza a cada troca de sub-aba,
+  // então precisa ser estável enquanto nada relevante muda (mesmo padrão do matchdayBanner)
+  function managerConfTier(conf) {
+    return conf >= 75 ? 3 : conf >= 55 ? 2 : conf >= 35 ? 1 : 0;
+  }
+  function managerLine(G, conf) {
+    const tier = managerConfTier(conf);
+    const rng = U.rngFor(G.seed, "mgrline", G.year, G.season.idx, tier);
+    return U.choice(MGR_LINES[tier], rng);
+  }
+
   function clubHTML() {
     const G = g(), p = G.player, cl = E().myClub(G);
     const lg = E().leagueOf(G, p.clubId);
@@ -2064,6 +2139,7 @@ window.CQ = window.CQ || {};
           </div>
           <div class="meter-lbl mt12"><span>Confiança do técnico</span><span class="tnum">${Math.round(conf)}%</span></div>${bar(conf, 100, conf < 40)}
           <p class="small muted mt8">${esc(confLbl)}. A confiança sobe com boas atuações e cai quando você não rende ou fica no banco — e decide sua titularidade.</p>
+          <blockquote class="mgr-quote">"${esc(managerLine(G, conf))}"</blockquote>
           ${p.captain === p.clubId ? `<span class="badge badge-gold mt8">${I.trophy} Capitão</span>` : ""}
         </div></div>`;
       })()}
@@ -2075,11 +2151,14 @@ window.CQ = window.CQ || {};
         </div></div>
       </div></div>`;
     } else if (tab === "elenco") {
-      const rows = squadOf(G).map(function (j) {
+      const squad = squadOf(G);
+      const rows = squad.map(function (j) {
         return `<tr><td>${esc(j.name)}</td><td>${D.POSITIONS[j.pos].name}</td><td class="num">${j.age}</td><td class="num"><b>${j.ov}</b></td></tr>`;
       }).join("");
       const meRow = `<tr class="me"><td>${esc(p.name)} <span class="badge badge-gold">você</span></td><td>${D.POSITIONS[p.pos].name}</td><td class="num">${p.age}</td><td class="num"><b>${p.overall}</b></td></tr>`;
-      body = `<div class="card"><div class="card-h"><h3>Elenco ${esc(cl.name)}</h3><span class="kicker-side">nomes fictícios</span></div>
+      const realCount = squad.filter(function (j) { return j.real; }).length;
+      const kicker = !realCount ? "nomes fictícios" : realCount === squad.length ? "elenco real" : realCount + " de " + squad.length + " nomes reais";
+      body = `<div class="card"><div class="card-h"><h3>Elenco ${esc(cl.name)}</h3><span class="kicker-side">${kicker}</span></div>
         <div class="card-b tight" style="overflow-x:auto"><table class="tbl tbl-zebra"><thead><tr><th>Jogador</th><th>Posição</th><th class="num">Idade</th><th class="num">OVR</th></tr></thead>
         <tbody>${meRow}${rows}</tbody></table></div>
         <p class="small muted" style="padding:8px 14px">Se o seu overall ficar muito abaixo do nível do elenco, o técnico vai te deixar no banco — titularidade se conquista.</p></div>`;
@@ -2261,6 +2340,7 @@ window.CQ = window.CQ || {};
     liveStep: liveStep, liveDecide: liveDecide, shootPick: shootPick, shootReveal: shootReveal, finishLive: finishLive,
     pickInterview: pickInterview, pickLife: pickLife,
     seasonEndFlow: seasonEndFlow, summaryNext: summaryNext, summaryNextStep: summaryNextStep, pickOffer: pickOffer, pickRenew: pickRenew,
+    managerLine: managerLine, managerConfTier: managerConfTier, MGR_LINES: MGR_LINES,
     ctab: ctab, ttab: ttab, closeTitle: closeTitle, closeDraw: closeDraw, closeCapa: closeCapa, votePoll: votePoll,
     setLogo: setLogo, clearLogo: clearLogo, toast: toast,
     requestTransfer: requestTransfer, cancelTransfer: cancelTransfer,

@@ -26,6 +26,21 @@
     });
   }
 
+  // ---- Bola de Ouro: defensores/goleiros de elite pontuam mais que antes ----
+  function testBallonScoreDefenders() {
+    const fakeZag = { year: 2030, season: null, player: { titles: [], stats: { g: 2, a: 3, cs: 18 }, fame: 60, overall: 84, pos: "ZAG" } };
+    const avg = 8.3;
+    const newScore = E().ballonScore(fakeZag, avg, 0);
+    // fórmula antiga (referência local, só pra confirmar que a mudança favorece o zagueiro)
+    const oldScore = Math.round(fakeZag.player.stats.g * 1.25 + fakeZag.player.stats.a * 0.75 + Math.max(0, avg - 6.8) * 15 + fakeZag.player.fame * 0.25 + (fakeZag.player.overall - 80) * 3);
+    assert("bola de ouro: fórmula nova favorece zagueiro de elite vs a antiga", newScore > oldScore, "novo=" + newScore + " antigo=" + oldScore);
+    ["GOL", "LAT", "VOL"].forEach(function (pos) {
+      const g2 = { year: 2030, season: null, player: { titles: [], stats: { g: 1, a: 1, cs: 15 }, fame: 55, overall: 83, pos: pos } };
+      const score = E().ballonScore(g2, 8.0, 0);
+      assert("bola de ouro: " + pos + " recebe crédito real por clean sheets", score >= 60, pos + "=" + score);
+    });
+  }
+
   // ---- BUG-01: cada gol conta uma vez no placar ao vivo ----
   function testLiveScoreSingleCount() {
     withTempGame(function () {
@@ -292,6 +307,18 @@
     });
   }
 
+  // ---- Fala do técnico: linha certa por faixa de confiança + determinística ----
+  function testManagerLine() {
+    const fakeG = { seed: 12345, year: 2030, season: { idx: 5 } };
+    [80, 60, 40, 10].forEach(function (conf) {
+      const tier = CQ.ui.managerConfTier(conf);
+      const line1 = CQ.ui.managerLine(fakeG, conf);
+      const line2 = CQ.ui.managerLine(fakeG, conf);
+      assert("fala do técnico: linha pertence ao pool da faixa certa (conf=" + conf + ")", CQ.ui.MGR_LINES[tier].indexOf(line1) >= 0, line1);
+      assert("fala do técnico: mesma chamada é determinística (conf=" + conf + ")", line1 === line2, line1 + " vs " + line2);
+    });
+  }
+
   function testImportRejectsInvalid() {
     withTempGame(function () {
       const raw = localStorage.getItem("craque-save-v1");
@@ -388,6 +415,8 @@
 
   function run() {
     results.length = 0;
+    testBallonScoreDefenders();
+    testManagerLine();
     testLiveScoreSingleCount();
     testImportMigrates();
     testImportRejectsInvalid();

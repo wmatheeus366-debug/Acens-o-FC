@@ -43,7 +43,7 @@ Fontes (Google Fonts) e bandeiras (flagcdn) vêm da web com fallback; todo o res
 
 ```
 # no navegador (index.html ou CRAQUE.html aberto), console:
-CQ.tests.run()             # tests/regression.js — 46 checagens
+CQ.tests.run()             # tests/regression.js — 58 checagens
 
 # balanceamento (Node, motor real num shim vm):
 node scripts/balance-runner.mjs 100   # gera docs/BALANCE_BASELINE.md + .json
@@ -103,6 +103,14 @@ temporada em passos (`buildSummarySteps`/`summaryStepRender`/`summaryNextStep`,
 `js/ui.js`), cobertura total de `D.CLUBS[id].rivals` + placar `g.clubRivalry` do
 clássico de clube (`js/data.js`, `js/engine.js`, `js/ui.js`), e alerta de olheiro
 europeu na notícia de promessa notável (`js/narrative.js`).
+
+## Imersão parte 2 — Bola de Ouro, contadores animados, fala do técnico
+`ballonScore` (`js/engine.js`) revisado pra dar chance real (ainda rara) a defensores/
+goleiros de elite. `animateCount`/`animateBarWidth`/`runEntranceAnimations` (novos em
+`js/ui.js`, com `CQ.state.lastSeen` guardando o "antes") animam patrimônio/fama/marcos.
+`managerLine` (`js/ui.js`) dá uma fala curta e determinística ao técnico, por faixa de
+confiança. Transição suave entre telas já existia desde o commit inicial
+(`css/editorial.css`, `pageIn`).
 - **Escudos/fotos:** já resolvido por fora desta fase — `CQ.DATA.CREST_MAP` (escudo real
   via API-Football, `media.api-sports.io`, uso pessoal) com fallback pro brasão vetorial
   (`crestSVG`) quando não mapeado ou se a imagem falhar. Ver `README.md` § Direitos de
