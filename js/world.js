@@ -1,5 +1,5 @@
 /* CRAQUE — mundo persistente (Fatia 1 de "Mundo Real 2026"): identidade estável de
-   NPCs em todos os 187 clubes, com envelhecimento e aposentadoria reais ano a ano.
+   NPCs em todos os 191 clubes, com envelhecimento e aposentadoria reais ano a ano.
    Antes, squadOf recalculava idade/overall do zero a cada chamada (determinístico,
    mas sem memória). Agora cada clube guarda um elenco que envelhece de verdade e se
    aposenta/repõe — igual ao que g.rival e REAL_WORLD_STARS já faziam, só que pro

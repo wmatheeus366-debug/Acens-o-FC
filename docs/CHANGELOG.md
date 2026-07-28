@@ -592,5 +592,22 @@ implementado desde o commit inicial do projeto (`main.page, .cover { animation: 
 - Regressão: de 46 pra **58 checagens** (fórmula nova da Bola de Ouro favorece defensores
   vs a antiga, fala do técnico determinística e no pool certo por faixa).
 
+## Correções de dados reais + ajuste de UI
+- **Botão "Poupar"** ganhou cor própria (`.btn-gold`, `css/style.css`) — antes usava o
+  estilo padrão sem cor, igual a nenhum outro botão da linha de ação.
+- **Copa do Mundo 2026**: `D.CHAMPS_SEED.WC` ganhou `2026: "Espanha"` (final 1-0 sobre a
+  Argentina, gol de Ferran Torres na prorrogação, Rodri Bola de Ouro do torneio).
+  `D.HALL_SCORERS.WC` atualizado: Mbappé agora lidera com 22 gols na carreira em Copas
+  (10 no torneio de 2026), superando o recorde histórico de Klose (16) — texto da aba
+  Campeões ajustado de "até 2025"/"a partir de 2026" pra "até 2026"/"a partir de 2027".
+- **Brasileirão Série B**: tinha só 16 clubes (dado desatualizado); a Série B real tem 20
+  desde a reformulação de formato. Adicionados Náutico, Figueirense, Paraná Clube e
+  Sampaio Corrêa — `LEAGUES.BRB.rounds` ajustado de 30 pra 38 (turno/returno de 20 times).
+  De quebra, dois clássicos reais novos: Sport×Náutico e Avaí×Figueirense. Mundo agora tem
+  **191 clubes** (era 187) — os 4 novos ainda usam gerador procedural de elenco/escudo
+  (não sincronizados via API ainda).
+- Regressão: contagem de clubes do mundo ajustada de 187 pra 191 (`testWorldAging`).
+
 ## Próximos passos
-Nenhum item pendente documentado no momento.
+1. Ressincronizar elencos com as transferências reais da janela de 2026 (`scripts/sync-squads.mjs`) — escopo a definir com o usuário.
+2. Sincronizar elenco/escudo real dos 4 novos clubes da Série B (Náutico, Figueirense, Paraná Clube, Sampaio Corrêa).

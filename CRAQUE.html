@@ -236,6 +236,8 @@ h1, h2, h3, h4 { font-family: var(--serif); font-weight: 600; line-height: 1.12;
 .btn-pri:hover { box-shadow: 3px 3px 0 var(--verm-dark); }
 .btn-green { background: var(--green); border-color: #0d3a26; color: #fff; box-shadow: 2px 2px 0 #0d3a26; }
 .btn-green:hover { box-shadow: 3px 3px 0 #0d3a26; }
+.btn-gold { background: var(--gold); border-color: var(--gold); color: var(--ink); box-shadow: 2px 2px 0 var(--ink-3); }
+.btn-gold:hover { box-shadow: 3px 3px 0 var(--ink-3); }
 .btn-ghost { box-shadow: none; border-color: var(--rule); color: var(--ink-2); }
 .btn-ghost:hover { border-color: var(--ink); color: var(--ink); box-shadow: none; transform: none; }
 .btn-big { font-size: 18px; padding: 13px 26px; }
@@ -1669,7 +1671,7 @@ window.CQ = window.CQ || {};
   C("cha", "Chapecoense", "CHA", 72, "BRA", "SC", "#0b7a3b", "#ffffff", "plain");
   C("rem", "Remo", "REM", 71, "BRA", "PA", "#0a2a5e", "#ffffff", "plain");
 
-  // ---- Série B (16) ----
+  // ---- Série B (20) ----
   C("spt", "Sport Recife", "SPT", 74, "BRB", "PE", "#d0342c", "#1b1812", "hoops");
   C("for", "Fortaleza", "FOR", 76, "BRB", "CE", "#1560a8", "#d0342c", "hoops");
   C("cea", "Ceará", "CEA", 74, "BRB", "CE", "#1b1812", "#ffffff", "hoops");
@@ -1686,6 +1688,10 @@ window.CQ = window.CQ || {};
   C("ope", "Operário-PR", "OPE", 67, "BRB", "PR", "#1b1812", "#ffffff", "stripes");
   C("amz", "Amazonas", "AMZ", 66, "BRB", "AM", "#f2c500", "#1b1812", "plain");
   C("ath", "Athletic-MG", "ATH", 66, "BRB", "MG", "#d0342c", "#1b1812", "stripes");
+  C("nau", "Náutico", "NAU", 70, "BRB", "PE", "#d0342c", "#1b1812", "stripes");
+  C("fig", "Figueirense", "FIG", 68, "BRB", "SC", "#1b1812", "#ffffff", "stripes");
+  C("prc", "Paraná Clube", "PAR", 68, "BRB", "PR", "#0b7a3b", "#d0342c", "stripes");
+  C("spc", "Sampaio Corrêa", "SPC", 67, "BRB", "MA", "#d0342c", "#1b1812", "hoops");
 
   // ---- Clubes de estaduais (pequenos/regionais) ----
   C("boa", "Boavista-RJ", "BOA", 62, "EST", "RJ", "#0b7a3b", "#f2c500", "half");
@@ -1811,6 +1817,7 @@ window.CQ = window.CQ || {};
   riv("fla", "flu"); riv("fla", "vas"); riv("fla", "bot"); riv("flu", "bot"); riv("vas", "bot"); riv("flu", "vas");
   riv("pal", "cor"); riv("pal", "sao"); riv("pal", "san"); riv("cor", "sao"); riv("cor", "san"); riv("sao", "san");
   riv("cru", "cam"); riv("gre", "int"); riv("bah", "vit"); riv("cap", "cfc"); riv("cea", "for"); riv("rem", "pay");
+  riv("spt", "nau"); riv("ava", "fig");
   riv("rma", "bar"); riv("rma", "atm"); riv("mci", "mun"); riv("liv", "mun"); riv("liv", "eve"); riv("ars", "tot");
   riv("intm", "mln"); riv("juve", "tor"); riv("rom", "laz"); riv("bay", "bvb"); riv("psg", "mars"); riv("ben", "porto"); riv("scp", "ben");
   riv("riv", "boc"); riv("pen", "nac");
@@ -1838,7 +1845,7 @@ window.CQ = window.CQ || {};
 
   const LEAGUES = {
     BRA: { id: "BRA", name: "Brasileirão Série A", short: "Série A", country: "BR", cupName: "Copa do Brasil", rounds: 38 },
-    BRB: { id: "BRB", name: "Brasileirão Série B", short: "Série B", country: "BR", cupName: "Copa do Brasil", rounds: 30 },
+    BRB: { id: "BRB", name: "Brasileirão Série B", short: "Série B", country: "BR", cupName: "Copa do Brasil", rounds: 38 },
     ESP: { id: "ESP", name: "LaLiga", short: "LaLiga", country: "ES", cupName: "Copa do Rei", rounds: 34 },
     ENG: { id: "ENG", name: "Premier League", short: "Premier", country: "EN", cupName: "Copa da Inglaterra", rounds: 34 },
     ITA: { id: "ITA", name: "Serie A italiana", short: "Serie A", country: "IT", cupName: "Copa da Itália", rounds: 34 },
@@ -1946,7 +1953,7 @@ window.CQ = window.CQ || {};
     CDB: { 2015: "Palmeiras", 2016: "Grêmio", 2017: "Cruzeiro", 2018: "Cruzeiro", 2019: "Athletico-PR", 2020: "Palmeiras", 2021: "Atlético-MG", 2022: "Flamengo", 2023: "São Paulo", 2024: "Flamengo" },
     LIB: { 2015: "River Plate", 2016: "Atlético Nacional", 2017: "Grêmio", 2018: "River Plate", 2019: "Flamengo", 2020: "Palmeiras", 2021: "Palmeiras", 2022: "Flamengo", 2023: "Fluminense", 2024: "Botafogo", 2025: "Flamengo" },
     UCL: { 2015: "Barcelona", 2016: "Real Madrid", 2017: "Real Madrid", 2018: "Real Madrid", 2019: "Liverpool", 2020: "Bayern de Munique", 2021: "Chelsea", 2022: "Real Madrid", 2023: "Manchester City", 2024: "Real Madrid", 2025: "Paris Saint-Germain" },
-    WC: { 2006: "Itália", 2010: "Espanha", 2014: "Alemanha", 2018: "França", 2022: "Argentina" },
+    WC: { 2006: "Itália", 2010: "Espanha", 2014: "Alemanha", 2018: "França", 2022: "Argentina", 2026: "Espanha" },
     CA: { 2015: "Chile", 2016: "Chile", 2019: "Brasil", 2021: "Argentina", 2024: "Argentina" },
     EU: { 2008: "Espanha", 2012: "Espanha", 2016: "Portugal", 2021: "Itália", 2024: "Espanha" }
   };
@@ -1962,9 +1969,9 @@ window.CQ = window.CQ || {};
   // Usado para você perseguir e ultrapassar recordes reais.
   const HALL_SCORERS = {
     WC: { title: "Artilheiros da Copa do Mundo (história)", list: [
-      { name: "Miroslav Klose", n: 16 }, { name: "Ronaldo", n: 15 }, { name: "Gerd Müller", n: 14 },
+      { name: "Kylian Mbappé", n: 22 }, { name: "Miroslav Klose", n: 16 }, { name: "Ronaldo", n: 15 }, { name: "Gerd Müller", n: 14 },
       { name: "Just Fontaine", n: 13 }, { name: "Lionel Messi", n: 13 }, { name: "Pelé", n: 12 },
-      { name: "Kylian Mbappé", n: 12 }, { name: "Jürgen Klinsmann", n: 11 }, { name: "Sándor Kocsis", n: 11 },
+      { name: "Jürgen Klinsmann", n: 11 }, { name: "Sándor Kocsis", n: 11 },
       { name: "Thomas Müller", n: 10 }, { name: "Gabriel Batistuta", n: 10 }, { name: "Gary Lineker", n: 10 },
       { name: "Teófilo Cubillas", n: 10 }, { name: "Grzegorz Lato", n: 10 }, { name: "Ademir", n: 9 }
     ] },
@@ -2254,7 +2261,7 @@ window.CQ = window.CQ || {};
 
 /* ===== js/world.js ===== */
 /* CRAQUE — mundo persistente (Fatia 1 de "Mundo Real 2026"): identidade estável de
-   NPCs em todos os 187 clubes, com envelhecimento e aposentadoria reais ano a ano.
+   NPCs em todos os 191 clubes, com envelhecimento e aposentadoria reais ano a ano.
    Antes, squadOf recalculava idade/overall do zero a cada chamada (determinístico,
    mas sem memória). Agora cada clube guarda um elenco que envelhece de verdade e se
    aposenta/repõe — igual ao que g.rival e REAL_WORLD_STARS já faziam, só que pro
@@ -5830,7 +5837,7 @@ window.CQ = window.CQ || {};
         ${notices.length ? `<div class="stack mt12" style="gap:8px">${notices.join("")}</div>` : ""}
         <div class="lead-cta"><div class="btnrow">
           <button class="btn btn-pri btn-big" onclick="CQ.ui.actionPlay()">${fx.decisive ? "Entrar em campo — ao vivo" : "Jogar a partida"}</button>
-          <button class="btn" onclick="CQ.ui.actionRest()">Poupar</button>
+          <button class="btn btn-gold" onclick="CQ.ui.actionRest()">Poupar</button>
           <button class="btn btn-ghost" onclick="CQ.ui.actionSim(1)">Simular</button>
           <button class="btn btn-ghost" onclick="CQ.ui.actionSim(5)">Simular 5</button>
           <button class="btn btn-ghost" onclick="CQ.ui.actionSim(10)">Simular 10</button>
@@ -7278,7 +7285,7 @@ window.CQ = window.CQ || {};
     }).join("");
     return `<div class="card"><div class="card-h"><h3>Histórico de campeões</h3>${sel}</div>
       <div class="card-b tight"><table class="tbl tbl-zebra"><thead><tr><th>Ano</th><th>Campeão</th></tr></thead><tbody>${rows}</tbody></table></div>
-      <p class="small muted" style="padding:8px 14px">Edições até 2025 são fatos reais; a partir de 2026, a história é escrita por você.</p></div>
+      <p class="small muted" style="padding:8px 14px">Edições até 2026 são fatos reais; a partir de 2027, a história é escrita por você.</p></div>
       ${hallScorersHTML(G, f)}`;
   }
 

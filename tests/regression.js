@@ -135,7 +135,7 @@
   function testWorldAging() {
     withTempGame(function () {
       const g = newCareer("ATA");
-      assert("mundo: 187 clubes ao criar carreira", Object.keys(g.world.clubs).length === 187, "n=" + Object.keys(g.world.clubs).length);
+      assert("mundo: 191 clubes ao criar carreira", Object.keys(g.world.clubs).length === 191, "n=" + Object.keys(g.world.clubs).length);
       const clubId = g.player.clubId;
       const before = g.world.clubs[clubId].roster.map(function (pl) { return { id: pl.id, age: pl.age }; });
       let guard = 0, seasons = 0; // 'seasons' só conta endSeason/advanceWorld executados de verdade

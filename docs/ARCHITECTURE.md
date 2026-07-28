@@ -9,7 +9,7 @@ Desenvolvimento com arquivos separados; distribuição num arquivo único `CRAQU
 |---|---|---|---|
 | `js/util.js` | `CQ.util` | RNG por seed, formatação, sanitização, retratos/escudos/bandeiras SVG, ícones | — |
 | `js/data.js` | `CQ.DATA` | Clubes, ligas, seleções, lendas, posições, elencos reais, recordes | util |
-| `js/world.js` | `CQ.world` | Mundo persistente: identidade estável de NPCs nos 187 clubes, envelhecimento/aposentadoria ano a ano | util, DATA |
+| `js/world.js` | `CQ.world` | Mundo persistente: identidade estável de NPCs nos 191 clubes, envelhecimento/aposentadoria ano a ano | util, DATA |
 | `js/engine.js` | `CQ.engine` | Modelo, calendário, simulação, prêmios, mercado, técnico, traços, aposentadoria | util, DATA, world, (nar) |
 | `js/market.js` | `CQ.market` | Mercado autônomo entre NPCs: clubes comprando/vendendo jogadores entre si a cada temporada | util, DATA, world, engine |
 | `js/narrative.js` | `CQ.nar` | Feed, entrevistas, eventos de vida, enquetes, rival | util, DATA, engine |
@@ -65,7 +65,7 @@ node scripts/world-check.mjs 20       # diagnóstico do mundo persistente (idade
 ## Mundo Real 2026 — status
 
 - ✅ **Fatia 1 (feita): identidade persistente de NPCs.** `js/world.js` (`CQ.world`) dá aos
-  187 elencos (`REAL_SQUADS`) uma identidade estável (`g.world.clubs[clubId].roster`) que
+  191 elencos (`REAL_SQUADS`) uma identidade estável (`g.world.clubs[clubId].roster`) que
   envelhece de verdade uma vez por temporada (`advanceWorld`, chamado de `endSeason`) e se
   aposenta/repõe por promessa gerada quando idade/decadência justificar (mesmos limiares do
   próprio jogador). `squadOf`/`topAttackerName` leem daí, com fallback pro gerador antigo
@@ -116,7 +116,9 @@ confiança. Transição suave entre telas já existia desde o commit inicial
   (`crestSVG`) quando não mapeado ou se a imagem falhar. Ver `README.md` § Direitos de
   imagem pro contexto da decisão de usar escudo real.
 - **Sync de dados:** o script real é `scripts/sync-squads.mjs` (API-Football, chave só em
-  `.env`/build, nunca no frontend) — sincroniza nome/posição pros 187 elencos e os IDs de
-  escudo. Não existe (nem é necessário) um snapshot JSON versionado separado — os dados já
-  vivem direto em `js/data.js` (`REAL_SQUADS`, `CREST_MAP`), reexecutar o script quando
-  quiser atualizar.
+  `.env`/build, nunca no frontend) — sincroniza nome/posição e os IDs de escudo. Cobertura
+  atual: 187 dos 191 clubes têm elenco/escudo real sincronizado; os 4 clubes da Série B
+  adicionados depois (Náutico, Figueirense, Paraná Clube, Sampaio Corrêa) ainda usam o
+  gerador procedural (`js/world.js`) até serem sincronizados. Não existe (nem é necessário)
+  um snapshot JSON versionado separado — os dados já vivem direto em `js/data.js`
+  (`REAL_SQUADS`, `CREST_MAP`), reexecutar o script quando quiser atualizar.

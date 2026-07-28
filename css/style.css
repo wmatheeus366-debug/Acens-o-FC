@@ -223,6 +223,8 @@ h1, h2, h3, h4 { font-family: var(--serif); font-weight: 600; line-height: 1.12;
 .btn-pri:hover { box-shadow: 3px 3px 0 var(--verm-dark); }
 .btn-green { background: var(--green); border-color: #0d3a26; color: #fff; box-shadow: 2px 2px 0 #0d3a26; }
 .btn-green:hover { box-shadow: 3px 3px 0 #0d3a26; }
+.btn-gold { background: var(--gold); border-color: var(--gold); color: var(--ink); box-shadow: 2px 2px 0 var(--ink-3); }
+.btn-gold:hover { box-shadow: 3px 3px 0 var(--ink-3); }
 .btn-ghost { box-shadow: none; border-color: var(--rule); color: var(--ink-2); }
 .btn-ghost:hover { border-color: var(--ink); color: var(--ink); box-shadow: none; transform: none; }
 .btn-big { font-size: 18px; padding: 13px 26px; }

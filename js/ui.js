@@ -456,7 +456,7 @@ window.CQ = window.CQ || {};
         ${notices.length ? `<div class="stack mt12" style="gap:8px">${notices.join("")}</div>` : ""}
         <div class="lead-cta"><div class="btnrow">
           <button class="btn btn-pri btn-big" onclick="CQ.ui.actionPlay()">${fx.decisive ? "Entrar em campo — ao vivo" : "Jogar a partida"}</button>
-          <button class="btn" onclick="CQ.ui.actionRest()">Poupar</button>
+          <button class="btn btn-gold" onclick="CQ.ui.actionRest()">Poupar</button>
           <button class="btn btn-ghost" onclick="CQ.ui.actionSim(1)">Simular</button>
           <button class="btn btn-ghost" onclick="CQ.ui.actionSim(5)">Simular 5</button>
           <button class="btn btn-ghost" onclick="CQ.ui.actionSim(10)">Simular 10</button>
@@ -1904,7 +1904,7 @@ window.CQ = window.CQ || {};
     }).join("");
     return `<div class="card"><div class="card-h"><h3>Histórico de campeões</h3>${sel}</div>
       <div class="card-b tight"><table class="tbl tbl-zebra"><thead><tr><th>Ano</th><th>Campeão</th></tr></thead><tbody>${rows}</tbody></table></div>
-      <p class="small muted" style="padding:8px 14px">Edições até 2025 são fatos reais; a partir de 2026, a história é escrita por você.</p></div>
+      <p class="small muted" style="padding:8px 14px">Edições até 2026 são fatos reais; a partir de 2027, a história é escrita por você.</p></div>
       ${hallScorersHTML(G, f)}`;
   }
 
