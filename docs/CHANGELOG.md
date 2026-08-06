@@ -615,7 +615,19 @@ implementado desde o commit inicial do projeto (`main.page, .cover { animation: 
   o Vasco no returno) e `D.CHAMPS_SEED.UCL` ganhou `2026: "Paris Saint-Germain"` (bicampeão
   europeu, bateu o Arsenal nos pênaltis na final de 2025-26).
 
+## Resync de elencos com a janela de transferências de 2026 (em andamento)
+Cache local (`scripts/.cache/squads/`) limpo pros 167 clubes já sincronizados antes (mantidos
+só os 4 novos da Série B, sincronizados no mesmo dia) — força o script a buscar dado fresco
+da API em vez de reaproveitar squads de meses atrás. Rodado em 3 lotes até a cota diária da
+API-Football estourar de vez ("request limit for the day").
+- **109/171 clubes do `CLUB_TEAM_MAP` já resincronizados** com o elenco real de 2026.
+- Os clubes ainda não alcançados nesta rodada ficam temporariamente com elenco gerado
+  (fallback procedural de `js/world.js`, sem quebrar nada — mesmo comportamento de um clube
+  sem `REAL_SQUADS`) até a cota renovar e o script rodar de novo. Reexecutar
+  `node scripts/sync-squads.mjs [N]` pula automaticamente quem já foi sincronizado hoje
+  (via cache local) e continua exatamente de onde parou.
+- Validado: 58/58 testes, `node scripts/world-check.mjs` sem problemas estruturais.
+
 ## Próximos passos
-1. Ressincronizar elencos dos 187 clubes já cobertos com as transferências reais da
-   janela de 2026 (`scripts/sync-squads.mjs`) — escopo maior, a combinar com o usuário
-   (gasta ~187 requisições, cota de 100/dia).
+1. Continuar o resync de elencos (item acima) quando a cota diária da API renovar —
+   62 clubes restantes (`CLUB_TEAM_MAP` tem a lista completa em `scripts/sync-squads.mjs`).
