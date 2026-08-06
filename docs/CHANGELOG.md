@@ -610,6 +610,10 @@ implementado desde o commit inicial do projeto (`main.page, .cover { animation: 
   20, 20 e 19 jogadores reais respectivamente. Escudo real também ativo via `CREST_MAP`
   (mesmos IDs, CDN pública, sem sync separado).
 - Regressão: contagem de clubes do mundo ajustada de 187 pra 191 (`testWorldAging`).
+- **Mais dois fatos reais atualizados** (mesma categoria, achados numa checagem posterior):
+  `D.CHAMPS_SEED.CDB` ganhou `2025: "Corinthians"` (campeão da Copa do Brasil 2025, bateu
+  o Vasco no returno) e `D.CHAMPS_SEED.UCL` ganhou `2026: "Paris Saint-Germain"` (bicampeão
+  europeu, bateu o Arsenal nos pênaltis na final de 2025-26).
 
 ## Próximos passos
 1. Ressincronizar elencos dos 187 clubes já cobertos com as transferências reais da
