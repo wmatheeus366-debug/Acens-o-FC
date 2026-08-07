@@ -206,6 +206,69 @@
     });
   }
 
+  // ---- Copa do Mundo real de 48 seleções: 12 grupos + mata-mata de 32 + disputa de 3º ----
+  function testWorldCup48() {
+    withTempGame(function () {
+      const g = newCareer("ZAG");
+      let guard = 0;
+      while (g.year % 4 !== 2 && guard++ < 8) {
+        let n = 0; while (E().currentFixture(g) && n++ < 200) E().applyMatch(g, E().resolveMatch(g, E().currentFixture(g), {}));
+        const sum = g.pendingSummary || E().endSeason(g);
+        if (sum.offers) {
+          if (sum.offers.renew) E().acceptRenew(g, sum.offers.renew);
+          else if (sum.offers.list && sum.offers.list[0]) E().acceptOffer(g, sum.offers.list[0]);
+        }
+        E().nextSeason(g);
+      }
+      assert("copa do mundo: alcança um ano de Copa do Mundo (ano%4===2)", g.year % 4 === 2, "year=" + g.year);
+      // força convocação e reconstrói a temporada — a elegibilidade de verdade não é o alvo
+      // deste teste, o alvo é a GEOMETRIA da Copa de 48 (12 grupos, 32 no mata-mata, 3º lugar)
+      g.player.natTeam.convocado = true;
+      E().startSeason(g);
+      const T = g.season.sel;
+      assert("copa do mundo: S.sel existe e é full-sim na temporada de Copa", !!(T && T.isFullSim), T ? (T.kind + "/" + T.isFullSim) : "sem sel");
+      if (!(T && T.isFullSim)) return;
+
+      const letters = Object.keys(T.groups);
+      assert("copa do mundo: exatamente 12 grupos", letters.length === 12, "n=" + letters.length);
+      let groupsOk = true, detail = "";
+      const allIds = {};
+      letters.forEach(function (l) {
+        const grp = T.groups[l];
+        if (grp.teamIds.length !== 4) { groupsOk = false; detail = l + ":size=" + grp.teamIds.length; }
+        if (grp.rounds.length !== 3) { groupsOk = false; detail = l + ":rounds=" + grp.rounds.length; }
+        grp.teamIds.forEach(function (id) {
+          if (allIds[id]) { groupsOk = false; detail = "repetido:" + id; }
+          allIds[id] = true;
+        });
+      });
+      const nUnique = Object.keys(allIds).length;
+      assert("copa do mundo: 48 seleções únicas em 12 grupos de 4, turno único (3 rodadas)", groupsOk && nUnique === 48, detail || ("n=" + nUnique));
+
+      // joga a temporada inteira (grupo + mata-mata do jogador, se avançar)
+      let n2 = 0; while (E().currentFixture(g) && n2++ < 300) E().applyMatch(g, E().resolveMatch(g, E().currentFixture(g), {}));
+
+      let jOk = true, jDetail = "";
+      letters.forEach(function (l) {
+        const table = E().tableOf(g, T.groups[l]);
+        const sumJ = table.reduce(function (a, t) { return a + t.j; }, 0);
+        if (sumJ !== 12) { jOk = false; jDetail = l + ":j=" + sumJ; } // 4 seleções, turno único = 6 jogos = 12 "j" somados
+      });
+      assert("copa do mundo: cada um dos 12 grupos completa 6 jogos (turno único)", jOk, jDetail);
+
+      if (T.eliminatedAt === "G") {
+        assert("copa do mundo: eliminado nos grupos não monta bracket", !T.bracket);
+      } else if (T.bracket) {
+        assert("copa do mundo: bracket com 32 seleções (2 primeiros x12 + 8 melhores terceiros)", T.bracket.teams.length === 32, "n=" + T.bracket.teams.length);
+        assert("copa do mundo: 5 estágios de mata-mata (dezesseis avos → final)", T.bracket.stages.length === 5, "n=" + T.bracket.stages.length);
+        if (T.thirdPlace) {
+          const sf = T.bracket.stages.find(function (s) { return s.key === "SF"; });
+          assert("copa do mundo: disputa de 3º lugar só existe com as 2 semis já resolvidas", sf && sf.ties && sf.ties.every(function (t) { return t.winner; }));
+        }
+      }
+    });
+  }
+
   // ---- Olheiro de base: promessa notável vira notícia + aba Base bem formada ----
   function testProspectBreakout() {
     withTempGame(function () {
@@ -427,6 +490,7 @@
     testMarketTransfers();
     testProspectBreakout();
     testWorldLeagueTables();
+    testWorldCup48();
     testRivalsCoverage();
     testClubRivalryScoreboard();
     testScoutingRumor();

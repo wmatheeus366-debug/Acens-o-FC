@@ -10,6 +10,11 @@ window.CQ = window.CQ || {};
   function g() { return CQ.state.game; }
 
   // ---------------- helpers visuais ----------------
+  // "sou eu" tanto pro clube do jogador quanto pra seleção dele (ids "nat:"+nome)
+  function isMineId(G, id) {
+    if (id === G.player.clubId) return true;
+    return typeof id === "string" && id.indexOf("nat:") === 0 && id.slice(4) === D.NATIONS[G.player.nat].name;
+  }
   function crest(clubOrId, cls) {
     const c = typeof clubOrId === "string" ? CQ.engine.oppObj(g(), clubOrId) : clubOrId;
     if (c && c.isNation && c.flag) {
@@ -1861,7 +1866,7 @@ window.CQ = window.CQ || {};
         else if (pos > z.reb) zc = "z-reb";
       }
       const c = CQ.engine.oppObj(G, t.id);
-      return `<tr class="${t.id === G.player.clubId ? "me" : ""} ${zc}">
+      return `<tr class="${isMineId(G, t.id) ? "me" : ""} ${zc}">
         <td class="tnum">${pos}</td><td><span class="clubcell">${crest(c, "crest-20")} ${esc(c.name)}</span></td>
         <td class="num">${t.j}</td><td class="num">${t.v}</td><td class="num">${t.e}</td><td class="num">${t.d}</td>
         <td class="num">${t.gp - t.gc > 0 ? "+" : ""}${t.gp - t.gc}</td><td class="num"><b>${t.pts}</b></td></tr>`;
@@ -1894,7 +1899,7 @@ window.CQ = window.CQ || {};
   function tieHTML(t) {
     const G = g();
     const a = CQ.engine.oppObj(G, t.a), b = CQ.engine.oppObj(G, t.b);
-    const mine = t.a === G.player.clubId || t.b === G.player.clubId;
+    const mine = isMineId(G, t.a) || isMineId(G, t.b);
     const pens = t.pens ? `<span class="condsmall">(${t.pens[0]}-${t.pens[1]} pên.)</span>` : "";
     return `<div class="br-tie ${mine ? "mine" : ""}">
       <div class="br-t ${t.winner === t.a ? "wn" : ""}"><span class="clubcell">${crest(a, "crest-20")} ${esc(a.short)}</span><span class="sc">${t.sa != null ? t.sa : ""}</span></div>
@@ -1938,9 +1943,35 @@ window.CQ = window.CQ || {};
     return group + ko;
   }
 
+  function selWCHTML(G, T, p, nat) {
+    const status = T.champion ? `<div class="notice ok">${I.trophy} CAMPEÃO! Copa do Mundo conquistada com a ${esc(nat.name)}!</div>`
+      : T.eliminatedAt ? `<div class="notice">Eliminado (${CQ.engine.STAGE_NAMES[T.eliminatedAt] || "fase de grupos"}).</div>` : "";
+
+    const letters = Object.keys(T.groups);
+    let gf = CQ.state.wcGroup;
+    if (!gf || letters.indexOf(gf) < 0) gf = T.myGroup;
+    const sel = `<select onchange="CQ.state.wcGroup=this.value;CQ.ui.render()" style="border:1px solid var(--ink);background:var(--paper-2);color:var(--ink);padding:6px 10px;font-size:14px">
+      ${letters.map(function (l) { return `<option value="${l}" ${gf === l ? "selected" : ""}>Grupo ${l}${l === T.myGroup ? " (você)" : ""}</option>`; }).join("")}</select>`;
+    const groupBlock = `<div class="card mb12"><div class="card-h"><h3>Fase de grupos</h3>${sel}</div>
+      <div class="card-b tight" style="padding:0">${leagueTableHTML(T.groups[gf], false)}</div>
+      <p class="small muted" style="padding:0 14px 10px">Classificam-se os 2 primeiros de cada grupo, mais os 8 melhores terceiros colocados entre os 12 grupos.</p></div>`;
+
+    const bracketBlock = T.bracket ? cupHTML(T.bracket)
+      : (T.eliminatedAt === "G" ? '<div class="notice mt12">Eliminado na fase de grupos — não ficou entre as 32 melhores.</div>'
+        : '<div class="card"><div class="card-b muted">Mata-mata ainda não definido.</div></div>');
+
+    const thirdBlock = T.thirdPlace ? `<div class="card mt16"><div class="card-h"><h3>Disputa de 3º lugar</h3></div>
+      <div class="card-b"><div class="bracket"><div class="br-round">${tieHTML(T.thirdPlace)}</div></div></div></div>` : "";
+
+    return `<div class="card mb12"><div class="section-banner"><span class="sb-title">${esc(T.name)} ${g().year}</span><span class="sb-meta">${p.natTeam.caps} caps · ${p.natTeam.goals} gols pela seleção</span></div>
+      <div class="card-b">${status}</div></div>
+      ${groupBlock}${bracketBlock}${thirdBlock}`;
+  }
+
   function selHTML(S) {
     const G = g(), T = S.sel, p = G.player, nat = D.NATIONS[p.nat];
     if (!T) return "";
+    if (T.isFullSim) return selWCHTML(G, T, p, nat);
     const title = T.kind === "elim" ? "Eliminatórias" : T.name;
     const status = T.champion ? `<div class="notice ok">${I.trophy} CAMPEÃO! ${esc(T.name)} conquistada com a ${esc(nat.name)}!</div>`
       : T.eliminatedAt ? `<div class="notice">Eliminado (${CQ.engine.STAGE_NAMES[T.eliminatedAt] || "grupos"}).</div>` : "";

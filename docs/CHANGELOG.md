@@ -700,3 +700,40 @@ por seleção, cobrindo goleiro/zaga/lateral/volante/meia/ponta/atacante).
 - Validado: 58/58 testes; confirmado visualmente contraste do `<select>` em tema escuro,
   rolagem interna com 40 títulos simulados, geometria distinta de cada nova forma de
   troféu (bounding box + contagem de elementos).
+
+## Copa do Mundo real de 48 seleções (Fatia 1 de "torneios de seleção com caminho visível")
+Reescreve a Copa do Mundo do zero: 12 grupos de 4 (48 seleções ao todo — `D.WORLD_POOL`
+foi de 22 pra 48, com 26 seleções novas ganhando força/bandeira real), **todos** os 12
+grupos simulados de verdade (não só o grupo do jogador — mesmo motor de liga já usado
+pras outras 7 ligas do mundo, `leagueComp`/`roundsRR`/`finishLeague`/`tableOf`).
+Classificação real: 2 primeiros de cada grupo + 8 melhores terceiros colocados = 32
+seleções no mata-mata. Mata-mata de verdade com chaveamento visível e histórico completo
+de cada rodada (dezesseis avos → oitavas → quartas → semifinal → final), reaproveitando o
+motor que já existia pra Copa do Brasil (`cupComp`/`buildStageTies`/`simTie`/`advanceCup`,
+agora parametrizado por `myId` pra também representar seleção em vez de só clube) —
+inclusive o **caminho de todo mundo fica visível**, não só o do jogador. Nova **disputa de
+3º lugar** (os 2 perdedores da semifinal), formato que não existia em nenhuma outra
+competição do jogo.
+- Nova aba "Seleção" (quando é ano de Copa) mostra: seletor dos 12 grupos com tabela real
+  (`leagueTableHTML`, sem mudança), o chaveamento completo (`cupHTML`/`tieHTML`, sem
+  mudança), e o card de disputa de 3º lugar quando existir.
+- **2 bugs reais encontrados e corrigidos durante a implementação:**
+  - O resto do chaveamento (quartas/semi/final de quem não é o jogador) só era resolvido
+    enquanto o jogador ainda estava vivo no torneio — uma vez eliminado, os estágios
+    seguintes ficavam pra sempre "a definir", e o campeão real nunca era conhecido.
+    Corrigido pra sempre resolver o chaveamento inteiro (mesmo padrão já usado na Copa do
+    Brasil: `if (!cup.alive) advanceCup(...)`, aplicado aqui também pra seleção).
+  - Mata-mata de seleção (Copa do Mundo **e** o formato antigo de Copa América/Eurocopa/
+    Copa Ouro/Copa da Ásia) nunca marcava a partida do próprio jogador como `knock:true` —
+    um empate no jogo dele nunca ia pra pênaltis, o adversário avançava automaticamente.
+    Corrigido nos 3 pontos (Copa do Mundo, torneios continentais antigos, disputa de 3º).
+- Copa América/Eurocopa/Copa Ouro/Copa da Ásia continuam no formato anterior por ora
+  (grupo só com o adversário do jogador, chaveamento por bloco) — ganham o mesmo
+  tratamento (todos os grupos simulados + chaveamento visível) numa fatia própria futura,
+  junto com Libertadores/Champions/Europa League/Sul-Americana (conserta o `C.koOpps`
+  morto, confirmado por revisão de código independente) e o Supermundial.
+- Validado: 66/66 testes (novo `testWorldCup48` cobre geometria — 12 grupos únicos de 4,
+  turno único, 32 avançam, bracket sempre potência de 2, 3º lugar só após as 2 semis);
+  simulação de 40+ carreiras aleatórias sem exceção, cobrindo eliminação nos grupos,
+  avanço ao mata-mata, disputa de 3º e conquista do título; conferido visualmente que o
+  campeão real (`T.champion`) bate com quem realmente venceu a final simulada.

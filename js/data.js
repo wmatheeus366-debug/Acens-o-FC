@@ -34,8 +34,15 @@ window.CQ = window.CQ || {};
     CONCACAF: ["México", "Estados Unidos", "Canadá", "Panamá", "Costa Rica", "Honduras", "Jamaica", "El Salvador"],
     AFC: ["Japão", "Coreia do Sul", "Irã", "Austrália", "Arábia Saudita", "Catar", "Iraque", "Uzbequistão"]
   };
-  const WORLD_POOL = ["Brasil", "Argentina", "França", "Espanha", "Inglaterra", "Portugal", "Alemanha", "Holanda", "Itália", "Uruguai", "Colômbia", "México", "Estados Unidos", "Japão", "Croácia", "Bélgica", "Marrocos", "Senegal", "Coreia do Sul", "Suíça", "Dinamarca", "Equador"];
-  const NAT_STR = { "Brasil": 90, "Argentina": 89, "França": 89, "Espanha": 88, "Inglaterra": 87, "Portugal": 86, "Alemanha": 85, "Holanda": 85, "Itália": 84, "Uruguai": 82, "Colômbia": 81, "México": 79, "Estados Unidos": 77, "Japão": 77, "Croácia": 82, "Bélgica": 82, "Marrocos": 80, "Senegal": 78, "Coreia do Sul": 76, "Suíça": 79, "Dinamarca": 79, "Equador": 78, "Paraguai": 75, "Chile": 75, "Peru": 74, "Bolívia": 70, "Venezuela": 72, "Canadá": 75, "Panamá": 71, "Costa Rica": 71, "Honduras": 68, "Jamaica": 68, "El Salvador": 65, "Irã": 76, "Austrália": 75, "Arábia Saudita": 73, "Catar": 71, "Iraque": 69, "Uzbequistão": 70, "Áustria": 78 };
+  // Copa do Mundo real de 48 seleções: estende o pool original (22, só as principais
+  // cabeças-de-chave) com as 18 seleções que já tinham força/bandeira definida em outro
+  // lugar (CONFED_POOL) mas ainda não entravam no sorteio da Copa, mais 8 novas (África/
+  // Oceania/Europa) — fecha exatamente 48, sem nenhuma repetição.
+  const WORLD_POOL = ["Brasil", "Argentina", "França", "Espanha", "Inglaterra", "Portugal", "Alemanha", "Holanda", "Itália", "Uruguai", "Colômbia", "México", "Estados Unidos", "Japão", "Croácia", "Bélgica", "Marrocos", "Senegal", "Coreia do Sul", "Suíça", "Dinamarca", "Equador",
+    "Paraguai", "Chile", "Peru", "Bolívia", "Venezuela", "Canadá", "Panamá", "Costa Rica", "Honduras", "Jamaica", "El Salvador", "Irã", "Austrália", "Arábia Saudita", "Catar", "Iraque", "Uzbequistão", "Áustria",
+    "Gana", "Nigéria", "Argélia", "Tunísia", "Egito", "Nova Zelândia", "Polônia", "Suécia"];
+  const NAT_STR = { "Brasil": 90, "Argentina": 89, "França": 89, "Espanha": 88, "Inglaterra": 87, "Portugal": 86, "Alemanha": 85, "Holanda": 85, "Itália": 84, "Uruguai": 82, "Colômbia": 81, "México": 79, "Estados Unidos": 77, "Japão": 77, "Croácia": 82, "Bélgica": 82, "Marrocos": 80, "Senegal": 78, "Coreia do Sul": 76, "Suíça": 79, "Dinamarca": 79, "Equador": 78, "Paraguai": 75, "Chile": 75, "Peru": 74, "Bolívia": 70, "Venezuela": 72, "Canadá": 75, "Panamá": 71, "Costa Rica": 71, "Honduras": 68, "Jamaica": 68, "El Salvador": 65, "Irã": 76, "Austrália": 75, "Arábia Saudita": 73, "Catar": 71, "Iraque": 69, "Uzbequistão": 70, "Áustria": 78,
+    "Gana": 74, "Nigéria": 76, "Argélia": 75, "Tunísia": 73, "Egito": 74, "Nova Zelândia": 68, "Polônia": 78, "Suécia": 77 };
 
   // ---------------- Clubes ----------------
   const CLUBS = {};

@@ -43,7 +43,7 @@ Fontes (Google Fonts) e bandeiras (flagcdn) vêm da web com fallback; todo o res
 
 ```
 # no navegador (index.html ou CRAQUE.html aberto), console:
-CQ.tests.run()             # tests/regression.js — 58 checagens
+CQ.tests.run()             # tests/regression.js — 66 checagens
 
 # balanceamento (Node, motor real num shim vm):
 node scripts/balance-runner.mjs 100   # gera docs/BALANCE_BASELINE.md + .json
@@ -122,3 +122,23 @@ confiança. Transição suave entre telas já existia desde o commit inicial
   à parte). Não existe (nem é necessário) um snapshot JSON versionado separado — os dados
   já vivem direto em `js/data.js` (`REAL_SQUADS`, `CREST_MAP`), reexecutar o script quando
   quiser atualizar (ex.: refletir a janela de transferências de 2026).
+
+## Torneios de seleção com caminho visível — roteiro em fatias
+
+- ✅ **Fatia 1 (feita): Copa do Mundo real de 48 seleções.** `D.WORLD_POOL` (`js/data.js`)
+  foi de 22 pra 48 seleções. `buildWCGroups`/`pickWCAdvancers`/`finishAllWCGroups`/
+  `resolveWC3rd` (`js/engine.js`) montam e resolvem os 12 grupos (todos simulados de
+  verdade — mesmo motor de `refreshWorldLeagues`) e o mata-mata de 32 com disputa de 3º
+  lugar, reaproveitando `cupComp`/`buildStageTies`/`simTie`/`advanceCup` (motor da Copa do
+  Brasil, agora com `myId` parametrizável em vez de fixo em `g.player.clubId`). `S.sel`
+  ganha `isFullSim:true` só na Copa do Mundo — Copa América/Eurocopa/Copa Ouro/Copa da
+  Ásia continuam no formato anterior (`resolveSlot`/`buildNationalCycle` em `js/engine.js`
+  bifurcam por `T.isFullSim`). Nova aba "Seleção" com seletor de grupo + chaveamento
+  visível reaproveita `leagueTableHTML`/`cupHTML`/`tieHTML` de `js/ui.js` sem CSS novo.
+- **Próximas fatias (escopo definido, plano detalhado fica pra quando chegar a vez):**
+  eliminatórias com risco real de não classificar (hoje só decorativas); Copa América/
+  Eurocopa/Copa Ouro/Copa da Ásia com todos os grupos simulados (mesmo motor da Fatia 1);
+  conserto do chaveamento morto de Libertadores/Champions/Europa League/Sul-Americana
+  (`C.koOpps` nunca é escrito, confirmado por revisão de código); tela de chaveamento do
+  Supermundial (já tem estado, não tem tela); Conference League (competição nova, não
+  existe em nenhum lugar do código hoje — precisa de planejamento próprio).
