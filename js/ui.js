@@ -357,13 +357,29 @@ window.CQ = window.CQ || {};
   // o próprio jogador na sua posição quando ele está disponível pra jogar
   function probableLineup(G, fx) {
     const p = G.player;
+    const isNat = !!(fx && fx.isNatMatch);
     const buckets = { GOL: 1, ZAG: 2, LAT: 2, VOL: 2, MEI: 2, PON: 1, ATA: 1 };
-    const squad = squadOf(G);
+    let squad;
+    if (isNat) {
+      // jogo de Seleção: NUNCA usar o elenco do clube (bug antigo) — elenco real da
+      // seleção quando disponível (NAT_SQUADS), senão gerador procedural com o
+      // "sotaque" de nome da própria nacionalidade
+      const real = D.NAT_SQUADS && D.NAT_SQUADS[p.nat];
+      if (real) {
+        squad = real.map(function (j) { return { name: j.n, pos: j.p }; });
+      } else {
+        const rng = U.rngFor(G.seed, "natsquad", p.nat);
+        const POSN = ["GOL", "GOL", "ZAG", "ZAG", "ZAG", "LAT", "LAT", "VOL", "VOL", "MEI", "MEI", "PON", "PON", "ATA", "ATA"];
+        squad = POSN.map(function (pos) { return { name: U.nameGen(rng, p.nat), pos: pos }; });
+      }
+    } else {
+      squad = squadOf(G);
+    }
     const out = [];
     Object.keys(buckets).forEach(function (pos) {
       out.push.apply(out, squad.filter(function (j) { return j.pos === pos; }).slice(0, buckets[pos]));
     });
-    if (p.injury === 0 && (p.susp === 0 || (fx && fx.isNatMatch))) {
+    if (p.injury === 0 && (p.susp === 0 || isNat)) {
       const idx = out.findIndex(function (j) { return j.pos === p.pos; });
       const me = { name: p.name, pos: p.pos, ov: p.overall, isMe: true };
       if (idx >= 0) out[idx] = me; else out.push(me);

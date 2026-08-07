@@ -551,6 +551,14 @@ window.CQ = window.CQ || {};
     intm: sq("GOL:Sommer, ZAG:Bastoni, ZAG:Acerbi, ZAG:Pavard, LAT:Dumfries, LAT:Dimarco, VOL:Barella, VOL:Çalhanoğlu, VOL:Mkhitaryan, MEI:Frattesi, PON:Zieliński, ATA:Lautaro Martínez, ATA:Thuram, ATA:Taremi")
   };
 
+  // ---------------- elencos reais de seleções (uso local/pessoal) ----------------
+  // Igual REAL_SQUADS, mas por nação (chave = D.NATIONS[id]) em vez de clube — usado
+  // no banner de dia de jogo (matchdayBanner) pra mostrar a escalação provável de
+  // verdade em jogo de Seleção. Nação sem entrada aqui cai no gerador procedural.
+  const NAT_SQUADS = {
+    BR: sq("GOL:Alisson, GOL:Bento, GOL:Hugo Souza, ZAG:Marquinhos, ZAG:Danilo, ZAG:Gabriel Magalhães, ZAG:Fabrício Bruno, ZAG:Éder Militão, LAT:Alex Sandro, LAT:Wesley, LAT:Caio Henrique, LAT:Vanderson, VOL:Casemiro, VOL:Bruno Guimarães, VOL:Andrey Santos, VOL:Fabinho, MEI:Lucas Paquetá, MEI:João Gomes, PON:Rodrygo, PON:Raphinha, PON:Estêvão, PON:Luiz Henrique, ATA:Vinícius Júnior, ATA:Richarlison, ATA:Neymar, ATA:João Pedro, ATA:Matheus Cunha, ATA:Endrick")
+  };
+
   // ---------------- escudos reais (uso local/pessoal — ver docs/CHANGELOG.md) ----------------
   // ID do time na API-Football; a URL do escudo é pública (media.api-sports.io), sem chave.
   // Clube sem entrada aqui cai no brasão vetorial procedural (crestSVG) automaticamente.
@@ -585,7 +593,7 @@ window.CQ = window.CQ || {};
   CQ.DATA = {
     NATIONS, CONFED_POOL, WORLD_POOL, NAT_STR,
     CLUBS, LEAGUES, EURO_LEAGUES, ESTADUAIS,
-    POSITIONS, ATTR_NAMES, LEGENDS, CHAMPS_SEED, COMP_NAMES, HALL_SCORERS, REAL_SQUADS, CREST_MAP,
+    POSITIONS, ATTR_NAMES, LEGENDS, CHAMPS_SEED, COMP_NAMES, HALL_SCORERS, REAL_SQUADS, NAT_SQUADS, CREST_MAP,
     clubsOf: function (league) {
       return Object.keys(CLUBS).filter(function (id) { return CLUBS[id].league === league; }).map(function (id) { return CLUBS[id]; });
     },

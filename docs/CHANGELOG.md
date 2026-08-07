@@ -645,6 +645,26 @@ ganhou desenho vetorial próprio (SVG, 100% procedural — mesmo espírito de `c
 - Validado: 58/58 testes, geometria de cada SVG conferida (bounding box, sem coordenada
   fora do viewBox, sem erro de console).
 
+## BUG-03: banner de dia de jogo mostrava elenco do clube em jogo de Seleção
+`probableLineup` (`js/ui.js`, do ritual de dia de jogo) nunca checava `fx.isNatMatch` —
+em jogo de Seleção, a "escalação provável" continuava puxando `squadOf(G)` (elenco do
+**clube**), mostrando companheiros de time errados (ex.: jogando pelo Bayern, aparecia
+"Olise" — companheiro de Bayern de verdade — como se fosse da Seleção Brasileira).
+- **Corrigido**: em jogo de Seleção, usa o elenco real da Seleção (`D.NAT_SQUADS[nat]`,
+  novo) quando disponível; nação sem dado real cai no gerador procedural (mesmo padrão
+  de fallback já usado em clubes sem `REAL_SQUADS`).
+- **Elenco real da Seleção Brasileira** adicionado (`D.NAT_SQUADS.BR`, 28 jogadores reais
+  da convocação de 2026 — Alisson, Marquinhos, Casemiro, Bruno Guimarães, Vinícius Júnior,
+  Neymar, Rodrygo, Raphinha, Endrick e outros). Mesmo racional de direito de imagem já
+  usado (uso pessoal, nomes/fatos reais, sem distribuição).
+- Outras seleções (Argentina, França etc.) continuam com gerador procedural por ora —
+  só a Seleção Brasileira foi pedida.
+- Validado: 58/58 testes; simulação real até um jogo de Seleção acontecer, confirmado
+  que a escalação mostra jogadores reais do Brasil (e o próprio jogador encaixado na
+  sua posição quando disponível).
+
 ## Próximos passos
 1. Continuar o resync de elencos (item acima) quando a cota diária da API renovar —
    62 clubes restantes (`CLUB_TEAM_MAP` tem a lista completa em `scripts/sync-squads.mjs`).
+2. Elenco real de outras seleções (Argentina, França, Espanha etc.), se o usuário quiser —
+   hoje só a Seleção Brasileira tem `NAT_SQUADS`.
