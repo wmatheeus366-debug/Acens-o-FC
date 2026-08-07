@@ -6807,8 +6807,8 @@ window.CQ = window.CQ || {};
     }
     return `<div class="cols">
       ${room}
-      <div class="card"><div class="card-h"><h3>Títulos coletivos</h3><span class="kicker-side">${p.titles.length}</span></div><div class="card-b">${titles}</div></div>
-      <div class="card"><div class="card-h"><h3>Prêmios individuais</h3><span class="kicker-side">${p.awards.length}</span></div><div class="card-b">${awards}</div></div>
+      <div class="card"><div class="card-h"><h3>Títulos coletivos</h3><span class="kicker-side">${p.titles.length}</span></div><div class="card-b" style="max-height:420px;overflow-y:auto">${titles}</div></div>
+      <div class="card"><div class="card-h"><h3>Prêmios individuais</h3><span class="kicker-side">${p.awards.length}</span></div><div class="card-b" style="max-height:420px;overflow-y:auto">${awards}</div></div>
     </div>`;
   }
 
@@ -6921,7 +6921,24 @@ window.CQ = window.CQ || {};
         <path d="M8.6 8.6c-1.5.2-2.4 1.1-2.4 2.4M15.4 8.6c1.5.2 2.4 1.1 2.4 2.4"/>
       </svg>`;
     }
-    // genérico (ligas nacionais, copas domésticas, estaduais, seleção etc.) — taça clássica
+    // copas domésticas de mata-mata — corpo mais curto e largo, com tampa/domo e
+    // pomo no topo (bem diferente da taça de liga, sem tampa, aberta em cima)
+    if (key === "CDB" || key === "COPA") {
+      return `<svg viewBox="0 0 24 28" fill="none" stroke="${c}" stroke-width="1.5"${sizeStyle}>
+        <path d="M8 25.4h8"/>
+        <path d="M9.6 25.4v-1.8h4.8v1.8"/>
+        <path d="M12 21.4v-2"/>
+        <path d="M8.4 12.6c0 2.6 1.5 4.6 3.6 4.6s3.6-2 3.6-4.6V9.4H8.4v3.2z" fill="${c}" fill-opacity="0.16"/>
+        <path d="M8.4 12.6c0 2.6 1.5 4.6 3.6 4.6s3.6-2 3.6-4.6V9.4H8.4v3.2z"/>
+        <path d="M7.6 9.4h8.8"/>
+        <path d="M8.4 10.6c-1.5.1-2.4.9-2.4 2M15.6 10.6c1.5.1 2.4.9 2.4 2"/>
+        <path d="M9.4 9.4c0-1.6 1.2-2.8 2.6-2.8s2.6 1.2 2.6 2.8" fill="${c}" fill-opacity="0.22"/>
+        <path d="M9.4 9.4c0-1.6 1.2-2.8 2.6-2.8s2.6 1.2 2.6 2.8"/>
+        <circle cx="12" cy="5.6" r="0.9" fill="${c}" stroke="none"/>
+      </svg>`;
+    }
+    // genérico (ligas nacionais, estaduais, seleção, continental de seleções etc.) — taça
+    // aberta clássica, sem tampa (a "família" de troféu de liga por pontos corridos)
     return `<svg viewBox="0 0 24 28" fill="none" stroke="${c}" stroke-width="1.5"${sizeStyle}>
       <path d="M8 25.4h8"/>
       <path d="M9.6 25.4v-1.8h4.8v1.8"/>
@@ -7154,7 +7171,7 @@ window.CQ = window.CQ || {};
     if (!keys.length) return '<div class="card"><div class="card-b muted">Tabelas do mundo ainda não disponíveis.</div></div>';
     let f = CQ.state.worldLeague;
     if (!f || !wl[f]) f = keys[0];
-    const sel = `<select onchange="CQ.state.worldLeague=this.value;CQ.ui.render()" style="border:1px solid var(--ink);background:#fffdf6;padding:6px 10px;font-size:14px">
+    const sel = `<select onchange="CQ.state.worldLeague=this.value;CQ.ui.render()" style="border:1px solid var(--ink);background:var(--paper-2);color:var(--ink);padding:6px 10px;font-size:14px">
       ${keys.map(function (k) { return `<option value="${k}" ${f === k ? "selected" : ""}>${esc(D.LEAGUES[k].name)}</option>`; }).join("")}</select>`;
     const comp = wl[f];
     return `<div class="card mb12"><div class="card-h"><h3>Outras ligas do mundo</h3>${sel}</div>
@@ -7294,7 +7311,7 @@ window.CQ = window.CQ || {};
     keys.forEach(function (k) {
       names[k] = D.COMP_NAMES[k] || (D.LEAGUES[k] ? D.LEAGUES[k].name : k);
     });
-    const sel = `<select onchange="CQ.state.champFilter=this.value;CQ.ui.render()" style="border:1px solid var(--ink);background:#fffdf6;padding:6px 10px;font-size:14px">
+    const sel = `<select onchange="CQ.state.champFilter=this.value;CQ.ui.render()" style="border:1px solid var(--ink);background:var(--paper-2);color:var(--ink);padding:6px 10px;font-size:14px">
       ${keys.map(function (k) { return `<option value="${k}" ${f === k ? "selected" : ""}>${esc(names[k])}</option>`; }).join("")}</select>`;
     const data = G.champs[f] || {};
     const rows = Object.keys(data).sort(function (a, b) { return b - a; }).map(function (y) {

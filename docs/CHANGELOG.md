@@ -668,3 +668,25 @@ em jogo de Seleção, a "escalação provável" continuava puxando `squadOf(G)` 
    62 clubes restantes (`CLUB_TEAM_MAP` tem a lista completa em `scripts/sync-squads.mjs`).
 2. Elenco real de outras seleções (Argentina, França, Espanha etc.), se o usuário quiser —
    hoje só a Seleção Brasileira tem `NAT_SQUADS`.
+
+## BUG-04: texto sumindo em tema escuro + tela de aposentadoria virando caixa gigante
+- **Tema escuro**: os dois `<select>` de filtro (aba Mundo, aba Campeões) tinham fundo
+  claro fixo (`background:#fffdf6`) sem cor de texto definida, em vez de usar a classe
+  `.field` (que já tem suporte a tema escuro). No escuro, o texto herdava a cor clara do
+  tema sobre um fundo que continuava claro — texto claro sobre fundo claro, invisível.
+  Corrigido pra `background:var(--paper-2);color:var(--ink)` (acompanha o tema).
+- **Tela de aposentadoria "caixa gigante"**: "Títulos coletivos" e "Prêmios individuais"
+  cresciam sem limite — uma carreira longa (40+ títulos) virava uma lista imensa,
+  esticando a página inteira. Agora essas duas listas têm altura máxima (420px) com
+  rolagem interna — nada de dado é perdido, só para de esticar a página.
+- **Mais uma família de troféu**: copas domésticas de mata-mata (Copa do Brasil e
+  equivalentes) ganharam desenho próprio — corpo mais curto com tampa/domo e pomo no
+  topo, bem diferente da taça aberta de liga por pontos corridos (que continua pro
+  Brasileirão e ligas europeias).
+- Escudos "sumindo" pra amigos: **não é bug** — é o fallback (já existente) mostrando o
+  brasão vetorial quando a imagem real não carrega na rede de quem está jogando (ex.:
+  bloqueador de anúncio). Funcionando como projetado; embutir as imagens reais no
+  próprio arquivo eliminaria essa dependência de rede, mas deixaria o arquivo bem maior.
+- Validado: 58/58 testes; confirmado visualmente contraste do `<select>` em tema escuro,
+  rolagem interna com 40 títulos simulados, geometria distinta de cada nova forma de
+  troféu (bounding box + contagem de elementos).
