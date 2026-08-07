@@ -628,6 +628,23 @@ API-Football estourar de vez ("request limit for the day").
   (via cache local) e continua exatamente de onde parou.
 - Validado: 58/58 testes, `node scripts/world-check.mjs` sem problemas estruturais.
 
+## Artes de troféu reconhecíveis por competição
+`trophyIcon(key)` (`js/ui.js`) deixou de ser um ícone genérico de taça em 2 tamanhos e
+ganhou desenho vetorial próprio (SVG, 100% procedural — mesmo espírito de `crestSVG`/
+`portraitSVG`, sem imagem externa) com silhueta reconhecível por família de troféu:
+- **Copa do Mundo / Mundial de Clubes / Supermundial**: fitas espiraladas erguendo um
+  globo, apoiadas numa base — a "assinatura visual" mais icônica do futebol.
+- **Champions/Europa League**: taça bojuda com as duas "orelhas" enormes e curvas.
+- **Libertadores/Sul-Americana**: base em degraus empilhados, bem diferente das outras.
+- **Demais (ligas nacionais, copas domésticas, estaduais, seleção)**: taça clássica
+  refinada, ainda simples mas visivelmente melhor que o ícone genérico anterior.
+- Usado nos 3 lugares que já chamavam `trophyIcon` (banner de celebração de título, lista
+  de títulos na Carreira, sala de troféus) — nenhuma mudança de assinatura/API.
+- Decisão de direito de imagem: formato de troféu segue a mesma lógica já usada pros
+  escudos reais (uso pessoal, só entre amigos, sem distribuição) — confirmado com o usuário.
+- Validado: 58/58 testes, geometria de cada SVG conferida (bounding box, sem coordenada
+  fora do viewBox, sem erro de console).
+
 ## Próximos passos
 1. Continuar o resync de elencos (item acima) quando a cota diária da API renovar —
    62 clubes restantes (`CLUB_TEAM_MAP` tem a lista completa em `scripts/sync-squads.mjs`).
