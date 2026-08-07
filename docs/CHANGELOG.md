@@ -663,11 +663,21 @@ em jogo de Seleção, a "escalação provável" continuava puxando `squadOf(G)` 
   que a escalação mostra jogadores reais do Brasil (e o próprio jogador encaixado na
   sua posição quando disponível).
 
+## Elenco real das 14 seleções selecionáveis (`D.NAT_SQUADS`)
+Completa o item pendente do BUG-03: as outras 13 nações que dá pra escolher na criação de
+carreira (`D.NATIONS`) ganharam elenco real, junto com o Brasil — Argentina, França,
+Espanha, Inglaterra, Portugal, Alemanha, Holanda, Itália, Uruguai, Colômbia, México,
+Estados Unidos e Japão. Mesmo formato/padrão do Brasil (`sq(...)`, ~18-24 jogadores reais
+por seleção, cobrindo goleiro/zaga/lateral/volante/meia/ponta/atacante).
+- Validado: 58/58 testes; `Object.keys(NAT_SQUADS).length === 14` (nenhuma nação
+  selecionável sem elenco real); confirmado visualmente jogando pela Argentina — jogadores
+  reais (Emiliano Martínez, Cristian Romero, Rodrigo De Paul, Enzo Fernández etc.)
+  aparecem corretamente na escalação provável, com o próprio jogador encaixado.
+- Mesmo racional de direito de imagem já usado no projeto (nomes/fatos reais, uso pessoal).
+
 ## Próximos passos
 1. Continuar o resync de elencos (item acima) quando a cota diária da API renovar —
    62 clubes restantes (`CLUB_TEAM_MAP` tem a lista completa em `scripts/sync-squads.mjs`).
-2. Elenco real de outras seleções (Argentina, França, Espanha etc.), se o usuário quiser —
-   hoje só a Seleção Brasileira tem `NAT_SQUADS`.
 
 ## BUG-04: texto sumindo em tema escuro + tela de aposentadoria virando caixa gigante
 - **Tema escuro**: os dois `<select>` de filtro (aba Mundo, aba Campeões) tinham fundo
