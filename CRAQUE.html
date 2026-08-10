@@ -70,7 +70,11 @@ body::before {
 
 ::selection { background: var(--verm); color: var(--paper); }
 
-button { font-family: inherit; cursor: pointer; }
+/* sem isso, botões caem no preto padrão do navegador em vez de herdar a cor do tema —
+   é exatamente o que deixava texto de botão invisível no tema escuro (fundo escuro +
+   texto preto fixo do navegador) sempre que uma classe de botão esquecesse de fixar
+   "color" explicitamente */
+button { font-family: inherit; cursor: pointer; color: inherit; }
 input, select { font-family: inherit; }
 
 /* ícones inline: tamanho de texto por padrão; contêineres especiais restauram */
@@ -413,7 +417,7 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .decision .dc-q { font-family: var(--serif); font-size: 17px; font-weight: 600; margin-bottom: 10px; }
 .dc-opt {
   display: block; width: 100%; text-align: left;
-  border: 1px solid var(--ink); background: var(--paper);
+  border: 1px solid var(--ink); background: var(--paper); color: var(--ink);
   padding: 9px 12px; margin-bottom: 8px;
   font-size: 14px;
 }
@@ -421,7 +425,7 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .dc-opt small { display: block; font-family: var(--cond); text-transform: uppercase; letter-spacing: 0.08em; font-size: 11px; color: var(--ink-3); margin-top: 2px; }
 
 .shootout-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 10px 0; }
-.shoot-slot { border: 1px solid var(--ink); padding: 8px 4px; text-align: center; font-family: var(--cond); background: var(--paper); }
+.shoot-slot { border: 1px solid var(--ink); padding: 8px 4px; text-align: center; font-family: var(--cond); background: var(--paper); color: var(--ink); }
 .shoot-slot.sel { background: var(--verm); color: #fff; }
 .shoot-slot b { display: block; font-size: 18px; font-family: var(--serif); }
 .shoot-dots { display: flex; gap: 6px; justify-content: center; margin: 4px 0; }
@@ -483,6 +487,7 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .choice {
   border: 1px solid var(--ink);
   background: var(--paper);
+  color: var(--ink);
   padding: 10px;
   text-align: left;
   font-size: 13.5px;
@@ -1220,7 +1225,7 @@ main.page, .cover { animation: pageIn 0.26s ease both; }
 .modal2-desc::first-letter { font-family: var(--serif); font-weight: 900; font-size: 2.6em; line-height: .8; float: left; margin: 3px 8px -2px 0; color: var(--verm-dark); }
 .opt2 {
   display: block; width: 100%; text-align: left; cursor: pointer;
-  border: 1.5px solid var(--ink); background: var(--newsprint);
+  border: 1.5px solid var(--ink); background: var(--newsprint); color: var(--ink);
   padding: 12px 14px; margin-bottom: 9px; position: relative;
   transition: transform 0.07s ease, box-shadow 0.07s ease, background 0.1s;
   box-shadow: 2px 2px 0 rgba(22,22,26,.14);

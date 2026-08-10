@@ -830,3 +830,17 @@ Fecha as 4 fatias que faltavam do roteiro iniciado com a Copa do Mundo:
   determinística, geometria do Supermundial, gatilho da Conference League, e o bug do
   banner corrigido); 18 carreiras simuladas (252 temporadas) cobrindo Brasil e Europa,
   seleções de todas as 4 confederações, sem nenhuma exceção.
+
+## BUG-05: texto invisível (preto no preto) em botões no tema escuro
+`.choice` (posição/arquétipo na criação de personagem, grupos de seleção, Supermundial),
+`.dc-opt` (decisões do modo ao vivo, ofertas de contrato/renovação), `.shoot-slot`
+(pênaltis) e `.opt2` (entrevistas) nunca definiam `color` — o texto caía no preto padrão
+que o navegador aplica a `<button>` por conta própria. No tema claro isso passava
+despercebido (preto do navegador ≈ preto do tema); no escuro, o fundo do botão também
+fica escuro e o texto ficava com contraste zero. Corrigido em 2 camadas: `color`
+explícito nas 4 classes específicas, mais `button { color: inherit; }` (`css/style.css`)
+como base geral — qualquer classe de botão nova herda a cor certa por padrão em vez de
+cair no preto fixo do navegador.
+- Validado: 101/101 testes; conferido nos dois temas via `getComputedStyle` que o texto
+  bate exatamente com `--ink`/`--paper` do tema ativo em `.choice`, `.dc-opt`,
+  `.shoot-slot` e `.opt2`.

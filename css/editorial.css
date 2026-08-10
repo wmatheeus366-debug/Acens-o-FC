@@ -510,7 +510,7 @@ main.page, .cover { animation: pageIn 0.26s ease both; }
 .modal2-desc::first-letter { font-family: var(--serif); font-weight: 900; font-size: 2.6em; line-height: .8; float: left; margin: 3px 8px -2px 0; color: var(--verm-dark); }
 .opt2 {
   display: block; width: 100%; text-align: left; cursor: pointer;
-  border: 1.5px solid var(--ink); background: var(--newsprint);
+  border: 1.5px solid var(--ink); background: var(--newsprint); color: var(--ink);
   padding: 12px 14px; margin-bottom: 9px; position: relative;
   transition: transform 0.07s ease, box-shadow 0.07s ease, background 0.1s;
   box-shadow: 2px 2px 0 rgba(22,22,26,.14);
