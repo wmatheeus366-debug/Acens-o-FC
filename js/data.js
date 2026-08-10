@@ -27,12 +27,19 @@ window.CQ = window.CQ || {};
     NATIONS[n[0]] = { id: n[0], name: n[1], flag: n[2], confed: n[3], str: n[4] };
   });
 
-  // rivais de eliminatórias/torneios por confederação (nomes de seleções)
+  // rivais de eliminatórias/torneios por confederação (nomes de seleções). CONMEBOL fica
+  // em 10 (já são todos os membros reais da confederação); as outras 3 crescem pro
+  // tamanho real de Eurocopa/Copa Ouro/Copa da Ásia (24/16/24) — efeito colateral bom:
+  // eliminatórias dessas confederações também ficam mais variadas.
   const CONFED_POOL = {
     CONMEBOL: ["Brasil", "Argentina", "Uruguai", "Colômbia", "Equador", "Paraguai", "Chile", "Peru", "Bolívia", "Venezuela"],
-    UEFA: ["França", "Espanha", "Inglaterra", "Portugal", "Alemanha", "Holanda", "Itália", "Bélgica", "Croácia", "Dinamarca", "Suíça", "Áustria"],
-    CONCACAF: ["México", "Estados Unidos", "Canadá", "Panamá", "Costa Rica", "Honduras", "Jamaica", "El Salvador"],
-    AFC: ["Japão", "Coreia do Sul", "Irã", "Austrália", "Arábia Saudita", "Catar", "Iraque", "Uzbequistão"]
+    UEFA: ["França", "Espanha", "Inglaterra", "Portugal", "Alemanha", "Holanda", "Itália", "Bélgica", "Croácia", "Dinamarca", "Suíça", "Áustria",
+      "Polônia", "Suécia", "Sérvia", "Ucrânia", "República Tcheca", "Escócia", "País de Gales", "Turquia", "Grécia", "Noruega", "Hungria", "Romênia"],
+    CONCACAF: ["México", "Estados Unidos", "Canadá", "Panamá", "Costa Rica", "Honduras", "Jamaica", "El Salvador",
+      "Trinidad e Tobago", "Haiti", "Curaçao", "Guadalupe", "Martinica", "Nicarágua", "Guatemala", "Cuba"],
+    AFC: ["Japão", "Coreia do Sul", "Irã", "Austrália", "Arábia Saudita", "Catar", "Iraque", "Uzbequistão",
+      "China", "Índia", "Vietnã", "Tailândia", "Indonésia", "Filipinas", "Bahrein", "Emirados Árabes Unidos",
+      "Jordânia", "Líbano", "Síria", "Omã", "Quirguistão", "Turcomenistão", "Tajiquistão", "Palestina"]
   };
   // Copa do Mundo real de 48 seleções: estende o pool original (22, só as principais
   // cabeças-de-chave) com as 18 seleções que já tinham força/bandeira definida em outro
@@ -42,7 +49,12 @@ window.CQ = window.CQ || {};
     "Paraguai", "Chile", "Peru", "Bolívia", "Venezuela", "Canadá", "Panamá", "Costa Rica", "Honduras", "Jamaica", "El Salvador", "Irã", "Austrália", "Arábia Saudita", "Catar", "Iraque", "Uzbequistão", "Áustria",
     "Gana", "Nigéria", "Argélia", "Tunísia", "Egito", "Nova Zelândia", "Polônia", "Suécia"];
   const NAT_STR = { "Brasil": 90, "Argentina": 89, "França": 89, "Espanha": 88, "Inglaterra": 87, "Portugal": 86, "Alemanha": 85, "Holanda": 85, "Itália": 84, "Uruguai": 82, "Colômbia": 81, "México": 79, "Estados Unidos": 77, "Japão": 77, "Croácia": 82, "Bélgica": 82, "Marrocos": 80, "Senegal": 78, "Coreia do Sul": 76, "Suíça": 79, "Dinamarca": 79, "Equador": 78, "Paraguai": 75, "Chile": 75, "Peru": 74, "Bolívia": 70, "Venezuela": 72, "Canadá": 75, "Panamá": 71, "Costa Rica": 71, "Honduras": 68, "Jamaica": 68, "El Salvador": 65, "Irã": 76, "Austrália": 75, "Arábia Saudita": 73, "Catar": 71, "Iraque": 69, "Uzbequistão": 70, "Áustria": 78,
-    "Gana": 74, "Nigéria": 76, "Argélia": 75, "Tunísia": 73, "Egito": 74, "Nova Zelândia": 68, "Polônia": 78, "Suécia": 77 };
+    "Gana": 74, "Nigéria": 76, "Argélia": 75, "Tunísia": 73, "Egito": 74, "Nova Zelândia": 68, "Polônia": 78, "Suécia": 77,
+    // Eurocopa/Copa Ouro/Copa da Ásia reais (24/16/24) — força na mesma escala das já existentes
+    "Sérvia": 79, "Ucrânia": 76, "República Tcheca": 75, "Escócia": 74, "País de Gales": 73, "Turquia": 76, "Grécia": 73, "Noruega": 76, "Hungria": 72, "Romênia": 71,
+    "Trinidad e Tobago": 62, "Haiti": 58, "Curaçao": 63, "Guadalupe": 60, "Martinica": 59, "Nicarágua": 55, "Guatemala": 61, "Cuba": 57,
+    "China": 68, "Índia": 58, "Vietnã": 62, "Tailândia": 63, "Indonésia": 60, "Filipinas": 56, "Bahrein": 61, "Emirados Árabes Unidos": 65,
+    "Jordânia": 63, "Líbano": 58, "Síria": 60, "Omã": 62, "Quirguistão": 55, "Turcomenistão": 54, "Tajiquistão": 53, "Palestina": 57 };
 
   // ---------------- Clubes ----------------
   const CLUBS = {};

@@ -1585,7 +1585,7 @@ window.CQ = window.CQ || {};
       </svg>`;
     }
     // Champions/Europa League — taça bojuda com as duas "orelhas" enormes e curvas
-    if (key === "UCL" || key === "UEL") {
+    if (key === "UCL" || key === "UEL" || key === "UECL") {
       return `<svg viewBox="0 0 24 28" fill="none" stroke="${c}" stroke-width="1.4"${sizeStyle}>
         <path d="M8 25.4h8"/>
         <path d="M10 25.4v-2.2h4v2.2"/>
@@ -1650,6 +1650,7 @@ window.CQ = window.CQ || {};
     if (S.comps.COPA) { const lgc = D.LEAGUES[E().leagueOf(G, G.player.clubId)]; tabs.push(["cdb", lgc ? lgc.cupName : S.comps.COPA.name]); }
     if (S.comps.CONTI) tabs.push(["conti", S.comps.CONTI.name]);
     if (S.sel) tabs.push(["sel", "Seleção"]);
+    if (S.super) tabs.push(["super", "Supermundial"]);
     tabs.push(["mundo", "Mundo"]);
     tabs.push(["champ", "Campeões"]);
     const subtabs = `<div class="subtabs">${tabs.map(function (t) {
@@ -1665,15 +1666,16 @@ window.CQ = window.CQ || {};
     else if (tab === "cdb") body = (S.comps.CDB || S.comps.COPA) ? cupHTML(S.comps.CDB || S.comps.COPA) : none;
     else if (tab === "conti") body = S.comps.CONTI ? contiHTML(S.comps.CONTI) : none;
     else if (tab === "sel") body = selHTML(S);
+    else if (tab === "super") body = S.super ? superHTML(G) : none;
     else if (tab === "mundo") body = worldLeaguesHTML(G);
     else body = champsHTML(G);
     return subtabs + body;
   }
   function ttab(t) { CQ.state.ttab = t; render(); }
 
-  const COMP_ABBR = { EST: "EST", LIGA: "LIGA", BRA: "LIGA", BRB: "SÉRIE B", CDB: "COPA BR", COPA: "COPA", LIB: "LIBERT", SUL: "SULA", UCL: "UCL", UEL: "UEL", SEL: "SELEÇÃO", WC: "COPA", CA: "COPA AM", EU: "EURO", MUN: "MUNDIAL", SUPER: "SUPERMUNDIAL" };
+  const COMP_ABBR = { EST: "EST", LIGA: "LIGA", BRA: "LIGA", BRB: "SÉRIE B", CDB: "COPA BR", COPA: "COPA", LIB: "LIBERT", SUL: "SULA", UCL: "UCL", UEL: "UEL", UECL: "CONFERENCE", SEL: "SELEÇÃO", WC: "COPA", CA: "COPA AM", EU: "EURO", GC: "COPA OURO", AC: "COPA ÁSIA", MUN: "MUNDIAL", SUPER: "SUPERMUNDIAL" };
   // classe de cor por competição (para diferenciar no calendário/panorama)
-  const COMP_COLOR = { EST: "c-est", LIGA: "c-liga", BRA: "c-liga", BRB: "c-serieb", CDB: "c-copa", COPA: "c-copa", LIB: "c-lib", SUL: "c-sula", UCL: "c-ucl", UEL: "c-uel", SEL: "c-sel", WC: "c-sel", CA: "c-sel", EU: "c-sel", MUN: "c-mun", SUPER: "c-mun" };
+  const COMP_COLOR = { EST: "c-est", LIGA: "c-liga", BRA: "c-liga", BRB: "c-serieb", CDB: "c-copa", COPA: "c-copa", LIB: "c-lib", SUL: "c-sula", UCL: "c-ucl", UEL: "c-uel", UECL: "c-uel", SEL: "c-sel", WC: "c-sel", CA: "c-sel", EU: "c-sel", GC: "c-sel", AC: "c-sel", MUN: "c-mun", SUPER: "c-mun" };
   function compTag(comp) {
     return `<span class="cal-tag ${COMP_COLOR[comp] || ""}">${esc(COMP_ABBR[comp] || comp)}</span>`;
   }
@@ -1946,21 +1948,27 @@ window.CQ = window.CQ || {};
     return group + ko;
   }
 
-  function selWCHTML(G, T, p, nat) {
-    const status = T.champion ? `<div class="notice ok">${I.trophy} CAMPEÃO! Copa do Mundo conquistada com a ${esc(nat.name)}!</div>`
-      : T.eliminatedAt ? `<div class="notice">Eliminado (${CQ.engine.STAGE_NAMES[T.eliminatedAt] || "fase de grupos"}).</div>` : "";
+  function selTourHTML(G, T, p, nat) {
+    // T.champion é sincronizado assim que o bracket termina de resolver — inclusive quando
+    // NÃO é o jogador quem vence (o resto do chaveamento continua avançando mesmo depois
+    // da sua eliminação). Só comemora quando o campeão é de fato a própria seleção.
+    const status = T.champion === nat.name ? `<div class="notice ok">${I.trophy} CAMPEÃO! ${esc(T.name)} conquistada com a ${esc(nat.name)}!</div>`
+      : T.eliminatedAt ? `<div class="notice">Eliminado (${CQ.engine.STAGE_NAMES[T.eliminatedAt] || "fase de grupos"}).${T.champion ? " Campeão: " + esc(T.champion) + "." : ""}</div>` : "";
 
+    const cfg = CQ.engine.TOUR_CONF[T.kind] || { thirds: 0 };
     const letters = Object.keys(T.groups);
+    const totalQualifiers = letters.length * 2 + cfg.thirds;
+    const thirdsTxt = cfg.thirds > 0 ? `, mais os ${cfg.thirds} melhores terceiros colocados entre os ${letters.length} grupos` : "";
     let gf = CQ.state.wcGroup;
     if (!gf || letters.indexOf(gf) < 0) gf = T.myGroup;
     const sel = `<select onchange="CQ.state.wcGroup=this.value;CQ.ui.render()" style="border:1px solid var(--ink);background:var(--paper-2);color:var(--ink);padding:6px 10px;font-size:14px">
       ${letters.map(function (l) { return `<option value="${l}" ${gf === l ? "selected" : ""}>Grupo ${l}${l === T.myGroup ? " (você)" : ""}</option>`; }).join("")}</select>`;
     const groupBlock = `<div class="card mb12"><div class="card-h"><h3>Fase de grupos</h3>${sel}</div>
       <div class="card-b tight" style="padding:0">${leagueTableHTML(T.groups[gf], false)}</div>
-      <p class="small muted" style="padding:0 14px 10px">Classificam-se os 2 primeiros de cada grupo, mais os 8 melhores terceiros colocados entre os 12 grupos.</p></div>`;
+      <p class="small muted" style="padding:0 14px 10px">Classificam-se os 2 primeiros de cada grupo${thirdsTxt}.</p></div>`;
 
     const bracketBlock = T.bracket ? cupHTML(T.bracket)
-      : (T.eliminatedAt === "G" ? '<div class="notice mt12">Eliminado na fase de grupos — não ficou entre as 32 melhores.</div>'
+      : (T.eliminatedAt === "G" ? `<div class="notice mt12">Eliminado na fase de grupos — não ficou entre as ${totalQualifiers} melhores.</div>`
         : '<div class="card"><div class="card-b muted">Mata-mata ainda não definido.</div></div>');
 
     const thirdBlock = T.thirdPlace ? `<div class="card mt16"><div class="card-h"><h3>Disputa de 3º lugar</h3></div>
@@ -1974,7 +1982,11 @@ window.CQ = window.CQ || {};
   function selHTML(S) {
     const G = g(), T = S.sel, p = G.player, nat = D.NATIONS[p.nat];
     if (!T) return "";
-    if (T.isFullSim) return selWCHTML(G, T, p, nat);
+    if (T.kind === "notqualified") {
+      return `<div class="card"><div class="section-banner"><span class="sb-title">${esc(T.name)} ${g().year}</span><span class="sb-meta">${p.natTeam.caps} caps · ${p.natTeam.goals} gols pela seleção</span></div>
+        <div class="card-b"><div class="notice">A ${esc(nat.name)} não se classificou pro ${esc(T.name)} nesta edição — a campanha nas eliminatórias não rendeu pontos suficientes. Sem jogos de seleção neste ciclo.</div></div></div>`;
+    }
+    if (T.isFullSim) return selTourHTML(G, T, p, nat);
     const title = T.kind === "elim" ? "Eliminatórias" : T.name;
     const status = T.champion ? `<div class="notice ok">${I.trophy} CAMPEÃO! ${esc(T.name)} conquistada com a ${esc(nat.name)}!</div>`
       : T.eliminatedAt ? `<div class="notice">Eliminado (${CQ.engine.STAGE_NAMES[T.eliminatedAt] || "grupos"}).</div>` : "";
@@ -2005,6 +2017,27 @@ window.CQ = window.CQ || {};
     return groupCard + `<div class="card"><div class="section-banner"><span class="sb-title">${esc(title)} ${g().year}</span><span class="sb-meta">${p.natTeam.caps} caps · ${p.natTeam.goals} gols pela seleção</span></div>
       <div class="card-b">${status}</div>
       <div class="card-b tight" style="overflow-x:auto"><table class="tbl"><thead><tr><th>Adversário</th><th class="num">Placar</th><th class="num">Nota</th></tr></thead><tbody>${fixRows}</tbody></table></div></div>`;
+  }
+
+  function superHTML(G) {
+    const T = G.season.super;
+    const myName = E().myClub(G).name;
+    // T.champion é sincronizado assim que o bracket termina de resolver, inclusive quando
+    // NÃO é o clube do jogador quem vence — só comemora quando o campeão é o próprio clube.
+    const status = T.champion === myName ? `<div class="notice ok">${I.trophy} CAMPEÃO! Supermundial conquistado com o ${esc(myName)}!</div>`
+      : T.eliminatedAt ? `<div class="notice">Eliminado (${CQ.engine.STAGE_NAMES[T.eliminatedAt] || "fase de grupos"}).${T.champion ? " Campeão: " + esc(T.champion) + "." : ""}</div>` : "";
+    const groupRows = (T.groupOpps || []).map(function (oppId) {
+      return `<div class="choice" style="cursor:default"><span class="flex">${crest(oppId, "crest-20")} <b>${esc(CQ.engine.oppObj(G, oppId).name)}</b></span></div>`;
+    }).join("");
+    const groupBlock = `<div class="card mb12"><div class="section-banner"><span class="sb-title">Fase de grupos</span><span class="sb-meta">Supermundial</span></div>
+      <div class="card-b"><div class="choice-grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">${groupRows}</div>
+      <p class="small muted mt8">Classifica-se ao mata-mata quem somar pelo menos 4 pontos nos 3 jogos de grupo.</p></div></div>`;
+    const bracketBlock = T.bracket ? cupHTML(T.bracket)
+      : (T.eliminatedAt === "G" ? '<div class="notice mt12">Eliminado na fase de grupos — não avançou ao mata-mata de 16.</div>'
+        : '<div class="card"><div class="card-b muted">Mata-mata ainda não definido.</div></div>');
+    return `<div class="card mb12"><div class="section-banner"><span class="sb-title">Supermundial ${g().year}</span></div>
+      <div class="card-b">${status}</div></div>
+      ${groupBlock}${bracketBlock}`;
   }
 
   function champsHTML(G) {

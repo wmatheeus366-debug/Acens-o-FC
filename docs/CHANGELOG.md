@@ -796,3 +796,37 @@ Junto, os 4 pontos de UX que tinham ficado de fora da rodada anterior:
   (16 times, 4 estágios, campeão sempre resolvido, zero exceção); fluxo do aviso de "ao
   vivo" testado ponta a ponta (aparece uma vez, marca visto, transiciona pro modo ao vivo
   de verdade).
+
+## Roteiro de torneios de seleção completo (eliminatórias, Copa América/Eurocopa/Copa Ouro/Copa da Ásia reais, Supermundial, Conference League)
+Fecha as 4 fatias que faltavam do roteiro iniciado com a Copa do Mundo:
+
+- **Eliminatórias com risco real de verdade.** `S.sel.record` (escrito a cada jogo de
+  eliminatória) era lido em **zero** lugares do código — a seleção sempre "classificava".
+  Agora `g.player.natTeam.qualified` é avaliado no fim de cada ciclo de eliminatória (3
+  pontos por vitória, 1 por empate, sobre os 8 jogos — precisa de pelo menos 12 pra
+  classificar) e trava o torneio inteiro se a campanha não render pontos suficientes (sem
+  jogo de seleção nenhum naquele ciclo). Notícia no feed nos dois sentidos.
+- **Copa América, Eurocopa, Copa Ouro e Copa da Ásia ganham o mesmo tratamento da Copa do
+  Mundo:** todos os grupos simulados de verdade, chaveamento completo e visível. Os pools
+  de seleção cresceram pro tamanho real de cada torneio — Eurocopa 24 (era 12), Copa Ouro
+  16 (era 8), Copa da Ásia 24 (era 8), com 34 seleções novas ganhando força e bandeira
+  real. Os formatos batem com a realidade: Eurocopa e Copa da Ásia usam os 4 melhores
+  terceiros colocados (igual aos formatos reais de 2024/2023); Copa América "empresta" 6
+  seleções da CONCACAF pra fechar as 16 vagas, mesma solução do torneio de verdade (a
+  CONMEBOL sozinha só tem 10 membros).
+- **Chaveamento real do Supermundial** (torneio raro, a cada 4 anos, pra quem ganhou
+  Libertadores ou Champions recentemente) — mesmo conserto do chaveamento de clube: campo
+  fixo de 16, chaveamento completo guardado, campeão sempre conhecido ao fim da temporada.
+  Ganhou também uma tela própria (não existia nenhuma antes).
+- **Conference League (UECL)**, nova no jogo — clubes europeus na 7ª-8ª posição da liga
+  entram nela (mesma regra real da UEFA), reaproveitando 100% o motor da Champions/Europa
+  League já consertado.
+- **Bug real encontrado e corrigido no processo:** o banner "CAMPEÃO!" das telas de Copa do
+  Mundo/Copa América/Eurocopa/Copa Ouro/Copa da Ásia/Supermundial comemorava toda vez que o
+  campeão real era conhecido — mesmo quando **não** foi o jogador quem venceu. Corrigido
+  pra só comemorar quando o campeão de verdade é a própria seleção/clube do jogador;
+  quando não é, mostra quem realmente ganhou.
+- Validado: 101/101 testes (35 checagens novas cobrindo as 4 confederações, qualificação
+  determinística, geometria do Supermundial, gatilho da Conference League, e o bug do
+  banner corrigido); 18 carreiras simuladas (252 temporadas) cobrindo Brasil e Europa,
+  seleções de todas as 4 confederações, sem nenhuma exceção.

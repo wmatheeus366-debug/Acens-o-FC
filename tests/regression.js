@@ -269,6 +269,137 @@
     });
   }
 
+  // ---- Torneios continentais reais (Copa América/Eurocopa/Copa Ouro/Copa da Ásia) ----
+  function testContinentalTours() {
+    withTempGame(function () {
+      const TOUR_CONF = E().TOUR_CONF;
+      // uma nação por confederação, forçando convocação e o torneio certo por ano
+      const cases = [
+        { natId: "AR", key: "CA" }, { natId: "DE", key: "EU" },
+        { natId: "MX", key: "GC" }, { natId: "JP", key: "AC" }
+      ];
+      cases.forEach(function (c) {
+        const g = newCareer("ATA", "fla");
+        g.player.nat = c.natId;
+        g.player.natTeam.convocado = true;
+        g.player.natTeam.qualified = true;
+        // avança até o ano do torneio certo (year%4===0) sem passar de uma Copa do Mundo
+        while (g.year % 4 !== 0) g.year++;
+        E().startSeason(g);
+        const T = g.season.sel;
+        assert("torneio " + c.key + ": monta S.sel full-sim no ano certo", !!(T && T.isFullSim && T.kind === c.key), T ? (T.kind + "/" + T.isFullSim) : "sem sel");
+        if (!(T && T.isFullSim)) return;
+        const cfg = TOUR_CONF[c.key];
+        const letters = Object.keys(T.groups);
+        const expectedGroups = { CA: 4, EU: 6, GC: 4, AC: 6 }[c.key];
+        assert("torneio " + c.key + ": número de grupos bate com o formato real", letters.length === expectedGroups, "n=" + letters.length);
+        let sizeOk = true, dupOk = true;
+        const ids = {};
+        letters.forEach(function (l) {
+          const grp = T.groups[l];
+          if (grp.teamIds.length !== 4) sizeOk = false;
+          grp.teamIds.forEach(function (id) { if (ids[id]) dupOk = false; ids[id] = 1; });
+        });
+        assert("torneio " + c.key + ": todos os grupos com 4 seleções, sem repetição", sizeOk && dupOk);
+
+        let n = 0; while (E().currentFixture(g) && n++ < 400) E().applyMatch(g, E().resolveMatch(g, E().currentFixture(g), {}));
+        if (T.bracket) {
+          const expectedAdv = expectedGroups * 2 + cfg.thirds;
+          assert("torneio " + c.key + ": bracket com " + expectedAdv + " classificados (formato real)", T.bracket.teams.length === expectedAdv, "n=" + T.bracket.teams.length);
+          assert("torneio " + c.key + ": bracket é potência de 2", (T.bracket.teams.length & (T.bracket.teams.length - 1)) === 0);
+        }
+        const sum = g.pendingSummary || E().endSeason(g);
+        if (T.bracket) assert("torneio " + c.key + ": campeão sempre resolvido ao fim da temporada", !!T.champion, "eliminatedAt=" + T.eliminatedAt);
+      });
+    });
+  }
+
+  // ---- Eliminatórias com risco real: qualificação lida de S.sel.record, não decorativa ----
+  function testEliminatoriasQualification() {
+    withTempGame(function () {
+      const g = newCareer("ZAG", "fla");
+      g.player.natTeam.convocado = true;
+      // força um ano de eliminatória (year%4 em {1,3}) e simula uma campanha perfeita
+      while (g.year % 4 === 0 || g.year % 4 === 2) g.year++;
+      E().startSeason(g);
+      const T = g.season.sel;
+      assert("eliminatórias: S.sel.kind é 'elim' no ano certo", T && T.kind === "elim", T ? T.kind : "sem sel");
+      if (!(T && T.kind === "elim")) return;
+      let n = 0; while (E().currentFixture(g) && n++ < 200) E().applyMatch(g, E().resolveMatch(g, E().currentFixture(g), {}));
+      assert("eliminatórias: S.sel.record acumula os 8 jogos", T.record.length === 8, "n=" + T.record.length);
+      const sum = g.pendingSummary || E().endSeason(g);
+      let qpts = 0;
+      T.record.forEach(function (r) { qpts += r.gm > r.go ? 3 : r.gm === r.go ? 1 : 0; });
+      const expected = qpts >= 12;
+      assert("eliminatórias: g.player.natTeam.qualified reflete os pontos reais da campanha", g.player.natTeam.qualified === expected, "pts=" + qpts + " qualified=" + g.player.natTeam.qualified);
+
+      // reforça o outro lado: força não-classificado e confirma que o próximo torneio vira "notqualified"
+      g.player.natTeam.qualified = false;
+      g.player.natTeam.convocado = true;
+      while (g.year % 4 !== 0 && g.year % 4 !== 2) g.year++;
+      E().startSeason(g);
+      const T2 = g.season.sel;
+      assert("eliminatórias: não classificado pula o torneio (S.sel.kind='notqualified')", T2 && T2.kind === "notqualified", T2 ? T2.kind : "sem sel");
+      assert("eliminatórias: não classificado não tem nenhum jogo de seleção na fila", g.season.queue.filter(function (s) { return s.comp === "SEL" && s.kind === "tour"; }).length === 0);
+    });
+  }
+
+  // ---- Supermundial: chaveamento real (cupComp/advanceCup), não mais bracketOpp ----
+  function testSupermundial() {
+    withTempGame(function () {
+      const g = newCareer("ZAG", "fla");
+      const myClubName = E().myClub(g).name;
+      g.player.titles.push({ year: 2028, key: "LIB", name: "Libertadores", club: myClubName });
+      g.year = 2029; // (2029-2029)%4===0
+      E().startSeason(g);
+      const T = g.season.super;
+      assert("supermundial: S.super é criado no ciclo certo após título continental", !!T, "sem super");
+      if (!T) return;
+      let n = 0; while (E().currentFixture(g) && n++ < 400) E().applyMatch(g, E().resolveMatch(g, E().currentFixture(g), {}));
+      const sum = g.pendingSummary || E().endSeason(g);
+      if (T.eliminatedAt === "G") {
+        assert("supermundial: eliminado nos grupos não monta bracket", !T.bracket);
+      } else {
+        assert("supermundial: bracket com 16 clubes", T.bracket && T.bracket.teams.length === 16, T.bracket ? ("n=" + T.bracket.teams.length) : "sem bracket");
+        assert("supermundial: campeão sempre resolvido ao fim da temporada", !!T.champion);
+      }
+    });
+  }
+
+  // ---- Conference League: 3º nível europeu, mesmo motor do Conti já consertado ----
+  function testConferenceLeague() {
+    withTempGame(function () {
+      const g = newCareer("ATA", "bay");
+      g.player.nat = "DE";
+      g.lastPos = 7; // 7ª posição -> UECL (qual<=8, acima do corte de UEL)
+      E().startSeason(g);
+      const C = g.season.comps.CONTI;
+      assert("conference league: 7ª posição monta S.comps.CONTI.id='UECL'", !!(C && C.id === "UECL"), C ? C.id : "sem conti");
+      if (!(C && C.id === "UECL")) return;
+      let n = 0; while (E().currentFixture(g) && n++ < 400) E().applyMatch(g, E().resolveMatch(g, E().currentFixture(g), {}));
+      const sum = g.pendingSummary || E().endSeason(g);
+      assert("conference league: campeão sempre resolvido ao fim da temporada", !!C.champion);
+    });
+  }
+
+  // ---- Bug real corrigido: banner de campeão não pode comemorar quando quem venceu foi outra seleção/clube ----
+  function testChampionBannerCorrectness() {
+    withTempGame(function () {
+      const g = newCareer("ZAG", "fla");
+      g.player.natTeam.convocado = true;
+      g.player.natTeam.qualified = true;
+      while (g.year % 4 !== 2) g.year++; // ano de Copa do Mundo
+      E().startSeason(g);
+      const T = g.season.sel;
+      let n = 0, tries = 0;
+      // roda até achar uma carreira onde o Brasil é eliminado antes da final (não é campeão)
+      while (T.eliminatedAt == null && n++ < 400) { const fx = E().currentFixture(g); if (!fx) break; E().applyMatch(g, E().resolveMatch(g, fx, {})); }
+      if (T.eliminatedAt && T.eliminatedAt !== "F") {
+        assert("banner de campeão: T.champion nunca é a própria seleção quando ela foi eliminada antes da final", T.champion !== "Brasil", "champion=" + T.champion);
+      }
+    });
+  }
+
   // ---- Olheiro de base: promessa notável vira notícia + aba Base bem formada ----
   function testProspectBreakout() {
     withTempGame(function () {
@@ -491,6 +622,11 @@
     testProspectBreakout();
     testWorldLeagueTables();
     testWorldCup48();
+    testContinentalTours();
+    testEliminatoriasQualification();
+    testSupermundial();
+    testConferenceLeague();
+    testChampionBannerCorrectness();
     testRivalsCoverage();
     testClubRivalryScoreboard();
     testScoutingRumor();

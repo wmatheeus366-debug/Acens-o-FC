@@ -15,7 +15,14 @@ window.CQ = window.CQ || {};
     "El Salvador": "sv", "Coreia do Sul": "kr", "Irã": "ir", "Austrália": "au", "Arábia Saudita": "sa",
     "Catar": "qa", "Iraque": "iq", "Uzbequistão": "uz", "Marrocos": "ma", "Senegal": "sn",
     "Gana": "gh", "Nigéria": "ng", "Argélia": "dz", "Tunísia": "tn", "Egito": "eg",
-    "Nova Zelândia": "nz", "Polônia": "pl", "Suécia": "se"
+    "Nova Zelândia": "nz", "Polônia": "pl", "Suécia": "se",
+    "Sérvia": "rs", "Ucrânia": "ua", "República Tcheca": "cz", "Escócia": "gb-sct", "País de Gales": "gb-wls",
+    "Turquia": "tr", "Grécia": "gr", "Noruega": "no", "Hungria": "hu", "Romênia": "ro",
+    "Trinidad e Tobago": "tt", "Haiti": "ht", "Curaçao": "cw", "Guadalupe": "gp", "Martinica": "mq",
+    "Nicarágua": "ni", "Guatemala": "gt", "Cuba": "cu",
+    "China": "cn", "Índia": "in", "Vietnã": "vn", "Tailândia": "th", "Indonésia": "id", "Filipinas": "ph",
+    "Bahrein": "bh", "Emirados Árabes Unidos": "ae", "Jordânia": "jo", "Líbano": "lb", "Síria": "sy",
+    "Omã": "om", "Quirguistão": "kg", "Turcomenistão": "tm", "Tajiquistão": "tj", "Palestina": "ps"
   };
 
   // ---------- helpers de clube ----------
@@ -86,7 +93,7 @@ window.CQ = window.CQ || {};
         injury: 0, yellows: 0, susp: 0,
         legendIds: opts.legendIds || [],
         takerPen: false, takerFK: false,
-        natTeam: { convocado: false, caps: 0, goals: 0 },
+        natTeam: { convocado: false, caps: 0, goals: 0, qualified: true },
         career: [], titles: [], awards: [],
         hist: [{ y: 2026, ov: ov }],
         marketValue: 0, milestones: [], assets: [], ballon: [],
@@ -493,20 +500,22 @@ window.CQ = window.CQ || {};
     const field = [p.clubId].concat(U.shuffle(others, U.rngFor(g.seed, "copa", g.year)).slice(0, 15));
     S.comps.COPA = cupComp("COPA", D.LEAGUES[lg].cupName, field, ["R16", "QF", "SF", "F"], U.rngFor(g.seed, "copa2", g.year));
 
-    // europa: UCL/UEL
+    // europa: UCL/UEL/UECL — mesma cascata real da UEFA (quem passa perto da Europa
+    // League mas não entra nela vai pra Conference League, "terceiro nível" continental)
     const qual = g.lastPos != null ? g.lastPos : strengthRank(g, lg, p.clubId);
     let conti = null;
-    if (qual <= 4) conti = "UCL"; else if (qual <= 6) conti = "UEL";
+    if (qual <= 4) conti = "UCL"; else if (qual <= 6) conti = "UEL"; else if (qual <= 8) conti = "UECL";
     if (conti) {
+      const contiStr = { UCL: 78, UEL: 72, UECL: 70 }[conti];
       const pool = [];
       D.EURO_LEAGUES.forEach(function (l) {
         if (l === lg) return;
-        D.clubsOf(l).forEach(function (c) { if (c.str >= (conti === "UCL" ? 78 : 72)) pool.push(c.id); });
+        D.clubsOf(l).forEach(function (c) { if (c.str >= contiStr) pool.push(c.id); });
       });
       const rngC = U.rngFor(g.seed, conti, g.year);
       const gids = [p.clubId].concat(U.shuffle(pool, rngC).slice(0, 3));
       S.comps.CONTI = {
-        kind: "conti", id: conti, name: conti === "UCL" ? "Champions League" : "Europa League",
+        kind: "conti", id: conti, name: conti === "UCL" ? "Champions League" : conti === "UEL" ? "Europa League" : "Conference League",
         group: leagueComp(g, conti + "G", "Grupo", gids, doubleRR(gids, rngC), rngS),
         koStages: ["R16", "QF", "SF", "F"], bracket: null, alive: true, champion: null, eliminatedAt: null
       };
@@ -575,12 +584,7 @@ window.CQ = window.CQ || {};
       const koKeys = ["R16", "QF", "SF", "F"];
       koKeys.forEach(function (k) { block.push({ comp: "SUPER", phase: "KO", stage: k }); });
       S.queue.splice.apply(S.queue, [at, 0].concat(block));
-      const koSize = Math.pow(2, koKeys.length);
-      const others = U.shuffle(bigIds, U.rngFor(g.seed, "superkoteams", y)).filter(function (o) { return groupOpps.indexOf(o) < 0; });
-      const koTeams = [p.clubId];
-      let oi = 0;
-      while (koTeams.length < koSize) { koTeams.push(others[oi++] || bigIds[oi % bigIds.length]); }
-      S.super = { name: "Supermundial", groupPts: 0, groupOpps: groupOpps, alive: true, groupDone: false, koKeys: koKeys, koTeams: koTeams, record: [], eliminatedAt: null, champion: null };
+      S.super = { name: "Supermundial", groupPts: 0, groupOpps: groupOpps, alive: true, groupDone: false, koKeys: koKeys, bracket: null, record: [], eliminatedAt: null, champion: null };
     } else if (wonLastSeason) {
       // Mundial de Clubes: confronto único (estilo Intercontinental pré-2000) contra o
       // campeão da outra competição continental
@@ -648,93 +652,109 @@ window.CQ = window.CQ || {};
           { comp: "SEL", kind: "elim", opp: "nat:" + opps[w * 2 + 1], home: false });
       }
       S.sel = { kind: "elim", record: [] };
-    } else if (tour.key === "WC") {
-      // Copa do Mundo real: 12 grupos de 4, TODOS simulados de verdade (não só o do
-      // jogador) — mesmo motor de liga (leagueComp/roundsRR/finishLeague/tableOf) já usado
-      // pras outras 7 ligas do mundo (refreshWorldLeagues). Mata-mata de 32 (2 primeiros de
-      // cada grupo + 8 melhores terceiros) usa o mesmo motor de copa já provado na Copa do
-      // Brasil (cupComp/buildStageTies/simTie/advanceCup), parametrizado por "myId" em vez
-      // de fixo em g.player.clubId, pra poder representar a seleção ("nat:"+nome).
-      const wc = buildWCGroups(g, nat, rng);
-      const myGrp = wc.groups[wc.myGroup];
+    } else if (!p.natTeam.qualified) {
+      // eliminatória mal-sucedida (ver endSeason) — sem risco real de verdade a
+      // classificação era decorativa; sem torneio nenhum pro jogador neste ciclo
+      S.sel = { kind: "notqualified", name: tour.name };
+    } else {
+      // torneio real (Copa do Mundo/Copa América/Eurocopa/Copa Ouro/Copa da Ásia): TODOS os
+      // grupos simulados de verdade (não só o do jogador) — mesmo motor de liga
+      // (leagueComp/roundsRR/finishLeague/tableOf) já usado pras outras 7 ligas do mundo
+      // (refreshWorldLeagues). Mata-mata (2 primeiros de cada grupo + melhores terceiros,
+      // conforme TOUR_CONF) usa o mesmo motor de copa já provado na Copa do Brasil
+      // (cupComp/buildStageTies/simTie/advanceCup), parametrizado por "myId" em vez de
+      // fixo em g.player.clubId, pra poder representar a seleção ("nat:"+nome).
+      const cfg = TOUR_CONF[tour.key];
+      const tg = buildTourGroups(g, nat, tour.key, cfg, rng);
+      const myGrp = tg.groups[tg.myGroup];
       const at = Math.floor(S.queue.length * 0.5);
       const block = [];
       for (let r = 1; r <= myGrp.nRounds; r++) block.push({ comp: "SEL", kind: "tour", phase: "G", round: r });
-      const koKeys = ["R32", "R16", "QF", "SF", "F"];
-      koKeys.forEach(function (k) {
+      cfg.koKeys.forEach(function (k) {
         block.push({ comp: "SEL", kind: "tour", phase: "KO", stage: k });
-        if (k === "SF") block.push({ comp: "SEL", kind: "tour", phase: "KO", stage: "3RD" });
+        if (cfg.thirdPlace && k === "SF") block.push({ comp: "SEL", kind: "tour", phase: "KO", stage: "3RD" });
       });
       S.queue.splice.apply(S.queue, [at, 0].concat(block));
       S.sel = {
-        kind: "WC", name: tour.name, isFullSim: true,
-        groups: wc.groups, myGroup: wc.myGroup, groupDone: false,
-        koKeys: koKeys, bracket: null, thirdPlace: null,
+        kind: tour.key, name: tour.name, isFullSim: true,
+        groups: tg.groups, myGroup: tg.myGroup, groupDone: false,
+        koKeys: cfg.koKeys, bracket: null, thirdPlace: null,
         alive: true, eliminatedAt: null, champion: null, record: []
       };
-    } else {
-      // torneio no meio do ano (Copa América/Eurocopa/etc.) — formato atual (grupo de 4 só
-      // com o próprio adversário, chaveamento por bloco); ganha grupos/bracket reais numa
-      // fatia futura própria.
-      const oppPool = pool;
-      const groupOpps = U.shuffle(oppPool, rng).slice(0, 3);
-      const at = Math.floor(S.queue.length * 0.5);
-      const block = groupOpps.map(function (o, i) {
-        return { comp: "SEL", kind: "tour", phase: "G", n: i + 1, opp: "nat:" + o, home: i !== 2 };
-      });
-      const koKeys = ["QF", "SF", "F"];
-      koKeys.forEach(function (k) { block.push({ comp: "SEL", kind: "tour", phase: "KO", stage: k }); });
-      S.queue.splice.apply(S.queue, [at, 0].concat(block));
-      // chaveamento fixo: nação do jogador no índice 0, adversários únicos preenchem o resto
-      const koSize = Math.pow(2, koKeys.length);
-      const others = U.shuffle(oppPool, U.rngFor(g.seed, "koteams", g.year)).filter(function (o) { return groupOpps.indexOf(o) < 0; });
-      const koTeams = ["nat:" + nat.name];
-      let oi = 0;
-      while (koTeams.length < koSize) { koTeams.push("nat:" + (others[oi++] || oppPool[oi % oppPool.length])); }
-      S.sel = { kind: tour.key, name: tour.name, groupPts: 0, groupOpps: groupOpps, alive: true, koKeys: koKeys, koTeams: koTeams, record: [], eliminatedAt: null, champion: null };
     }
   }
 
-  // ---------- Copa do Mundo: 12 grupos reais de 4 seleções ----------
-  function buildWCGroups(g, nat, rng) {
-    const others = D.WORLD_POOL.filter(function (n) { return n !== nat.name; });
-    const field = [nat.name].concat(U.shuffle(others, rng).slice(0, 47));
-    const letters = "ABCDEFGHIJKL".split("");
+  // ---------- torneios de seleção reais: grupos + mata-mata, parametrizado por competição ----------
+  // tamanho de grupo/melhores terceiros/estágios do mata-mata varia por torneio, mas o
+  // motor é sempre o mesmo (mesmo padrão de leagueComp/roundsRR/finishLeague pros grupos e
+  // cupComp/advanceCup pro mata-mata já provado na Copa do Brasil e na Copa do Mundo)
+  // eliminatórias: pontos mínimos pra classificar em 8 jogos (3 vitória/1 empate, 24
+  // possíveis) — metade dos pontos disponíveis; ajustar se a taxa de classificação sair
+  // muito longe do razoável (ver Verificação)
+  const QUALIFY_THRESHOLD = 12;
+  const TOUR_CONF = {
+    WC: { groupSize: 4, thirds: 8, koKeys: ["R32", "R16", "QF", "SF", "F"], thirdPlace: true },
+    CA: { groupSize: 4, thirds: 0, koKeys: ["QF", "SF", "F"], thirdPlace: false },
+    EU: { groupSize: 4, thirds: 4, koKeys: ["R16", "QF", "SF", "F"], thirdPlace: false },
+    GC: { groupSize: 4, thirds: 0, koKeys: ["QF", "SF", "F"], thirdPlace: false },
+    AC: { groupSize: 4, thirds: 4, koKeys: ["R16", "QF", "SF", "F"], thirdPlace: false }
+  };
+
+  // campo de seleções de cada torneio: Copa do Mundo usa o pool mundial; Copa América
+  // "empresta" 6 seleções da CONCACAF pra fechar 16 (mesma solução da Copa América real,
+  // já que a CONMEBOL sozinha só tem 10 membros); as outras 3 usam o pool da própria
+  // confederação (já do tamanho real de cada torneio)
+  function tourField(nat, key) {
+    if (key === "WC") return D.WORLD_POOL.filter(function (n) { return n !== nat.name; });
+    if (key === "CA") {
+      const guests = D.CONFED_POOL.CONCACAF.slice().sort(function (a, b) { return (D.NAT_STR[b] || 74) - (D.NAT_STR[a] || 74); }).slice(0, 6);
+      return D.CONFED_POOL.CONMEBOL.filter(function (n) { return n !== nat.name; }).concat(guests);
+    }
+    return D.CONFED_POOL[nat.confed].filter(function (n) { return n !== nat.name; });
+  }
+
+  function buildTourGroups(g, nat, key, cfg, rng) {
+    const others = tourField(nat, key);
+    const field = [nat.name].concat(U.shuffle(others, rng));
+    const nGroups = Math.floor(field.length / cfg.groupSize);
+    const letters = "ABCDEFGHIJKL".split("").slice(0, nGroups);
     const groups = {};
-    let myGroup = "A";
+    let myGroup = letters[0];
     letters.forEach(function (l, gi) {
-      const names = field.slice(gi * 4, gi * 4 + 4);
+      const names = field.slice(gi * cfg.groupSize, gi * cfg.groupSize + cfg.groupSize);
       const ids = names.map(function (n) { return "nat:" + n; });
       if (names.indexOf(nat.name) >= 0) myGroup = l;
-      groups[l] = leagueComp(g, "WCG" + l, "Grupo " + l, ids, roundsRR(ids, U.rngFor(g.seed, "wcgroup", l, g.year)));
+      groups[l] = leagueComp(g, key + "G" + l, "Grupo " + l, ids, roundsRR(ids, U.rngFor(g.seed, "tourgroup", key, l, g.year)));
     });
     return { groups: groups, myGroup: myGroup };
   }
 
-  // resolve os 12 grupos por inteiro (mesmo padrão de refreshWorldLeagues — quem não tem o
-  // jogador dentro degenera em "resolve tudo de uma vez"; o próprio grupo já deve estar
+  // resolve todos os grupos por inteiro (mesmo padrão de refreshWorldLeagues — quem não tem
+  // o jogador dentro degenera em "resolve tudo de uma vez"; o próprio grupo já deve estar
   // completo a essa altura, isso só é defensivo)
-  function finishAllWCGroups(g, T) {
+  function finishAllTourGroups(g, T) {
     const myId = "nat:" + D.NATIONS[g.player.nat].name;
     Object.keys(T.groups).forEach(function (l) { finishLeague(g, T.groups[l], myId); });
   }
 
-  // 2 primeiros de cada grupo + 8 melhores terceiros (regra real da Copa de 48)
-  function pickWCAdvancers(g, T) {
-    const thirds = [];
-    const firsts = [], seconds = [];
+  // 2 primeiros de cada grupo + N melhores terceiros (N vem de TOUR_CONF; 0 pra torneios
+  // sem melhores terceiros — Copa América/Copa Ouro no formato real também não usam)
+  function pickTourAdvancers(g, T, cfg) {
+    const firsts = [], seconds = [], thirds = [];
     Object.keys(T.groups).forEach(function (l) {
       const tb = tableOf(g, T.groups[l]);
       firsts.push(tb[0].id); seconds.push(tb[1].id);
-      thirds.push({ id: tb[2].id, pts: tb[2].pts, sg: tb[2].gp - tb[2].gc, gp: tb[2].gp });
+      if (cfg.thirds > 0) thirds.push({ id: tb[2].id, pts: tb[2].pts, sg: tb[2].gp - tb[2].gc, gp: tb[2].gp });
     });
+    if (!cfg.thirds) return firsts.concat(seconds);
     thirds.sort(function (a, b) { return b.pts - a.pts || b.sg - a.sg || b.gp - a.gp; });
-    return firsts.concat(seconds, thirds.slice(0, 8).map(function (t) { return t.id; }));
+    return firsts.concat(seconds, thirds.slice(0, cfg.thirds).map(function (t) { return t.id; }));
   }
 
-  // disputa de 3º lugar: os 2 perdedores da semifinal — não faz parte de compCup.stages
-  // (esse encadeia só vencedores), por isso fica num campo à parte (T.thirdPlace)
-  function resolveWC3rd(g, T, myId) {
+  // disputa de 3º lugar (só a Copa do Mundo tem — TOUR_CONF.WC.thirdPlace): os 2 perdedores
+  // da semifinal — não faz parte de compCup.stages (esse encadeia só vencedores), por isso
+  // fica num campo à parte (T.thirdPlace)
+  function resolveTourThird(g, T, myId) {
     if (!T.bracket) return null;
     const sfIdx = T.bracket.stages.findIndex(function (s) { return s.key === "SF"; });
     const sf = T.bracket.stages[sfIdx];
@@ -750,28 +770,6 @@ window.CQ = window.CQ || {};
     return mkNatFix(g, T.kind, T.name + " · Disputa de 3º lugar", home ? tie.b : tie.a, home, { decisive: false, knock: true, sel: "tourKO3rd", tie: tie });
   }
 
-  // vencedor de um bloco do chaveamento (blocos disjuntos → nunca ressuscita eliminado)
-  function bracketBlockWinner(g, teams, lo, hi, keyPrefix) {
-    let cur = teams.slice(lo, hi);
-    let round = 0;
-    while (cur.length > 1) {
-      const next = [];
-      for (let i = 0; i < cur.length; i += 2) {
-        const a = cur[i], b = cur[i + 1];
-        const rng = U.rngFor(g.seed, keyPrefix, g.year, "blk", lo, round, i, a, b);
-        const A = oppObj(g, a), B = oppObj(g, b);
-        const sc = simScore(A.str, B.str, rng, 1.5);
-        next.push(sc[0] === sc[1] ? (U.chance(0.5, rng) ? a : b) : (sc[0] > sc[1] ? a : b));
-      }
-      cur = next; round++;
-    }
-    return cur[0];
-  }
-  // adversário do jogador no estágio stageIdx (bloco à direita da sua metade)
-  function bracketOpp(g, teams, stageIdx, keyPrefix) {
-    const lo = Math.pow(2, stageIdx), hi = Math.pow(2, stageIdx + 1);
-    return bracketBlockWinner(g, teams, lo, hi, keyPrefix);
-  }
 
   // ---------- tabela / simulação de rodadas de fundo ----------
   function simScore(strH, strA, rng, homeAdv) {
@@ -987,8 +985,9 @@ window.CQ = window.CQ || {};
         if (C.id === "LIB" || C.id === "SUL") {
           pool = D.clubsOf("SAM").concat(D.clubsOf("BRA").filter(function (c) { return c.id !== p.clubId && c.str >= 78; }));
         } else {
+          const contiStr = { UCL: 78, UEL: 72, UECL: 70 }[C.id] || 78;
           pool = [];
-          D.EURO_LEAGUES.forEach(function (l) { D.clubsOf(l).forEach(function (c) { if (c.str >= 78 && c.id !== p.clubId) pool.push(c); }); });
+          D.EURO_LEAGUES.forEach(function (l) { D.clubsOf(l).forEach(function (c) { if (c.str >= contiStr && c.id !== p.clubId) pool.push(c); }); });
         }
         const ids = U.shuffle(pool.map(function (c) { return c.id; }), rngK);
         const field = [p.clubId];
@@ -1014,7 +1013,8 @@ window.CQ = window.CQ || {};
       const T = S.sel;
       if (!T || T.kind === "elim") return null;
       if (T.isFullSim) {
-        // ---- Copa do Mundo real: 12 grupos + mata-mata de 32 ----
+        // ---- torneio real (Copa do Mundo/Copa América/Eurocopa/Copa Ouro/Copa da Ásia):
+        // grupos TODOS simulados de verdade + mata-mata com chaveamento visível guardado ----
         if (slot.phase === "G") {
           if (!T.alive) return null;
           const grp = T.groups[T.myGroup];
@@ -1024,13 +1024,13 @@ window.CQ = window.CQ || {};
           const home = pair[0] === myId;
           return mkNatFix(g, T.kind, T.name + " · Grupo " + T.myGroup + ", jogo " + slot.round, oppId, home, { decisive: false, sel: "tourG", round: slot.round });
         }
-        if (slot.stage === "3RD") return resolveWC3rd(g, T, myId);
+        if (slot.stage === "3RD") return resolveTourThird(g, T, myId);
         if (slot.stage === T.koKeys[0] && T.groupDone !== true) {
           T.groupDone = true;
-          finishAllWCGroups(g, T);
-          const advancers = pickWCAdvancers(g, T);
+          finishAllTourGroups(g, T);
+          const advancers = pickTourAdvancers(g, T, TOUR_CONF[T.kind]);
           if (advancers.indexOf(myId) < 0) { T.alive = false; T.eliminatedAt = "G"; return null; }
-          T.bracket = cupComp("WC", "Copa do Mundo", advancers, T.koKeys, U.rngFor(g.seed, "wcbracket", g.year));
+          T.bracket = cupComp(T.kind, T.name, advancers, T.koKeys, U.rngFor(g.seed, "tourbracket", T.kind, g.year));
         }
         if (!T.bracket) return null; // eliminado nos grupos — nunca chega a montar bracket
         // mesmo já eliminado no mata-mata, o resto do chaveamento (o caminho de todo mundo,
@@ -1050,21 +1050,7 @@ window.CQ = window.CQ || {};
         const home2 = tie.a === myId;
         return mkNatFix(g, T.kind, T.name + " · " + STAGE_NAMES[slot.stage], home2 ? tie.b : tie.a, home2, { decisive: slot.stage === "F", knock: true, sel: "tourKO", stage: slot.stage, tie: tie, stageIdx: nxt.stageIdx });
       }
-      if (slot.phase === "G") {
-        if (!T.alive) return null;
-        return mkNatFix(g, T.kind, T.name + " · Grupo, jogo " + slot.n, slot.opp, slot.home, { decisive: false, sel: "tourG", n: slot.n });
-      }
-      // mata-mata do torneio (chaveamento real, sem ressuscitar eliminados)
-      if (!T.alive) return null;
-      const koKeys = T.koKeys || ["QF", "SF", "F"];
-      if (slot.stage === koKeys[0] && T.groupDone !== true) {
-        T.groupDone = true;
-        if (T.groupPts < 4) { T.alive = false; T.eliminatedAt = "G"; return null; }
-      }
-      const stageIdx = koKeys.indexOf(slot.stage);
-      const oppTeam = T.koTeams ? bracketOpp(g, T.koTeams, stageIdx, "selbracket") : "nat:" + T.groupOpps[0];
-      const home = stageIdx % 2 === 0;
-      return mkNatFix(g, T.kind, T.name + " · " + STAGE_NAMES[slot.stage], oppTeam, home, { decisive: slot.stage === "F", knock: true, sel: "tourKO", stage: slot.stage });
+      return null; // "notqualified" (ou qualquer outro estado sem torneio real) — sem jogo
     }
     if (slot.comp === "MUN") {
       const M = S.mundial;
@@ -1080,16 +1066,41 @@ window.CQ = window.CQ || {};
         const pair = slot.home ? [p.clubId, slot.opp] : [slot.opp, p.clubId];
         return mkFix(g, "SUPER", "Supermundial · Grupo, jogo " + slot.n, pair, { decisive: false, superPhase: "G", n: slot.n });
       }
-      if (!T.alive) return null;
-      const koKeys = T.koKeys;
-      if (slot.stage === koKeys[0] && T.groupDone !== true) {
-        T.groupDone = true;
-        if (T.groupPts < 4) { T.alive = false; T.eliminatedAt = "G"; return null; }
+      // mata-mata — mesmo motor da Copa do Mundo/Conti (cupComp/advanceCup): chaveamento
+      // completo guardado (não só o caminho do jogador), resto continua avançando mesmo
+      // após o jogador ser eliminado, campeão sincronizado mesmo perdendo a final
+      if (!T.alive) {
+        if (T.bracket) {
+          advanceCup(g, T.bracket);
+          if (T.bracket.champion && !T.champion) T.champion = T.bracket.champion;
+        }
+        return null;
       }
-      const stageIdx = koKeys.indexOf(slot.stage);
-      const oppId = bracketOpp(g, T.koTeams, stageIdx, "superbracket");
-      const home = stageIdx % 2 === 0;
-      return mkFix(g, "SUPER", "Supermundial · " + STAGE_NAMES[slot.stage], home ? [p.clubId, oppId] : [oppId, p.clubId], { stage: slot.stage, knock: true, decisive: slot.stage === "F", superPhase: "KO", ko: slot.ko });
+      const koKeys = T.koKeys;
+      if (slot.stage === koKeys[0] && !T.bracket) {
+        if (T.groupDone !== true) {
+          T.groupDone = true;
+          if (T.groupPts < 4) { T.alive = false; T.eliminatedAt = "G"; return null; }
+        }
+        // campo fixo de 16 (jogador + 15 sorteados) — mesmo padrão de cupField (Copa do Brasil)
+        const rngK = U.rngFor(g.seed, "super", g.year, "koteams");
+        const bigPool = D.clubsOf("SAM")
+          .concat(D.clubsOf("BRA").filter(function (c) { return c.id !== p.clubId && c.str >= 78; }))
+          .concat(D.EURO_LEAGUES.reduce(function (acc, l) { return acc.concat(D.clubsOf(l).filter(function (c) { return c.id !== p.clubId && c.str >= 78; })); }, []));
+        const ids = U.shuffle(bigPool.map(function (c) { return c.id; }), rngK);
+        const field = [p.clubId];
+        let ci = 0;
+        while (field.length < 16) { field.push(ids[ci++] || bigPool[ci % bigPool.length].id); }
+        T.bracket = cupComp("SUPER", "Supermundial", field, koKeys, rngK);
+      }
+      if (!T.bracket) return null;
+      const nxt = advanceCup(g, T.bracket);
+      if (T.bracket.champion && !T.champion) T.champion = T.bracket.champion;
+      if (!nxt || nxt.stageIdx !== koKeys.indexOf(slot.stage)) return null;
+      const tie = nxt.tie;
+      const stage = koKeys[nxt.stageIdx];
+      const home = tie.a === p.clubId;
+      return mkFix(g, "SUPER", "Supermundial · " + STAGE_NAMES[stage], home ? [p.clubId, tie.b] : [tie.a, p.clubId], { stage: stage, knock: true, decisive: stage === "F", superPhase: "KO", tie: tie, stageIdx: nxt.stageIdx });
     }
     return null;
   }
@@ -1353,8 +1364,13 @@ window.CQ = window.CQ || {};
       }
     } else if (fx.superPhase === "KO") {
       const T = S.super;
-      if (advanced === false) { T.alive = false; T.eliminatedAt = fx.stage; }
-      else if (fx.stage === "F") { T.champion = myClub(g).name; T.alive = false; winTitle(g, "SUPER", "Supermundial"); }
+      fillTie(fx.tie, fx, res);
+      const stS = T.bracket.stages[fx.stageIdx];
+      stS.ties.forEach(function (t) { simTie(g, T.bracket, fx.stageIdx, t, true); });
+      if (fx.stage === "F" && fx.tie.winner) T.bracket.champion = oppObj(g, fx.tie.winner).name;
+      if (fx.tie.winner !== p.clubId) { T.alive = false; T.eliminatedAt = fx.stage; }
+      else if (fx.stage === "F") { T.alive = false; winTitle(g, "SUPER", "Supermundial"); }
+      if (T.bracket.champion && !T.champion) T.champion = T.bracket.champion;
     } else if (fx.superPhase === "G") {
       S.super.groupPts += res.win ? 3 : res.draw ? 1 : 0;
     } else if (fx.isNatMatch) {
@@ -1467,38 +1483,24 @@ window.CQ = window.CQ || {};
     if (T.kind === "elim") return;
     const myId = "nat:" + D.NATIONS[g.player.nat].name;
     if (fx.sel === "tourG") {
-      if (T.isFullSim) {
-        recordLeagueResult(g, T.groups[T.myGroup], fx, res, myId);
-        ensureRound(g, T.groups[T.myGroup], fx.round, myId);
-      } else {
-        T.groupPts += res.win ? 3 : res.draw ? 1 : 0;
-      }
+      recordLeagueResult(g, T.groups[T.myGroup], fx, res, myId);
+      ensureRound(g, T.groups[T.myGroup], fx.round, myId);
     } else if (fx.sel === "tourKO") {
-      if (T.isFullSim) {
-        fillTie(fx.tie, fx, res);
-        const st = T.bracket.stages[fx.stageIdx];
-        st.ties.forEach(function (t) { simTie(g, T.bracket, fx.stageIdx, t, true, myId); });
-        // sincroniza o campeão real assim que a final termina, ganhando ou perdendo — sem
-        // isso, quando o jogador perde a final, ninguém marca T.bracket.champion (só o
-        // advanceCup faz isso, e ele nunca roda de novo depois que o próprio jogo do
-        // jogador já resolveu a final via fillTie/simTie acima)
-        if (fx.stage === "F" && fx.tie.winner) T.bracket.champion = oppObj(g, fx.tie.winner).name;
-        if (fx.tie.winner !== myId) { T.alive = false; T.eliminatedAt = fx.stage; }
-        else if (fx.stage === "F") {
-          T.alive = false;
-          winTitle(g, T.kind, T.name);
-          g.player.fame = U.clamp(g.player.fame + 12, 0, 100);
-        }
-        if (T.bracket.champion && !T.champion) T.champion = T.bracket.champion;
-      } else {
-        const advanced = res.win || (res.draw && res.shootoutWin);
-        if (!advanced) { T.alive = false; T.eliminatedAt = fx.stage; }
-        else if (fx.stage === "F") {
-          T.alive = false; T.champion = fx.myTeam.name;
-          winTitle(g, T.kind, T.name);
-          g.player.fame = U.clamp(g.player.fame + 12, 0, 100);
-        }
+      fillTie(fx.tie, fx, res);
+      const st = T.bracket.stages[fx.stageIdx];
+      st.ties.forEach(function (t) { simTie(g, T.bracket, fx.stageIdx, t, true, myId); });
+      // sincroniza o campeão real assim que a final termina, ganhando ou perdendo — sem
+      // isso, quando o jogador perde a final, ninguém marca T.bracket.champion (só o
+      // advanceCup faz isso, e ele nunca roda de novo depois que o próprio jogo do
+      // jogador já resolveu a final via fillTie/simTie acima)
+      if (fx.stage === "F" && fx.tie.winner) T.bracket.champion = oppObj(g, fx.tie.winner).name;
+      if (fx.tie.winner !== myId) { T.alive = false; T.eliminatedAt = fx.stage; }
+      else if (fx.stage === "F") {
+        T.alive = false;
+        winTitle(g, T.kind, T.name);
+        g.player.fame = U.clamp(g.player.fame + 12, 0, 100);
       }
+      if (T.bracket.champion && !T.champion) T.champion = T.bracket.champion;
     } else if (fx.sel === "tourKO3rd") {
       // disputa de 3º lugar: só resultado/medalha, sem título nem eliminação
       fillTie(fx.tie, fx, res);
@@ -1511,9 +1513,9 @@ window.CQ = window.CQ || {};
     const isNat = ["WC", "CA", "EU", "GC", "AC"].indexOf(key) >= 0;
     const withName = isNat ? D.NATIONS[p.nat].name : myClub(g).name;
     p.titles.push({ year: g.year, key: key, name: name, club: withName });
-    p.fame = U.clamp(p.fame + ({ SUPER: 22, WC: 15, MUN: 13, UCL: 12, LIB: 10, CA: 8, EU: 8, LIGA: 8, BRA: 8, CDB: 6, COPA: 5, EST: 3 }[key] || 5), 0, 100);
+    p.fame = U.clamp(p.fame + ({ SUPER: 22, WC: 15, MUN: 13, UCL: 12, LIB: 10, UEL: 9, GC: 8, AC: 8, CA: 8, EU: 8, LIGA: 8, SUL: 7, UECL: 7, CDB: 6, COPA: 5, EST: 3 }[key] || 5), 0, 100);
     p.morale = U.clamp(p.morale + 12, 5, 100);
-    const bonus = ({ SUPER: 4000000, WC: 2500000, UCL: 2000000, MUN: 1500000, LIB: 1200000, BRA: 900000, LIGA: 900000, CDB: 500000, COPA: 400000, CA: 800000, EU: 800000, EST: 150000 }[key] || 300000);
+    const bonus = ({ SUPER: 4000000, WC: 2500000, UCL: 2000000, MUN: 1500000, LIB: 1200000, UEL: 900000, GC: 700000, AC: 700000, BRA: 900000, LIGA: 900000, SUL: 600000, UECL: 600000, CDB: 500000, COPA: 400000, CA: 800000, EU: 800000, EST: 150000 }[key] || 300000);
     p.money += bonus;
     g.season.lastTitle = { key: key, name: name, bonus: bonus };
   }
@@ -1685,6 +1687,10 @@ window.CQ = window.CQ || {};
     const table = finishLeague(g, S.comps.LIGA);
     const myPos = table.findIndex(function (t) { return t.id === p.clubId; }) + 1;
     ["CDB", "COPA"].forEach(function (k) { if (S.comps[k]) completeCup(g, S.comps[k]); });
+    // Supermundial: mesmo cuidado do CDB/COPA/Conti — força terminar o bracket real (fim de
+    // temporada antecipado) antes de qualquer leitura de S.super.champion
+    if (S.super && S.super.bracket && !S.super.champion) completeCup(g, S.super.bracket);
+    if (S.super && S.super.bracket && S.super.bracket.champion && !S.super.champion) S.super.champion = S.super.bracket.champion;
     let contiResult = null;
     if (S.comps.CONTI) {
       const C = S.comps.CONTI;
@@ -1796,6 +1802,20 @@ window.CQ = window.CQ || {};
       || (wasConv && strongForNat && p.overall >= nat.str - 18 && p.stats.j >= 6);
     const convNews = p.natTeam.convocado && !wasConv ? "convocado" : (!p.natTeam.convocado && wasConv ? "cortado" : null);
 
+    // eliminatórias com risco real: se a temporada que terminou foi de eliminatória (e o
+    // jogador chegou a jogar — sem campanha de fundo pra quem não foi convocado, mesmo
+    // escopo já usado pro resto do "mundo": só o que o jogador realmente jogou é simulado),
+    // soma pontos (3 vitória, 1 empate, sobre os 8 jogos) e decide se a seleção se
+    // classifica pro próximo torneio. Antes disso, S.sel.record era escrito e nunca lido
+    // em lugar nenhum — a classificação era 100% decorativa.
+    if (S.sel && S.sel.kind === "elim" && S.sel.record && S.sel.record.length) {
+      let qpts = 0;
+      S.sel.record.forEach(function (r) { qpts += r.gm > r.go ? 3 : r.gm === r.go ? 1 : 0; });
+      const qualifiedNow = qpts >= QUALIFY_THRESHOLD;
+      notes.push({ t: qualifiedNow ? "nat-qualified" : "nat-notqualified", nat: nat.name, pts: qpts });
+      p.natTeam.qualified = qualifiedNow;
+    }
+
     // snapshot da carreira
     const seasonRec = {
       year: g.year, clubId: p.clubId, clubName: myClub(g).name, league: S.comps.LIGA.name, pos: myPos,
@@ -1889,6 +1909,10 @@ window.CQ = window.CQ || {};
     const tour = tournamentOfYear(g);
     if (tour) {
       const T = S.sel;
+      // fim de temporada antecipado: força terminar de resolver o mata-mata real (mesmo
+      // padrão já usado pra CDB/COPA/Conti — completeCup) antes de recorrer ao sorteio
+      if (T && T.bracket && !T.champion) completeCup(g, T.bracket);
+      if (T && T.bracket && T.bracket.champion && !T.champion) T.champion = T.bracket.champion;
       if (T && T.champion) put(tour.key, T.champion);
       else {
         const poolN = (tour.key === "WC" ? D.WORLD_POOL : D.CONFED_POOL[D.NATIONS[p.nat].confed])
@@ -2179,8 +2203,7 @@ window.CQ = window.CQ || {};
         }
         return { comp: "SEL", label: T.name + " · " + (STAGE_NAMES[slot.stage] || slot.stage), oppName: null, home: null, decisive: slot.stage === "F" };
       }
-      if (slot.phase === "G") return { comp: "SEL", label: (T ? T.name : "Torneio") + " · Grupo, jogo " + slot.n, oppName: (slot.opp || "").slice(4), home: slot.home, decisive: false };
-      return { comp: "SEL", label: (T ? T.name : "Torneio") + " · " + STAGE_NAMES[slot.stage], oppName: null, home: null, decisive: slot.stage === "F" };
+      return null; // "notqualified" (ou qualquer outro estado sem torneio real) — sem jogo
     }
     if (slot.comp === "MUN") {
       const M = S.mundial; if (!M) return null;
@@ -2245,7 +2268,7 @@ window.CQ = window.CQ || {};
     TRAITS: TRAITS, hasTrait: hasTrait, managerConf: managerConf, ensureManager: ensureManager,
     leagueOf: leagueOf, myClub: myClub, oppObj: oppObj, natTeamObj: natTeamObj,
     refreshWorldLeagues: refreshWorldLeagues,
-    STAGE_NAMES: STAGE_NAMES, NAT_FLAGS: NAT_FLAGS,
+    STAGE_NAMES: STAGE_NAMES, NAT_FLAGS: NAT_FLAGS, TOUR_CONF: TOUR_CONF,
     teamStrength: teamStrength, simScore: simScore
   };
 })();

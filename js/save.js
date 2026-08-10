@@ -49,6 +49,7 @@ window.CQ = window.CQ || {};
     // save já existia antes desse aviso existir — trata como "já viu" pra não surpreender
     // quem já é veterano do modo ao vivo com um tutorial do nada
     if (p.seenLiveIntro === undefined) p.seenLiveIntro = true;
+    if (p.natTeam && p.natTeam.qualified === undefined) p.natTeam.qualified = true;
     if (g.manager === undefined) g.manager = null;
     if (CQ.engine && CQ.engine.ensureManager) CQ.engine.ensureManager(g);
     if (!g.rivalHistory) g.rivalHistory = [];

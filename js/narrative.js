@@ -466,6 +466,8 @@ window.CQ = window.CQ || {};
           post(g, "imprensa", "De olho na Europa: clubes do continente já monitoram " + n.player + " após a boa fase nas categorias de base do " + n.club + ".", { hot: n.ovr >= EURO_SCOUT_OVR + 4 });
         }
       }
+      if (n.t === "nat-qualified") post(g, "selecao", "Classificada! A " + n.nat + " garante vaga no próximo torneio (" + n.pts + " pontos nas eliminatórias).", { hot: true });
+      if (n.t === "nat-notqualified") post(g, "imprensa", "Fora! A " + n.nat + " não se classifica pro próximo torneio (" + n.pts + " pontos nas eliminatórias) — fica de fora dessa edição.", { hot: true });
     });
     if (sum.convNews === "convocado") post(g, "selecao", "CONVOCADO! " + p.name + " está na lista para o próximo ciclo da Seleção. 🎽", { hot: true });
     if (sum.convNews === "cortado") post(g, "imprensa", p.name + " fica fora da nova lista da Seleção. Queda de rendimento pesou.");

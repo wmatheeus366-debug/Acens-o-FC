@@ -43,7 +43,7 @@ Fontes (Google Fonts) e bandeiras (flagcdn) vêm da web com fallback; todo o res
 
 ```
 # no navegador (index.html ou CRAQUE.html aberto), console:
-CQ.tests.run()             # tests/regression.js — 66 checagens
+CQ.tests.run()             # tests/regression.js — 101 checagens
 
 # balanceamento (Node, motor real num shim vm):
 node scripts/balance-runner.mjs 100   # gera docs/BALANCE_BASELINE.md + .json
@@ -142,12 +142,37 @@ confiança. Transição suave entre telas já existia desde o commit inicial
   guarda o histórico completo de toda rodada (não só o caminho do jogador). `contiHTML`
   (`js/ui.js`) troca a renderização quebrada por `cupHTML(C.bracket)`, reaproveitado sem
   mudança nenhuma.
-- **Próximas fatias (escopo definido, plano detalhado fica pra quando chegar a vez):**
-  eliminatórias com risco real de não classificar (hoje só decorativas); Copa América/
-  Eurocopa/Copa Ouro/Copa da Ásia com todos os grupos simulados (mesmo motor da Fatia 1);
-  tela de chaveamento do Supermundial (já tem estado, não tem tela); Conference League
-  (competição nova, não existe em nenhum lugar do código hoje — precisa de planejamento
-  próprio).
+- ✅ **Fatia 2 (feita): eliminatórias com risco real.** `g.player.natTeam.qualified`
+  (`js/engine.js`) é avaliado em `endSeason` a partir de `S.sel.record` (3 pts vitória/1
+  empate, 8 jogos, `QUALIFY_THRESHOLD=12`) — antes esse dado era escrito e nunca lido em
+  lugar nenhum. Não classificado pula o torneio inteiro daquele ciclo
+  (`S.sel={kind:"notqualified",name}`, sem nenhum jogo de seleção na fila). Notícia no feed
+  (`js/narrative.js`) nos dois sentidos (classificou/não classificou).
+- ✅ **Fatia 3 (feita): Copa América/Eurocopa/Copa Ouro/Copa da Ásia com formato real.**
+  `buildWCGroups`/`pickWCAdvancers`/`finishAllWCGroups` da Fatia 1 generalizados pra
+  `buildTourGroups`/`pickTourAdvancers`/`finishAllTourGroups`, parametrizados por
+  `TOUR_CONF` (tamanho de grupo/melhores terceiros/estágios do mata-mata, por competição —
+  exportado em `CQ.engine.TOUR_CONF`). `CONFED_POOL` (`js/data.js`) cresceu pro tamanho
+  real de cada torneio: UEFA 12→24, CONCACAF 8→16, AFC 8→24 (CONMEBOL fica em 10, já são
+  todos os membros reais — a Copa América "empresta" 6 seleções da CONCACAF pra fechar 16,
+  mesma solução do torneio real). Formatos batem com a realidade: Copa América 16/4
+  grupos/sem terceiros; Eurocopa 24/6 grupos/4 melhores terceiros (formato real de 2024);
+  Copa Ouro 16/4 grupos; Copa da Ásia 24/6 grupos/4 melhores terceiros (formato real de
+  2023). `selWCHTML` generalizado pra `selTourHTML` (sem texto/números fixos de Copa do
+  Mundo). **Bug real encontrado e corrigido no processo:** o banner "CAMPEÃO!" aparecia
+  toda vez que `T.champion` existia, mesmo quando quem venceu foi outra seleção — corrigido
+  pra só comemorar quando `T.champion === nat.name`.
+- ✅ **Fatia 4 (feita): chaveamento real do Supermundial + tela nova.** Mesmo conserto do
+  Conti: `S.super.bracket` via `cupComp`/`advanceCup` em vez de `bracketOpp`/`koTeams`.
+  Nova aba "Supermundial" em `compsHTML` (`js/ui.js`, fica direto em `g.season`, mesmo
+  padrão de `S.sel`) + `superHTML` novo reaproveitando `cupHTML` sem CSS novo. Mesmo bug do
+  banner de campeão corrigido aqui também.
+- ✅ **Fatia 5 (feita): Conference League (UECL).** Extensão mecânica da cascata de
+  qualificação europeia em `buildEuroSeason` (`js/engine.js`): `qual<=4→UCL`, `qual<=6→UEL`,
+  `qual<=8→UECL` (mesma regra real da UEFA — quem passa perto da Europa League mas não
+  entra nela). Reaproveita 100% o motor do Conti já consertado (`cupComp`/`advanceCup`/
+  `contiHTML`) — só precisou de threshold de força mais baixo (`str>=70`) e dos dicionários
+  de rótulo/cor/troféu em `js/ui.js`.
 
 ## Achados dos agentes de revisão (funcional/código/UX) — correções aplicadas
 Além dos itens pequenos já corrigidos (ver CHANGELOG), os itens de UX maiores também
