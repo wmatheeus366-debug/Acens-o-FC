@@ -528,6 +528,12 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 
 .subtabs { display: flex; gap: 2px; border-bottom: 2px solid var(--ink); margin-bottom: 14px; overflow-x: auto; scrollbar-width: none; }
 .subtabs::-webkit-scrollbar { display: none; }
+/* pista visual de que dá pra rolar pro lado — a barra de rolagem nativa some (linha acima),
+   então sem isso não há nenhum indício de que existem mais abas fora da tela */
+.subtabs {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 14px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 14px), transparent);
+}
 .subtabs button {
   border: 0; background: transparent;
   font-family: var(--cond); font-size: 14px; font-weight: 600;

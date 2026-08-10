@@ -92,7 +92,8 @@ window.CQ = window.CQ || {};
         marketValue: 0, milestones: [], assets: [], ballon: [],
         clubGoals: {}, idolClubs: [], compGoals: {},
         traits: [], decisiveGoals: 0, captain: null, squadRole: "titular", potUps: 0,
-        records: { hatTricks: 0, bestSeasonG: 0, bestSeasonAvg: 0, biggestWin: null }
+        records: { hatTricks: 0, bestSeasonG: 0, bestSeasonAvg: 0, biggestWin: null },
+        seenLiveIntro: false
       },
       leagueOf: {}, champs: {}, feed: [], customLogos: {},
       boardFail: 0, retired: false, transferRequested: false,
@@ -460,7 +461,7 @@ window.CQ = window.CQ || {};
       S.comps.CONTI = {
         kind: "conti", id: conti, name: conti === "LIB" ? "Libertadores" : "Sul-Americana",
         group: leagueComp(g, conti + "G", "Grupo", gids, doubleRR(gids, rngC), rngS),
-        koStages: ["R16", "QF", "SF", "F"], koIdx: -1, alive: true, koOpps: {}, champion: null, eliminatedAt: null
+        koStages: ["R16", "QF", "SF", "F"], bracket: null, alive: true, champion: null, eliminatedAt: null
       };
     }
 
@@ -507,7 +508,7 @@ window.CQ = window.CQ || {};
       S.comps.CONTI = {
         kind: "conti", id: conti, name: conti === "UCL" ? "Champions League" : "Europa League",
         group: leagueComp(g, conti + "G", "Grupo", gids, doubleRR(gids, rngC), rngS),
-        koStages: ["R16", "QF", "SF", "F"], koIdx: -1, alive: true, koOpps: {}, champion: null, eliminatedAt: null
+        koStages: ["R16", "QF", "SF", "F"], bracket: null, alive: true, champion: null, eliminatedAt: null
       };
     }
 
@@ -962,21 +963,25 @@ window.CQ = window.CQ || {};
         if (!pair) { ensureRound(g, C.group, slot.round); return null; }
         return mkFix(g, C.id, C.name + " · Grupo, jogo " + slot.round, pair, { round: slot.round, phase: "G", decisive: false });
       }
-      // mata-mata continental
-      if (!C.alive) return null;
-      if (slot.ko === 0 && C.koIdx < 0) {
+      // mata-mata continental — mesmo motor da Copa do Mundo (cupComp/advanceCup), então
+      // o caminho de TODO mundo no chaveamento fica guardado e visível, não só o do jogador
+      if (!C.alive) {
+        // já eliminado (ou nunca chegou a montar bracket, se caiu nos grupos) — mas o resto
+        // do chaveamento (quem não é o jogador) precisa continuar avançando de qualquer jeito
+        if (C.bracket) {
+          advanceCup(g, C.bracket);
+          if (C.bracket.champion && !C.champion) C.champion = C.bracket.champion;
+        }
+        return null;
+      }
+      if (slot.ko === 0 && !C.bracket) {
         // classificação: top 2 do grupo
         C.group.nRounds = C.group.rounds.length;
         for (let r = 1; r <= C.group.rounds.length; r++) ensureRound(g, C.group, r);
         const tb = tableOf(g, C.group);
         const myPos = tb.findIndex(function (t) { return t.id === p.clubId; }) + 1;
         if (myPos > 2) { C.alive = false; C.eliminatedAt = "G"; return null; }
-        C.koIdx = 0;
-      }
-      if (slot.ko !== C.koIdx) return null;
-      const stage = C.koStages[slot.ko];
-      // chaveamento fixo de 16 clubes (blocos disjuntos)
-      if (!C.koTeams) {
+        // campo fixo de 16 (jogador + 15 sorteados) — mesmo padrão de cupField (Copa do Brasil)
         const rngK = U.rngFor(g.seed, C.id, g.year, "koteams");
         let pool;
         if (C.id === "LIB" || C.id === "SUL") {
@@ -986,14 +991,19 @@ window.CQ = window.CQ || {};
           D.EURO_LEAGUES.forEach(function (l) { D.clubsOf(l).forEach(function (c) { if (c.str >= 78 && c.id !== p.clubId) pool.push(c); }); });
         }
         const ids = U.shuffle(pool.map(function (c) { return c.id; }), rngK);
-        C.koTeams = [p.clubId];
+        const field = [p.clubId];
         let ci = 0;
-        while (C.koTeams.length < 16) { C.koTeams.push(ids[ci++] || pool[ci % pool.length].id); }
+        while (field.length < 16) { field.push(ids[ci++] || pool[ci % pool.length].id); }
+        C.bracket = cupComp(C.id, C.name, field, C.koStages, rngK);
       }
-      const stageIdx = C.koStages.indexOf(stage);
-      const oppId = bracketOpp(g, C.koTeams, stageIdx, "contibracket" + C.id);
-      const home = slot.ko % 2 === 0;
-      return mkFix(g, C.id, C.name + " · " + STAGE_NAMES[stage], home ? [p.clubId, oppId] : [oppId, p.clubId], { stage: stage, knock: true, decisive: stage === "F", conti: true, ko: slot.ko });
+      if (!C.bracket) return null; // eliminado nos grupos — nunca chega a montar bracket
+      const nxt = advanceCup(g, C.bracket);
+      if (C.bracket.champion && !C.champion) C.champion = C.bracket.champion;
+      if (!nxt || nxt.stageIdx !== slot.ko) return null;
+      const tie = nxt.tie;
+      const stage = C.koStages[slot.ko];
+      const home = tie.a === p.clubId;
+      return mkFix(g, C.id, C.name + " · " + STAGE_NAMES[stage], home ? [p.clubId, tie.b] : [tie.a, p.clubId], { stage: stage, knock: true, decisive: stage === "F", conti: true, tie: tie, stageIdx: nxt.stageIdx });
     }
     if (slot.comp === "SEL") {
       const nat = D.NATIONS[p.nat];
@@ -1323,9 +1333,15 @@ window.CQ = window.CQ || {};
       else if (fx.stage === "F") { cup.champion = myClub(g).name; winTitle(g, fx.compKey, cup.name); }
     } else if (fx.conti) {
       const C = S.comps.CONTI;
-      if (advanced === false) { C.alive = false; C.eliminatedAt = fx.stage; }
-      else if (fx.stage === "F") { C.champion = myClub(g).name; C.alive = false; winTitle(g, C.id, C.name); }
-      else C.koIdx++;
+      fillTie(fx.tie, fx, res);
+      const stC = C.bracket.stages[fx.stageIdx];
+      stC.ties.forEach(function (t) { simTie(g, C.bracket, fx.stageIdx, t, true); });
+      // sincroniza o campeão real assim que a final termina, ganhando ou perdendo (mesmo
+      // raciocínio da Copa do Mundo — senão o resto do chaveamento nunca é conhecido)
+      if (fx.stage === "F" && fx.tie.winner) C.bracket.champion = oppObj(g, fx.tie.winner).name;
+      if (fx.tie.winner !== p.clubId) { C.alive = false; C.eliminatedAt = fx.stage; }
+      else if (fx.stage === "F") { C.alive = false; winTitle(g, C.id, C.name); }
+      if (C.bracket.champion && !C.champion) C.champion = C.bracket.champion;
     } else if (fx.compKey === "CONTI" || (S.comps.CONTI && fx.compKey === S.comps.CONTI.id && fx.phase === "G")) {
       recordLeagueResult(g, S.comps.CONTI.group, fx, res);
       ensureRound(g, S.comps.CONTI.group, fx.round);
@@ -1672,6 +1688,11 @@ window.CQ = window.CQ || {};
     let contiResult = null;
     if (S.comps.CONTI) {
       const C = S.comps.CONTI;
+      // se o bracket real chegou a ser montado (o jogador se classificou do grupo), força
+      // terminar de resolver tudo agora (fim de temporada antecipado) antes de recorrer ao
+      // sorteio por força — mesmo padrão já usado pra CDB/COPA (completeCup)
+      if (C.bracket && !C.champion) completeCup(g, C.bracket);
+      if (C.bracket && C.bracket.champion && !C.champion) C.champion = C.bracket.champion;
       if (!C.champion) {
         const rngC = U.rngFor(g.seed, "contichamp", g.year);
         const pool = (C.id === "LIB" || C.id === "SUL")
@@ -2142,8 +2163,7 @@ window.CQ = window.CQ || {};
         return { comp: C.id, label: C.name + " · Grupo, jogo " + slot.round, oppName: oppObj(g, opp).name, oppId: opp, home: pair[0] === p.clubId };
       }
       const stage = C.koStages[slot.ko];
-      const opp = C.koOpps && C.koOpps[stage];
-      return { comp: C.id, label: C.name + " · " + STAGE_NAMES[stage], oppName: opp ? oppObj(g, opp).name : null, oppId: opp || null, home: slot.ko % 2 === 0, decisive: stage === "F" };
+      return { comp: C.id, label: C.name + " · " + STAGE_NAMES[stage], oppName: null, home: null, decisive: stage === "F" };
     }
     if (slot.comp === "SEL") {
       const nat = D.NATIONS[p.nat], T = S.sel;

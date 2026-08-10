@@ -541,6 +541,12 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 
 .subtabs { display: flex; gap: 2px; border-bottom: 2px solid var(--ink); margin-bottom: 14px; overflow-x: auto; scrollbar-width: none; }
 .subtabs::-webkit-scrollbar { display: none; }
+/* pista visual de que dá pra rolar pro lado — a barra de rolagem nativa some (linha acima),
+   então sem isso não há nenhum indício de que existem mais abas fora da tela */
+.subtabs {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 14px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 14px), transparent);
+}
 .subtabs button {
   border: 0; background: transparent;
   font-family: var(--cond); font-size: 14px; font-weight: 600;
@@ -2440,7 +2446,8 @@ window.CQ = window.CQ || {};
         marketValue: 0, milestones: [], assets: [], ballon: [],
         clubGoals: {}, idolClubs: [], compGoals: {},
         traits: [], decisiveGoals: 0, captain: null, squadRole: "titular", potUps: 0,
-        records: { hatTricks: 0, bestSeasonG: 0, bestSeasonAvg: 0, biggestWin: null }
+        records: { hatTricks: 0, bestSeasonG: 0, bestSeasonAvg: 0, biggestWin: null },
+        seenLiveIntro: false
       },
       leagueOf: {}, champs: {}, feed: [], customLogos: {},
       boardFail: 0, retired: false, transferRequested: false,
@@ -2808,7 +2815,7 @@ window.CQ = window.CQ || {};
       S.comps.CONTI = {
         kind: "conti", id: conti, name: conti === "LIB" ? "Libertadores" : "Sul-Americana",
         group: leagueComp(g, conti + "G", "Grupo", gids, doubleRR(gids, rngC), rngS),
-        koStages: ["R16", "QF", "SF", "F"], koIdx: -1, alive: true, koOpps: {}, champion: null, eliminatedAt: null
+        koStages: ["R16", "QF", "SF", "F"], bracket: null, alive: true, champion: null, eliminatedAt: null
       };
     }
 
@@ -2855,7 +2862,7 @@ window.CQ = window.CQ || {};
       S.comps.CONTI = {
         kind: "conti", id: conti, name: conti === "UCL" ? "Champions League" : "Europa League",
         group: leagueComp(g, conti + "G", "Grupo", gids, doubleRR(gids, rngC), rngS),
-        koStages: ["R16", "QF", "SF", "F"], koIdx: -1, alive: true, koOpps: {}, champion: null, eliminatedAt: null
+        koStages: ["R16", "QF", "SF", "F"], bracket: null, alive: true, champion: null, eliminatedAt: null
       };
     }
 
@@ -3310,21 +3317,25 @@ window.CQ = window.CQ || {};
         if (!pair) { ensureRound(g, C.group, slot.round); return null; }
         return mkFix(g, C.id, C.name + " · Grupo, jogo " + slot.round, pair, { round: slot.round, phase: "G", decisive: false });
       }
-      // mata-mata continental
-      if (!C.alive) return null;
-      if (slot.ko === 0 && C.koIdx < 0) {
+      // mata-mata continental — mesmo motor da Copa do Mundo (cupComp/advanceCup), então
+      // o caminho de TODO mundo no chaveamento fica guardado e visível, não só o do jogador
+      if (!C.alive) {
+        // já eliminado (ou nunca chegou a montar bracket, se caiu nos grupos) — mas o resto
+        // do chaveamento (quem não é o jogador) precisa continuar avançando de qualquer jeito
+        if (C.bracket) {
+          advanceCup(g, C.bracket);
+          if (C.bracket.champion && !C.champion) C.champion = C.bracket.champion;
+        }
+        return null;
+      }
+      if (slot.ko === 0 && !C.bracket) {
         // classificação: top 2 do grupo
         C.group.nRounds = C.group.rounds.length;
         for (let r = 1; r <= C.group.rounds.length; r++) ensureRound(g, C.group, r);
         const tb = tableOf(g, C.group);
         const myPos = tb.findIndex(function (t) { return t.id === p.clubId; }) + 1;
         if (myPos > 2) { C.alive = false; C.eliminatedAt = "G"; return null; }
-        C.koIdx = 0;
-      }
-      if (slot.ko !== C.koIdx) return null;
-      const stage = C.koStages[slot.ko];
-      // chaveamento fixo de 16 clubes (blocos disjuntos)
-      if (!C.koTeams) {
+        // campo fixo de 16 (jogador + 15 sorteados) — mesmo padrão de cupField (Copa do Brasil)
         const rngK = U.rngFor(g.seed, C.id, g.year, "koteams");
         let pool;
         if (C.id === "LIB" || C.id === "SUL") {
@@ -3334,14 +3345,19 @@ window.CQ = window.CQ || {};
           D.EURO_LEAGUES.forEach(function (l) { D.clubsOf(l).forEach(function (c) { if (c.str >= 78 && c.id !== p.clubId) pool.push(c); }); });
         }
         const ids = U.shuffle(pool.map(function (c) { return c.id; }), rngK);
-        C.koTeams = [p.clubId];
+        const field = [p.clubId];
         let ci = 0;
-        while (C.koTeams.length < 16) { C.koTeams.push(ids[ci++] || pool[ci % pool.length].id); }
+        while (field.length < 16) { field.push(ids[ci++] || pool[ci % pool.length].id); }
+        C.bracket = cupComp(C.id, C.name, field, C.koStages, rngK);
       }
-      const stageIdx = C.koStages.indexOf(stage);
-      const oppId = bracketOpp(g, C.koTeams, stageIdx, "contibracket" + C.id);
-      const home = slot.ko % 2 === 0;
-      return mkFix(g, C.id, C.name + " · " + STAGE_NAMES[stage], home ? [p.clubId, oppId] : [oppId, p.clubId], { stage: stage, knock: true, decisive: stage === "F", conti: true, ko: slot.ko });
+      if (!C.bracket) return null; // eliminado nos grupos — nunca chega a montar bracket
+      const nxt = advanceCup(g, C.bracket);
+      if (C.bracket.champion && !C.champion) C.champion = C.bracket.champion;
+      if (!nxt || nxt.stageIdx !== slot.ko) return null;
+      const tie = nxt.tie;
+      const stage = C.koStages[slot.ko];
+      const home = tie.a === p.clubId;
+      return mkFix(g, C.id, C.name + " · " + STAGE_NAMES[stage], home ? [p.clubId, tie.b] : [tie.a, p.clubId], { stage: stage, knock: true, decisive: stage === "F", conti: true, tie: tie, stageIdx: nxt.stageIdx });
     }
     if (slot.comp === "SEL") {
       const nat = D.NATIONS[p.nat];
@@ -3671,9 +3687,15 @@ window.CQ = window.CQ || {};
       else if (fx.stage === "F") { cup.champion = myClub(g).name; winTitle(g, fx.compKey, cup.name); }
     } else if (fx.conti) {
       const C = S.comps.CONTI;
-      if (advanced === false) { C.alive = false; C.eliminatedAt = fx.stage; }
-      else if (fx.stage === "F") { C.champion = myClub(g).name; C.alive = false; winTitle(g, C.id, C.name); }
-      else C.koIdx++;
+      fillTie(fx.tie, fx, res);
+      const stC = C.bracket.stages[fx.stageIdx];
+      stC.ties.forEach(function (t) { simTie(g, C.bracket, fx.stageIdx, t, true); });
+      // sincroniza o campeão real assim que a final termina, ganhando ou perdendo (mesmo
+      // raciocínio da Copa do Mundo — senão o resto do chaveamento nunca é conhecido)
+      if (fx.stage === "F" && fx.tie.winner) C.bracket.champion = oppObj(g, fx.tie.winner).name;
+      if (fx.tie.winner !== p.clubId) { C.alive = false; C.eliminatedAt = fx.stage; }
+      else if (fx.stage === "F") { C.alive = false; winTitle(g, C.id, C.name); }
+      if (C.bracket.champion && !C.champion) C.champion = C.bracket.champion;
     } else if (fx.compKey === "CONTI" || (S.comps.CONTI && fx.compKey === S.comps.CONTI.id && fx.phase === "G")) {
       recordLeagueResult(g, S.comps.CONTI.group, fx, res);
       ensureRound(g, S.comps.CONTI.group, fx.round);
@@ -4020,6 +4042,11 @@ window.CQ = window.CQ || {};
     let contiResult = null;
     if (S.comps.CONTI) {
       const C = S.comps.CONTI;
+      // se o bracket real chegou a ser montado (o jogador se classificou do grupo), força
+      // terminar de resolver tudo agora (fim de temporada antecipado) antes de recorrer ao
+      // sorteio por força — mesmo padrão já usado pra CDB/COPA (completeCup)
+      if (C.bracket && !C.champion) completeCup(g, C.bracket);
+      if (C.bracket && C.bracket.champion && !C.champion) C.champion = C.bracket.champion;
       if (!C.champion) {
         const rngC = U.rngFor(g.seed, "contichamp", g.year);
         const pool = (C.id === "LIB" || C.id === "SUL")
@@ -4490,8 +4517,7 @@ window.CQ = window.CQ || {};
         return { comp: C.id, label: C.name + " · Grupo, jogo " + slot.round, oppName: oppObj(g, opp).name, oppId: opp, home: pair[0] === p.clubId };
       }
       const stage = C.koStages[slot.ko];
-      const opp = C.koOpps && C.koOpps[stage];
-      return { comp: C.id, label: C.name + " · " + STAGE_NAMES[stage], oppName: opp ? oppObj(g, opp).name : null, oppId: opp || null, home: slot.ko % 2 === 0, decisive: stage === "F" };
+      return { comp: C.id, label: C.name + " · " + STAGE_NAMES[stage], oppName: null, home: null, decisive: stage === "F" };
     }
     if (slot.comp === "SEL") {
       const nat = D.NATIONS[p.nat], T = S.sel;
@@ -5735,9 +5761,11 @@ window.CQ = window.CQ || {};
         <input type="text" id="cr-name" maxlength="28" value="${esc(d.name)}" placeholder="Ex.: Kaio Ribeiro" oninput="CQ.state.draft.name=this.value"></div>
       <div class="cols" style="grid-template-columns:1fr 1fr 1fr;gap:12px">
         <div class="field"><label>Idade inicial</label>
-          <select onchange="CQ.ui.dset('age',+this.value)">${[16, 17, 18].map(function (a) { return `<option ${d.age === a ? "selected" : ""} value="${a}">${a} anos</option>`; }).join("")}</select></div>
+          <select onchange="CQ.ui.dset('age',+this.value)">${[16, 17, 18].map(function (a) { return `<option ${d.age === a ? "selected" : ""} value="${a}">${a} anos</option>`; }).join("")}</select>
+          <small class="muted" style="display:block;margin-top:4px">Mais novo = mais temporadas de crescimento antes do declínio por idade.</small></div>
         <div class="field"><label>Pé preferido</label>
-          <select onchange="CQ.ui.dset('foot',this.value)">${["Destro", "Canhoto", "Ambidestro"].map(function (f) { return `<option ${d.foot === f ? "selected" : ""}>${f}</option>`; }).join("")}</select></div>
+          <select onchange="CQ.ui.dset('foot',this.value)">${["Destro", "Canhoto", "Ambidestro"].map(function (f) { return `<option ${d.foot === f ? "selected" : ""}>${f}</option>`; }).join("")}</select>
+          <small class="muted" style="display:block;margin-top:4px">Só estética — aparece no seu perfil, sem efeito nos atributos.</small></div>
         <div class="field"><label>Número da camisa</label>
           <input type="number" min="1" max="99" value="${d.num}" onchange="CQ.ui.dset('num',Math.max(1,Math.min(99,+this.value||10)))"></div>
       </div>
@@ -6053,10 +6081,10 @@ window.CQ = window.CQ || {};
       </div></div></div>`;
 
     // ---- RAIL: dossiê do jogador ----
-    const form = (S.history || []).slice(-5).map(function (h) {
-      const r = h.win ? "V" : h.draw ? "E" : "D";
-      return `<span class="result-pill ${r}" title="${esc(h.opp)}">${r}</span>`;
-    }).join("") || '<span class="muted small">Sem jogos ainda</span>';
+    // "Forma recente" (V/E/D dos últimos jogos) foi removida daqui — o Ticker (acima, na
+    // coluna principal) já mostra os últimos 12 resultados com placar e adversário, mais
+    // completo que os pills soltos que ficavam aqui; duas visões da mesma coisa na mesma
+    // tela era redundância, não reforço.
     const st = p.stats;
     const dossier = `<div>
       <div class="section-banner"><span class="sb-title">O Craque</span><span class="sb-meta">Ficha do atleta</span></div>
@@ -6074,8 +6102,6 @@ window.CQ = window.CQ || {};
           <div class="meter-lbl"><span>Potencial ${p.pot}</span><span>Fama <b id="cnt-fame" data-count-to="${Math.round(p.fame)}">${fromFame}</b></span></div>${bar(p.overall, 100, false, p.pot)}
           <div class="meter-lbl mt8"><span>Condição</span><span class="tnum">${Math.round(p.condition)}%</span></div>${bar(p.condition, 100, p.condition < 40)}
           <div class="meter-lbl mt8"><span>Moral</span><span class="tnum">${Math.round(p.morale)}%</span></div>${bar(p.morale, 100, p.morale < 35)}
-          <hr class="rule">
-          <div class="flex-b"><span class="condsmall">Forma recente</span><span class="lastres">${form}</span></div>
           <hr class="rule">
           <div class="tiles">
             <div class="tile"><b class="tnum">${st.j}</b><span>Jogos</span></div>
@@ -6122,6 +6148,22 @@ window.CQ = window.CQ || {};
     const fx = E().currentFixture(G);
     if (!fx) { seasonEndFlow(); return; }
     if (fx.decisive) {
+      if (!G.player.seenLiveIntro) {
+        G.player.seenLiveIntro = true;
+        CQ.main.save();
+        overlay(`<div class="card"><div class="card-h"><h3>Jogo decisivo — modo ao vivo</h3></div>
+          <div class="card-b">
+            <p>Esta partida você acompanha <b>minuto a minuto</b>: lances, decisões e,
+            se empatar, os pênaltis, tudo em tempo real — diferente das partidas normais,
+            que são resolvidas com um clique.</p>
+            <p class="small muted">Isso só acontece em finais e jogos decisivos — a
+            maioria das suas partidas continua rápida.</p>
+          </div>
+          <div class="card-b" style="padding-top:0">
+            <button class="btn btn-pri btn-block" onclick="CQ.ui.actionPlay()">Entendi, vamos lá</button>
+          </div></div>`);
+        return;
+      }
       CQ.state.live = CQ.live.buildLive(G, fx);
       renderLiveOverlay(true);
       return;
@@ -7441,24 +7483,11 @@ window.CQ = window.CQ || {};
   }
 
   function contiHTML(C) {
-    const G = g();
     const group = leagueTableHTML(C.group, false).replace("card-h\"><h3>" + esc(C.group.name), "card-h\"><h3>" + esc(C.name) + " · Grupo");
     let ko = "";
-    const done = C.koStages.filter(function (s) { return C.koOpps[s]; });
-    if (C.koIdx >= 0 || done.length) {
-      ko = `<div class="card mt16"><div class="card-h"><h3>Mata-mata</h3></div><div class="card-b">
-        ${C.koStages.map(function (s, i) {
-        const opp = C.koOpps[s];
-        if (!opp) return "";
-        const passed = C.eliminatedAt !== s && (C.koIdx > i || C.champion);
-        const cur = C.koIdx === i && C.alive;
-        return `<div class="flex-b" style="padding:6px 0;border-bottom:1px dashed var(--rule-soft)">
-          <span class="flex">${CQ.engine.STAGE_NAMES[s]}: ${crest(opp, "crest-20")} ${esc(CQ.engine.oppObj(G, opp).name)}</span>
-          <span class="badge ${passed ? "badge-green" : cur ? "badge-soft" : "badge-verm"}">${passed ? "Superado" : cur ? "Em jogo" : "Eliminado"}</span></div>`;
-      }).join("")}
-        ${C.champion ? `<p class="mt8"><b>Campeão: ${esc(C.champion)}</b></p>` : ""}
-      </div></div>`;
-    } else if (!C.alive) {
+    if (C.bracket) {
+      ko = '<div class="mt16">' + cupHTML(C.bracket) + '</div>';
+    } else if (C.eliminatedAt === "G") {
       ko = `<div class="notice mt12">Eliminado na fase de grupos.</div>`;
     }
     return group + ko;
@@ -8034,6 +8063,9 @@ window.CQ = window.CQ || {};
     if (p.captain === undefined) p.captain = null;
     if (!p.squadRole) p.squadRole = "titular";
     if (p.potUps == null) p.potUps = 0;
+    // save já existia antes desse aviso existir — trata como "já viu" pra não surpreender
+    // quem já é veterano do modo ao vivo com um tutorial do nada
+    if (p.seenLiveIntro === undefined) p.seenLiveIntro = true;
     if (g.manager === undefined) g.manager = null;
     if (CQ.engine && CQ.engine.ensureManager) CQ.engine.ensureManager(g);
     if (!g.rivalHistory) g.rivalHistory = [];

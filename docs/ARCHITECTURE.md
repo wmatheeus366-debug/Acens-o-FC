@@ -135,10 +135,25 @@ confiança. Transição suave entre telas já existia desde o commit inicial
   Ásia continuam no formato anterior (`resolveSlot`/`buildNationalCycle` em `js/engine.js`
   bifurcam por `T.isFullSim`). Nova aba "Seleção" com seletor de grupo + chaveamento
   visível reaproveita `leagueTableHTML`/`cupHTML`/`tieHTML` de `js/ui.js` sem CSS novo.
+- ✅ **Conserto do chaveamento morto de Libertadores/Champions/Europa League/Sul-Americana
+  (feito).** `C.koOpps`/`C.koTeams`/`bracketOpp` (nunca escrevia dado nenhum, tela vazia)
+  substituídos pelo mesmo `cupComp`/`buildStageTies`/`simTie`/`advanceCup` da Fatia 1 —
+  campo fixo de 16 clubes montado assim que o jogador se classifica do grupo, `C.bracket`
+  guarda o histórico completo de toda rodada (não só o caminho do jogador). `contiHTML`
+  (`js/ui.js`) troca a renderização quebrada por `cupHTML(C.bracket)`, reaproveitado sem
+  mudança nenhuma.
 - **Próximas fatias (escopo definido, plano detalhado fica pra quando chegar a vez):**
   eliminatórias com risco real de não classificar (hoje só decorativas); Copa América/
   Eurocopa/Copa Ouro/Copa da Ásia com todos os grupos simulados (mesmo motor da Fatia 1);
-  conserto do chaveamento morto de Libertadores/Champions/Europa League/Sul-Americana
-  (`C.koOpps` nunca é escrito, confirmado por revisão de código); tela de chaveamento do
-  Supermundial (já tem estado, não tem tela); Conference League (competição nova, não
-  existe em nenhum lugar do código hoje — precisa de planejamento próprio).
+  tela de chaveamento do Supermundial (já tem estado, não tem tela); Conference League
+  (competição nova, não existe em nenhum lugar do código hoje — precisa de planejamento
+  próprio).
+
+## Achados dos agentes de revisão (funcional/código/UX) — correções aplicadas
+Além dos itens pequenos já corrigidos (ver CHANGELOG), os itens de UX maiores também
+foram endereçados: fade nas bordas do `.subtabs` (`css/style.css`) indicando rolagem
+horizontal; aviso único (`p.seenLiveIntro`, `js/engine.js`/`js/save.js`) explicando o modo
+"ao vivo" na primeira partida decisiva; remoção da "Forma recente" redundante do Dossiê da
+Home (o Ticker já cobre isso, com mais detalhe); dicas de consequência (idade/pé) no passo
+0 da criação de personagem. Único item que segue como próxima fatia: eliminatórias com
+risco real.

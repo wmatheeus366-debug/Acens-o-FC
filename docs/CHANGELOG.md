@@ -769,3 +769,30 @@ pequenos e de baixo risco:
   A → Série B) confirmando a liga antiga aparecendo e a nova sem dado velho; conferido
   visualmente rolagem interna nas 3 telas com uma carreira de 21 temporadas até a
   aposentadoria.
+
+## Conserta o chaveamento morto de Libertadores/Champions/Europa/Sul-Americana + UX
+Fatia 4 do roteiro de torneios (a que faltava): `C.koOpps` nunca era escrito em lugar
+nenhum — a tela de mata-mata dessas 4 competições sempre aparecia vazia, e jogos futuros
+no Calendário ficavam "a definir" pra sempre. Trocado pelo mesmo motor da Copa do Mundo
+(`cupComp`/`buildStageTies`/`simTie`/`advanceCup`) — campo fixo de 16 clubes montado assim
+que o jogador se classifica do grupo, chaveamento completo guardado (não só o caminho do
+jogador), reaproveitando `cupHTML` em vez do `contiHTML` quebrado. Mesmo cuidado da Copa
+do Mundo: o resto do chaveamento continua avançando mesmo depois do jogador ser eliminado,
+e o campeão real é sincronizado mesmo quando o jogador perde a final.
+
+Junto, os 4 pontos de UX que tinham ficado de fora da rodada anterior:
+- **Sub-abas de Torneios**: fade nas bordas (`.subtabs`, `css/style.css`) indicando que dá
+  pra rolar pro lado — a barra de rolagem nativa já era escondida de propósito, sem
+  nenhum outro indício visual.
+- **1ª partida "ao vivo"**: aviso único (na primeira vez que uma partida decisiva
+  acontece) explicando que essa partida é acompanhada minuto a minuto — saves antigos são
+  tratados como "já sabem", só carreiras novas veem o aviso.
+- **Home**: removida a "Forma recente" do Dossiê (últimos 5 jogos em pills soltos) —
+  redundante com o Ticker (últimos 12, com placar) que já está na mesma tela.
+- **Criação de personagem**: dicas curtas sob idade inicial ("mais novo = mais
+  temporadas de crescimento antes do declínio") e pé preferido ("só estética, sem efeito
+  nos atributos") — decisões que antes eram tomadas às cegas.
+- Validado: 66/66 testes; 24 carreiras simuladas cobrindo Libertadores e Champions/Europa
+  (16 times, 4 estágios, campeão sempre resolvido, zero exceção); fluxo do aviso de "ao
+  vivo" testado ponta a ponta (aparece uma vez, marca visto, transiciona pro modo ao vivo
+  de verdade).

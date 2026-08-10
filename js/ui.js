@@ -214,9 +214,11 @@ window.CQ = window.CQ || {};
         <input type="text" id="cr-name" maxlength="28" value="${esc(d.name)}" placeholder="Ex.: Kaio Ribeiro" oninput="CQ.state.draft.name=this.value"></div>
       <div class="cols" style="grid-template-columns:1fr 1fr 1fr;gap:12px">
         <div class="field"><label>Idade inicial</label>
-          <select onchange="CQ.ui.dset('age',+this.value)">${[16, 17, 18].map(function (a) { return `<option ${d.age === a ? "selected" : ""} value="${a}">${a} anos</option>`; }).join("")}</select></div>
+          <select onchange="CQ.ui.dset('age',+this.value)">${[16, 17, 18].map(function (a) { return `<option ${d.age === a ? "selected" : ""} value="${a}">${a} anos</option>`; }).join("")}</select>
+          <small class="muted" style="display:block;margin-top:4px">Mais novo = mais temporadas de crescimento antes do declínio por idade.</small></div>
         <div class="field"><label>Pé preferido</label>
-          <select onchange="CQ.ui.dset('foot',this.value)">${["Destro", "Canhoto", "Ambidestro"].map(function (f) { return `<option ${d.foot === f ? "selected" : ""}>${f}</option>`; }).join("")}</select></div>
+          <select onchange="CQ.ui.dset('foot',this.value)">${["Destro", "Canhoto", "Ambidestro"].map(function (f) { return `<option ${d.foot === f ? "selected" : ""}>${f}</option>`; }).join("")}</select>
+          <small class="muted" style="display:block;margin-top:4px">Só estética — aparece no seu perfil, sem efeito nos atributos.</small></div>
         <div class="field"><label>Número da camisa</label>
           <input type="number" min="1" max="99" value="${d.num}" onchange="CQ.ui.dset('num',Math.max(1,Math.min(99,+this.value||10)))"></div>
       </div>
@@ -532,10 +534,10 @@ window.CQ = window.CQ || {};
       </div></div></div>`;
 
     // ---- RAIL: dossiê do jogador ----
-    const form = (S.history || []).slice(-5).map(function (h) {
-      const r = h.win ? "V" : h.draw ? "E" : "D";
-      return `<span class="result-pill ${r}" title="${esc(h.opp)}">${r}</span>`;
-    }).join("") || '<span class="muted small">Sem jogos ainda</span>';
+    // "Forma recente" (V/E/D dos últimos jogos) foi removida daqui — o Ticker (acima, na
+    // coluna principal) já mostra os últimos 12 resultados com placar e adversário, mais
+    // completo que os pills soltos que ficavam aqui; duas visões da mesma coisa na mesma
+    // tela era redundância, não reforço.
     const st = p.stats;
     const dossier = `<div>
       <div class="section-banner"><span class="sb-title">O Craque</span><span class="sb-meta">Ficha do atleta</span></div>
@@ -553,8 +555,6 @@ window.CQ = window.CQ || {};
           <div class="meter-lbl"><span>Potencial ${p.pot}</span><span>Fama <b id="cnt-fame" data-count-to="${Math.round(p.fame)}">${fromFame}</b></span></div>${bar(p.overall, 100, false, p.pot)}
           <div class="meter-lbl mt8"><span>Condição</span><span class="tnum">${Math.round(p.condition)}%</span></div>${bar(p.condition, 100, p.condition < 40)}
           <div class="meter-lbl mt8"><span>Moral</span><span class="tnum">${Math.round(p.morale)}%</span></div>${bar(p.morale, 100, p.morale < 35)}
-          <hr class="rule">
-          <div class="flex-b"><span class="condsmall">Forma recente</span><span class="lastres">${form}</span></div>
           <hr class="rule">
           <div class="tiles">
             <div class="tile"><b class="tnum">${st.j}</b><span>Jogos</span></div>
@@ -601,6 +601,22 @@ window.CQ = window.CQ || {};
     const fx = E().currentFixture(G);
     if (!fx) { seasonEndFlow(); return; }
     if (fx.decisive) {
+      if (!G.player.seenLiveIntro) {
+        G.player.seenLiveIntro = true;
+        CQ.main.save();
+        overlay(`<div class="card"><div class="card-h"><h3>Jogo decisivo — modo ao vivo</h3></div>
+          <div class="card-b">
+            <p>Esta partida você acompanha <b>minuto a minuto</b>: lances, decisões e,
+            se empatar, os pênaltis, tudo em tempo real — diferente das partidas normais,
+            que são resolvidas com um clique.</p>
+            <p class="small muted">Isso só acontece em finais e jogos decisivos — a
+            maioria das suas partidas continua rápida.</p>
+          </div>
+          <div class="card-b" style="padding-top:0">
+            <button class="btn btn-pri btn-block" onclick="CQ.ui.actionPlay()">Entendi, vamos lá</button>
+          </div></div>`);
+        return;
+      }
       CQ.state.live = CQ.live.buildLive(G, fx);
       renderLiveOverlay(true);
       return;
@@ -1920,24 +1936,11 @@ window.CQ = window.CQ || {};
   }
 
   function contiHTML(C) {
-    const G = g();
     const group = leagueTableHTML(C.group, false).replace("card-h\"><h3>" + esc(C.group.name), "card-h\"><h3>" + esc(C.name) + " · Grupo");
     let ko = "";
-    const done = C.koStages.filter(function (s) { return C.koOpps[s]; });
-    if (C.koIdx >= 0 || done.length) {
-      ko = `<div class="card mt16"><div class="card-h"><h3>Mata-mata</h3></div><div class="card-b">
-        ${C.koStages.map(function (s, i) {
-        const opp = C.koOpps[s];
-        if (!opp) return "";
-        const passed = C.eliminatedAt !== s && (C.koIdx > i || C.champion);
-        const cur = C.koIdx === i && C.alive;
-        return `<div class="flex-b" style="padding:6px 0;border-bottom:1px dashed var(--rule-soft)">
-          <span class="flex">${CQ.engine.STAGE_NAMES[s]}: ${crest(opp, "crest-20")} ${esc(CQ.engine.oppObj(G, opp).name)}</span>
-          <span class="badge ${passed ? "badge-green" : cur ? "badge-soft" : "badge-verm"}">${passed ? "Superado" : cur ? "Em jogo" : "Eliminado"}</span></div>`;
-      }).join("")}
-        ${C.champion ? `<p class="mt8"><b>Campeão: ${esc(C.champion)}</b></p>` : ""}
-      </div></div>`;
-    } else if (!C.alive) {
+    if (C.bracket) {
+      ko = '<div class="mt16">' + cupHTML(C.bracket) + '</div>';
+    } else if (C.eliminatedAt === "G") {
       ko = `<div class="notice mt12">Eliminado na fase de grupos.</div>`;
     }
     return group + ko;
