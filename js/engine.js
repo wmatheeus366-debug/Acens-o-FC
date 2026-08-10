@@ -1688,7 +1688,6 @@ window.CQ = window.CQ || {};
 
     // registra campeões no histórico
     recordChampions(g, table, champName, contiResult);
-    if (g.world) refreshWorldLeagues(g);
 
     // média
     const avg = p.stats.notaN ? p.stats.notaSum / p.stats.notaN : 0;
@@ -1709,6 +1708,10 @@ window.CQ = window.CQ || {};
 
     // rebaixamento / acesso (Brasil)
     const moves = promoteRelegate(g, table, lg);
+    // só depois do rebaixamento/acesso (g.leagueOf já atualizado pra próxima temporada) —
+    // senão a liga que você acabou de deixar fica de fora do "Mundo" por uma temporada
+    // inteira, porque refreshWorldLeagues pula "minha liga" usando o valor ainda antigo
+    if (g.world) refreshWorldLeagues(g);
 
     // envelhecimento
     const aging = applyAging(g, avg);
@@ -1954,6 +1957,9 @@ window.CQ = window.CQ || {};
   function refreshWorldLeagues(g) {
     const myLg = leagueOf(g, g.player.clubId);
     g.world.leagues = g.world.leagues || {};
+    // a liga que virou "minha" agora não deve carregar um snapshot velho de quando ainda
+    // não era (senão fica ali parado, sem atualizar, enquanto for minha liga)
+    delete g.world.leagues[myLg];
     Object.keys(D.LEAGUES).forEach(function (lgId) {
       if (lgId === myLg) return; // essa é a S.comps.LIGA real, já simulada pelo próprio jogo
       const teamIds = leagueTeamIds(g, lgId);

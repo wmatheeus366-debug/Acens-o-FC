@@ -677,13 +677,13 @@ window.CQ = window.CQ || {};
     // hat-trick
     if (res.hatTrick) {
       return cap("Noite inesquecível · " + G.year, "<em>TRINCA!</em> " + esc(first) + " decide sozinho",
-        "Três vezes a rede balançou com a assinatura do camisa " + p.num + ". " + esc(meName) + " " + (fx.home ? res.gm + " a " + res.go : res.go + " a " + res.gm) + " e um espetáculo que ninguém no estádio vai esquecer.",
+        "Três vezes a rede balançou com a assinatura do camisa " + p.num + ". " + meName + " " + (fx.home ? res.gm + " a " + res.go : res.go + " a " + res.gm) + " e um espetáculo que ninguém no estádio vai esquecer.",
         "HAT-TRICK");
     }
     // estreia profissional (primeiro jogo da carreira)
     if (p.stats.j === 1 && p.career.length === 0) {
       return cap("Nasce uma promessa · " + G.year, "O primeiro capítulo de <em>" + esc(first) + "</em>",
-        "A camisa " + p.num + " do " + esc(meName) + " ganha um novo dono. Aos " + p.age + " anos, " + first + " faz sua estreia no profissional — o começo de uma história que promete.",
+        "A camisa " + p.num + " do " + meName + " ganha um novo dono. Aos " + p.age + " anos, " + first + " faz sua estreia no profissional — o começo de uma história que promete.",
         "ESTREIA");
     }
     return null;
@@ -866,7 +866,7 @@ window.CQ = window.CQ || {};
   function evIcon(e) {
     if (e.type === "goal") return `<span class="green">${I.goal}</span>`;
     if (e.type === "oppgoal") return `<span class="verm">${I.goal}</span>`;
-    if (e.type === "card") return `<span style="color:#c9a227">${I.card}</span>`;
+    if (e.type === "card") return `<span style="color:var(--gold)">${I.card}</span>`;
     if (e.type === "redcard") return `<span class="verm">${I.card}</span>`;
     if (e.type === "ko" || e.type === "ht" || e.type === "ft") return I.whistle;
     if (e.type === "flavor") return `<span class="verm">${I.press}</span>`;
@@ -1377,7 +1377,7 @@ window.CQ = window.CQ || {};
       </div>`;
     }).join("");
     return `<div class="section-banner"><span class="sb-title">Linha do tempo</span><span class="sb-meta">${events.length} ${U.plural(events.length, "marco", "marcos")}</span></div>
-      <div class="card" style="border-top:none"><div class="card-b"><div class="timeline">${rows}</div></div></div>`;
+      <div class="card" style="border-top:none"><div class="card-b" style="max-height:480px;overflow-y:auto"><div class="timeline">${rows}</div></div></div>`;
   }
 
   function archName(p) {
@@ -1457,7 +1457,7 @@ window.CQ = window.CQ || {};
     }).join("");
     if (!rows) return '<div class="card"><div class="card-b muted center">Sua primeira temporada ainda está em andamento.</div></div>';
     return `<div class="card"><div class="card-h"><h3>Histórico temporada a temporada</h3></div>
-      <div class="card-b tight" style="overflow-x:auto"><table class="tbl tbl-zebra">
+      <div class="card-b tight" style="overflow-x:auto;max-height:480px;overflow-y:auto"><table class="tbl tbl-zebra">
       <thead><tr><th>Ano</th><th>Clube</th><th>Liga</th><th class="num">Pos</th><th class="num">J</th><th class="num">${p.pos === "GOL" ? "SG" : "G"}</th><th class="num">A</th><th class="num">Nota</th><th class="num">OVR</th></tr></thead>
       <tbody>${rows}</tbody></table></div></div>`;
   }
@@ -1631,7 +1631,7 @@ window.CQ = window.CQ || {};
     const tabs = [["pano", "Panorama"], ["cal", "Calendário"], ["liga", "Liga"], ["art", "Artilharia"]];
     if (S.comps.EST) tabs.push(["est", "Estadual"]);
     if (S.comps.CDB) tabs.push(["cdb", "Copa do Brasil"]);
-    if (S.comps.COPA) tabs.push(["cdb", D.LEAGUES[E().leagueOf(G, G.player.clubId)].cupName]);
+    if (S.comps.COPA) { const lgc = D.LEAGUES[E().leagueOf(G, G.player.clubId)]; tabs.push(["cdb", lgc ? lgc.cupName : S.comps.COPA.name]); }
     if (S.comps.CONTI) tabs.push(["conti", S.comps.CONTI.name]);
     if (S.sel) tabs.push(["sel", "Seleção"]);
     tabs.push(["mundo", "Mundo"]);
@@ -1933,7 +1933,7 @@ window.CQ = window.CQ || {};
         const cur = C.koIdx === i && C.alive;
         return `<div class="flex-b" style="padding:6px 0;border-bottom:1px dashed var(--rule-soft)">
           <span class="flex">${CQ.engine.STAGE_NAMES[s]}: ${crest(opp, "crest-20")} ${esc(CQ.engine.oppObj(G, opp).name)}</span>
-          <span class="badge ${passed ? "badge-green" : cur ? "badge-gold" : "badge-verm"}">${passed ? "Superado" : cur ? "Em jogo" : "Eliminado"}</span></div>`;
+          <span class="badge ${passed ? "badge-green" : cur ? "badge-soft" : "badge-verm"}">${passed ? "Superado" : cur ? "Em jogo" : "Eliminado"}</span></div>`;
       }).join("")}
         ${C.champion ? `<p class="mt8"><b>Campeão: ${esc(C.champion)}</b></p>` : ""}
       </div></div>`;
@@ -2019,7 +2019,7 @@ window.CQ = window.CQ || {};
       return `<tr><td class="tnum">${y}</td><td><b>${esc(data[y])}</b> ${isMe && +y >= 2026 ? '<span class="badge badge-gold">com você</span>' : ""}</td></tr>`;
     }).join("");
     return `<div class="card"><div class="card-h"><h3>Histórico de campeões</h3>${sel}</div>
-      <div class="card-b tight"><table class="tbl tbl-zebra"><thead><tr><th>Ano</th><th>Campeão</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div class="card-b tight" style="max-height:480px;overflow-y:auto"><table class="tbl tbl-zebra"><thead><tr><th>Ano</th><th>Campeão</th></tr></thead><tbody>${rows}</tbody></table></div>
       <p class="small muted" style="padding:8px 14px">Edições até 2026 são fatos reais; a partir de 2027, a história é escrita por você.</p></div>
       ${hallScorersHTML(G, f)}`;
   }

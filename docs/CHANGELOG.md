@@ -737,3 +737,35 @@ competição do jogo.
   simulação de 40+ carreiras aleatórias sem exceção, cobrindo eliminação nos grupos,
   avanço ao mata-mata, disputa de 3º e conquista do título; conferido visualmente que o
   campeão real (`T.champion`) bate com quem realmente venceu a final simulada.
+
+## Achados dos agentes de revisão (funcional + código + UX) — correções pequenas
+Rodei 3 agentes em paralelo pra olhar o jogo inteiro (simulação funcional de 835
+temporadas, revisão de código de todo `js/ui.js`, avaliação de UX). Corrigidos os achados
+pequenos e de baixo risco:
+- **Bug real (funcional):** `g.world.leagues` perdia a liga que você acabou de deixar por
+  uma temporada inteira após acesso/rebaixamento — `refreshWorldLeagues` rodava **antes**
+  de `promoteRelegate` em `endSeason` (`js/engine.js`), então a liga recém-abandonada só
+  aparecia no "Mundo" um ano depois. Corrigido invertendo a ordem; junto, a liga que virou
+  seu destino agora também é limpa do snapshot (senão ficava com dado velho, congelado, de
+  quando ainda não era sua).
+- **3 telas sem limite de altura** (Temporadas, Linha do tempo, Histórico de campeões) —
+  mesma classe de bug já corrigida na tela de aposentadoria; carreira longa/temporadas
+  acumuladas ganham rolagem interna em vez de esticar a página.
+- **Dupla escapagem de HTML** na "capa de jornal" de hat-trick/estreia — invisível com os
+  dados de hoje, mas corrigido (o nome do clube/seleção só é escapado uma vez agora).
+- **Guarda faltando** num acesso a `D.LEAGUES[...]` na aba Torneios (Copa nacional) que
+  podia derrubar a tela inteira se algum dia um clube caísse fora do conjunto esperado de
+  ligas.
+- **Cor de ícone fixa** (cartão amarelo do modo ao vivo) trocada por `var(--gold)`, agora
+  acompanha o tema claro/escuro.
+- **`badge-gold` reservado pra conquista de verdade** — o status "Em jogo" do mata-mata
+  continental (que não é uma conquista, só "ainda não decidido") virou `badge-soft`
+  (neutro), pra não confundir com título/prêmio.
+- Achados maiores de UX (sub-abas sem indício de rolagem, redundância Ticker/Dossiê na
+  Home, sem explicação na 1ª partida "ao vivo", criação de personagem sem preview de
+  consequência) e o chaveamento morto de Libertadores/Champions/Europa/Sul-Americana
+  ficam de fora desta entrega — não são pequenos, decisão de escopo pendente.
+- Validado: 66/66 testes; reproduzido o cenário exato do bug de rebaixamento (Remo, Série
+  A → Série B) confirmando a liga antiga aparecendo e a nova sem dado velho; conferido
+  visualmente rolagem interna nas 3 telas com uma carreira de 21 temporadas até a
+  aposentadoria.
