@@ -866,3 +866,27 @@ era o real: **filtro cosmético** — o bloqueador deixa a imagem carregar norma
   nenhum). Sem bloqueador: 18 escudos reais antes, 18 depois — nada trocado
   indevidamente. Com bloqueador: 22 escudos escondidos viram 22 brasões vetoriais
   visíveis (20×22px), inclusive dentro do overlay de sorteio.
+
+## Escudos reais embutidos no jogo (sem depender de rede)
+Continuação do BUG-06: a varredura garantia que sempre aparecesse *algum* escudo, mas
+para quem usa bloqueador o que aparecia era o brasão vetorial, não o escudo real. Agora
+os 191 escudos vêm **embutidos no próprio jogo** — nada passa pela rede, então nenhum
+bloqueador alcança e funciona até offline.
+- Novo `scripts/embed-crests.mjs` (mesmo padrão de `sync-squads.mjs`: cache em
+  `scripts/.cache/crests/`, gitignored, rerodar é de graça) baixa cada escudo, reduz pra
+  64px e converte pra WebP q82, gerando `js/crests.js` → `CQ.CRESTS = { clubId: "data:..." }`.
+  64px cobre com folga o maior uso na tela (62px, banner de jogo). Requer `sharp`
+  (`npm install --no-save sharp`) — só pra gerar; o jogo em si não ganhou dependência
+  nenhuma.
+- `crestSVG` (`js/util.js`) passa a preferir o embutido. A imagem do CDN e o brasão
+  vetorial continuam no código como rede de segurança, caso `js/crests.js` falte.
+- **Custo**: `CRAQUE.html` foi de 496 KB → 1151 KB (`js/crests.js` sozinho tem 650 KB).
+  Baixa uma vez e fica em cache — o ganho é escudo real garantido pra todo mundo.
+- **Endurecimento na varredura**: a guarda de "fora da tela" usava `window.innerHeight`
+  direto; quando esse valor é 0 ou indisponível, a varredura inteira virava um no-op
+  silencioso (peguei isso testando). Agora, sem informação confiável de viewport, ela não
+  pula nada em vez de pular tudo.
+- Validado: 100/100 testes e os 4 cenários conferidos um a um no navegador — (a) sem
+  bloqueador: 22 escudos reais, 0 vetoriais; (b) CDN bloqueado (o caso reportado): 22
+  escudos **reais** (todos `data:`), 0 vetoriais; (c) filtro agressivo escondendo até as
+  imagens embutidas: cai pro vetorial visível; (d) de volta ao normal: 22 reais.

@@ -187,6 +187,14 @@ window.CQ = window.CQ || {};
   function crestSVG(club, cls) {
     const custom = CQ.state && CQ.state.game && CQ.state.game.customLogos && CQ.state.game.customLogos[club.id];
     if (custom) return `<span class="crest ${cls || ""}"><img src="${esc(custom)}" alt=""></span>`;
+    // escudo real EMBUTIDO (js/crests.js, gerado por scripts/embed-crests.mjs): não passa
+    // pela rede, então nenhum bloqueador de anúncio alcança e funciona offline. É o
+    // caminho normal — os dois abaixo são só rede de segurança se crests.js faltar.
+    // os data-* mantêm a varredura de reserva (sweepCrests) valendo também aqui: uma
+    // imagem embutida não tem como falhar de rede, mas um filtro cosmético mais agressivo
+    // (que esconda qualquer <img> dentro de .crest) ainda a apagaria — aí cai no vetorial.
+    const embedded = CQ.CRESTS && CQ.CRESTS[club.id];
+    if (embedded) return `<span class="crest ${cls || ""}"><img src="${embedded}" alt="" data-crest-club="${esc(club.id)}" data-crest-cls="${esc(cls || "")}"></span>`;
     const realId = CQ.DATA && CQ.DATA.CREST_MAP && CQ.DATA.CREST_MAP[club.id];
     if (realId) {
       // alguns bloqueadores de anúncio não disparam erro de rede (só escondem via CSS,

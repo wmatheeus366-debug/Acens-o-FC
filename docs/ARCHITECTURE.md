@@ -111,17 +111,25 @@ goleiros de elite. `animateCount`/`animateBarWidth`/`runEntranceAnimations` (nov
 `managerLine` (`js/ui.js`) dá uma fala curta e determinística ao técnico, por faixa de
 confiança. Transição suave entre telas já existia desde o commit inicial
 (`css/editorial.css`, `pageIn`).
-- **Escudos/fotos:** já resolvido por fora desta fase — `CQ.DATA.CREST_MAP` (escudo real
-  via API-Football, `media.api-sports.io`, uso pessoal) com fallback pro brasão vetorial
-  (`crestSVG`) quando não mapeado ou se a imagem falhar. Ver `README.md` § Direitos de
-  imagem pro contexto da decisão de usar escudo real.
+- **Escudos:** os 191 escudos reais vivem **embutidos** em `js/crests.js`
+  (`CQ.CRESTS[clubId]` → `data:image/webp;base64,...`, 64px, gerado por
+  `scripts/embed-crests.mjs`). Sem rede: nenhum bloqueador de anúncio alcança e funciona
+  offline. `crestSVG` (`js/util.js`) tem 3 níveis de reserva, nessa ordem: embutido →
+  imagem do CDN (`CQ.DATA.CREST_MAP` + `media.api-sports.io`) → brasão vetorial
+  procedural. Mais uma varredura pós-render (`sweepCrests`, `js/ui.js`) que troca pelo
+  vetorial qualquer escudo que não tenha aparecido de fato — pega o que `onerror`/`onload`
+  não alcançam (filtro cosmético de bloqueador, requisição pendurada). Ver `README.md`
+  § Direitos de imagem pro contexto da decisão de usar escudo real.
 - **Sync de dados:** o script real é `scripts/sync-squads.mjs` (API-Football, chave só em
   `.env`/build, nunca no frontend) — sincroniza nome/posição e os IDs de escudo. Cobertura
   atual: **191/191 clubes** com elenco/escudo real sincronizado (os 4 clubes da Série B
   adicionados depois — Náutico, Figueirense, Paraná Clube, Sampaio Corrêa — sincronizados
   à parte). Não existe (nem é necessário) um snapshot JSON versionado separado — os dados
   já vivem direto em `js/data.js` (`REAL_SQUADS`, `CREST_MAP`), reexecutar o script quando
-  quiser atualizar (ex.: refletir a janela de transferências de 2026).
+  quiser atualizar (ex.: refletir a janela de transferências de 2026). Depois de mexer em
+  `CREST_MAP`, rode também `node scripts/embed-crests.mjs` pra regerar `js/crests.js`
+  (precisa de `npm install --no-save sharp`; o cache em `scripts/.cache/crests/` faz
+  rerodadas custarem só os escudos novos).
 
 ## Torneios de seleção com caminho visível — roteiro em fatias
 

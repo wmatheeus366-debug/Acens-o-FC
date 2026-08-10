@@ -143,13 +143,17 @@ window.CQ = window.CQ || {};
   // render e troca pelo brasão vetorial o que não apareceu de fato.
   function sweepCrests() {
     setTimeout(function () {
+      // altura da janela: se não der pra saber (0/indisponível), NÃO pula nada — pular por
+      // um viewport desconhecido faria a varredura inteira virar no-op silencioso
+      const vh = window.innerHeight || (document.documentElement && document.documentElement.clientHeight) || 0;
       document.querySelectorAll(".crest img[data-crest-club]").forEach(function (img) {
         const holder = img.parentElement;
         if (!holder) return;
         const box = holder.getBoundingClientRect();
+        if (box.height === 0) return; // contêiner sem layout: nada a julgar ainda
         // fora da tela: loading="lazy" pode legitimamente não ter carregado ainda —
         // trocar aqui apagaria um escudo real que ia aparecer ao rolar a página
-        if (box.height === 0 || box.bottom < 0 || box.top > (window.innerHeight || 0)) return;
+        if (vh > 0 && (box.bottom < 0 || box.top > vh)) return;
         const carregou = img.complete && img.naturalWidth >= 10;
         const r = img.getBoundingClientRect();
         const cs = window.getComputedStyle(img);
