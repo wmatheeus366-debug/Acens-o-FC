@@ -844,3 +844,25 @@ cair no preto fixo do navegador.
 - Validado: 101/101 testes; conferido nos dois temas via `getComputedStyle` que o texto
   bate exatamente com `--ink`/`--paper` do tema ativo em `.choice`, `.dc-opt`,
   `.shoot-slot` e `.opt2`.
+
+## BUG-06: escudos sumindo (buraco em branco) para quem usa bloqueador de anúncio
+Reportado com print de outra máquina rodando o jogo: nenhum escudo aparecia — nem o real,
+nem o brasão vetorial de reserva. O fallback que já existia (`crestSVG`, `js/util.js`)
+cobria só **dois** modos de falha: bloqueio de rede (`onerror`) e imagem vazia que
+"carrega com sucesso" (`onload` + `naturalWidth < 10`). Reproduzi um terceiro modo, que
+era o real: **filtro cosmético** — o bloqueador deixa a imagem carregar normalmente
+(`naturalWidth` 150, `complete`) e injeta uma regra CSS que a esconde. Nesse caminho
+*nenhum* dos dois eventos dispara, então a reserva nunca entrava e ficava um buraco.
+- **Corrigido** com uma varredura de reserva (`sweepCrests`, `js/ui.js`) que roda 1,5s
+  após cada render **e após cada overlay** (o print era da cerimônia de sorteio de
+  grupos, que não passa por `render()`): confere se cada escudo real de fato apareceu
+  (carregou com conteúdo **e** está visível) e, se não, troca pelo brasão vetorial. Pega
+  de quebra um quarto caso que também não era coberto: requisição que fica pendurada, sem
+  carregar nem falhar.
+- Cuidado contra regressão: a varredura ignora escudos fora da tela, senão apagaria
+  imagens reais que o `loading="lazy"` ainda ia carregar ao rolar a página.
+- Validado: 100/100 testes; os 4 modos de falha reproduzidos um a um no navegador
+  (bloqueio de rede, pixel vazio, filtro cosmético via CSS, e o caso sem bloqueador
+  nenhum). Sem bloqueador: 18 escudos reais antes, 18 depois — nada trocado
+  indevidamente. Com bloqueador: 22 escudos escondidos viram 22 brasões vetoriais
+  visíveis (20×22px), inclusive dentro do overlay de sorteio.

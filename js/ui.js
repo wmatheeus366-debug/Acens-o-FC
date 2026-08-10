@@ -68,8 +68,8 @@ window.CQ = window.CQ || {};
   function render() {
     const s = CQ.state;
     const app = $("#app");
-    if (s.screen === "create") { app.innerHTML = createHTML(); runEntranceAnimations(); return; }
-    if (!s.game || s.screen === "cover") { app.innerHTML = coverHTML(); runEntranceAnimations(); return; }
+    if (s.screen === "create") { app.innerHTML = createHTML(); runEntranceAnimations(); sweepCrests(); return; }
+    if (!s.game || s.screen === "cover") { app.innerHTML = coverHTML(); runEntranceAnimations(); sweepCrests(); return; }
     if (s.game.retired && s.screen !== "retro") s.screen = "retro";
     let body = "";
     switch (s.screen) {
@@ -83,6 +83,7 @@ window.CQ = window.CQ || {};
     }
     app.innerHTML = mastheadHTML() + `<main class="page">${body}</main>` + bottomNavHTML();
     runEntranceAnimations();
+    sweepCrests();
   }
 
   // conta números-chave de baixo pra cima e desliza barras de progresso — pinta o
@@ -132,6 +133,31 @@ window.CQ = window.CQ || {};
       animateBarWidth(barEl.querySelector("i"), to);
       ls.marcos[field] = to;
     });
+  }
+
+  // BUG-06: rede de segurança pros escudos reais. onerror/onload (js/util.js) só pegam
+  // bloqueio de REDE e imagem vazia. Faltavam dois casos que deixam um buraco em branco:
+  // (a) filtro cosmético de bloqueador de anúncio — a imagem carrega de verdade, mas uma
+  // regra CSS injetada a esconde, então nenhum dos dois eventos dispara; (b) requisição
+  // que fica pendurada, sem carregar nem falhar. Esta varredura roda um instante após o
+  // render e troca pelo brasão vetorial o que não apareceu de fato.
+  function sweepCrests() {
+    setTimeout(function () {
+      document.querySelectorAll(".crest img[data-crest-club]").forEach(function (img) {
+        const holder = img.parentElement;
+        if (!holder) return;
+        const box = holder.getBoundingClientRect();
+        // fora da tela: loading="lazy" pode legitimamente não ter carregado ainda —
+        // trocar aqui apagaria um escudo real que ia aparecer ao rolar a página
+        if (box.height === 0 || box.bottom < 0 || box.top > (window.innerHeight || 0)) return;
+        const carregou = img.complete && img.naturalWidth >= 10;
+        const r = img.getBoundingClientRect();
+        const cs = window.getComputedStyle(img);
+        const visivel = r.width > 0 && r.height > 0 && cs.display !== "none" && cs.visibility !== "hidden";
+        if (carregou && visivel) return;
+        holder.outerHTML = U.crestSVGFallback(img.getAttribute("data-crest-club"), img.getAttribute("data-crest-cls") || "");
+      });
+    }, 1500);
   }
 
   const MONTHS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
@@ -777,6 +803,7 @@ window.CQ = window.CQ || {};
     // acessibilidade: foca o primeiro controle acionável do diálogo
     const first = div.querySelector("button, a, input, select, .dc-opt, .choice, .shoot-slot");
     if (first && first.focus) { try { first.focus(); } catch (e) { } }
+    sweepCrests(); // overlays (sorteio de grupos, capa, mercado) não passam por render()
   }
   function closeOverlay() {
     const o = $("#cq-overlay");

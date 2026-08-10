@@ -192,8 +192,11 @@ window.CQ = window.CQ || {};
       // alguns bloqueadores de anúncio não disparam erro de rede (só escondem via CSS,
       // ou trocam por um pixel em branco "carregado com sucesso") — por isso o onload
       // também confere se a imagem realmente veio com conteúdo, não só o onerror.
+      // Os data-* são pra varredura de reserva (sweepCrests, js/ui.js), que pega os casos
+      // que NENHUM dos dois eventos alcança: filtro cosmético (a imagem carrega mas é
+      // escondida por CSS injetado) e requisição que fica pendurada sem erro.
       const fb = `CQ.util.crestSVGFallback('${esc(club.id)}','${esc(cls || "")}')`;
-      return `<span class="crest ${cls || ""}"><img src="https://media.api-sports.io/football/teams/${realId}.png" alt="" loading="lazy" onerror="this.parentElement.outerHTML=${fb}" onload="if(this.naturalWidth<10)this.parentElement.outerHTML=${fb}"></span>`;
+      return `<span class="crest ${cls || ""}"><img src="https://media.api-sports.io/football/teams/${realId}.png" alt="" loading="lazy" data-crest-club="${esc(club.id)}" data-crest-cls="${esc(cls || "")}" onerror="this.parentElement.outerHTML=${fb}" onload="if(this.naturalWidth<10)this.parentElement.outerHTML=${fb}"></span>`;
     }
     return crestSVGProcedural(club, cls);
   }
