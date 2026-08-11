@@ -226,7 +226,10 @@ window.CQ = window.CQ || {};
         const res = live.res;
         // recalcula com o placar final (decisões podem ter mudado)
         res.win = res.gm > res.go; res.draw = res.gm === res.go; res.loss = res.gm < res.go;
-        if (live.fixture.knock && res.draw) {
+        // pênaltis só na partida que DECIDE o confronto e só se o AGREGADO empatar — numa
+        // ida de mata-mata continental um empate é resultado normal, não vai pra pênaltis
+        const decideAqui = live.fixture.knock && live.fixture.decides !== false;
+        if (decideAqui && CQ.engine.tieDrawn(live.fixture, res)) {
           live.phase = "shootout";
           live.shootout = initShootout(live);
         } else {

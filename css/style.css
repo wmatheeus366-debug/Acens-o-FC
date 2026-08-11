@@ -528,6 +528,8 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .br-tie .br-t.wn { font-weight: 700; }
 .br-tie .br-t .sc { font-variant-numeric: tabular-nums; font-weight: 600; }
 .br-tie.mine { border-color: var(--verm); box-shadow: 1px 1px 0 var(--verm); }
+/* placar das duas partidas de um confronto de ida e volta (o número grande é o agregado) */
+.br-tie .br-legs { border-top: 1px dashed var(--rule-soft); padding: 3px 8px; font-family: var(--cond); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); text-align: center; font-variant-numeric: tabular-nums; }
 
 /* ---------------- Abas internas ---------------- */
 

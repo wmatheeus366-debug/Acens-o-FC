@@ -43,7 +43,7 @@ Fontes (Google Fonts) e bandeiras (flagcdn) vêm da web com fallback; todo o res
 
 ```
 # no navegador (index.html ou CRAQUE.html aberto), console:
-CQ.tests.run()             # tests/regression.js — 101 checagens
+CQ.tests.run()             # tests/regression.js — 112 checagens
 
 # balanceamento (Node, motor real num shim vm):
 node scripts/balance-runner.mjs 100   # gera docs/BALANCE_BASELINE.md + .json
@@ -175,6 +175,22 @@ confiança. Transição suave entre telas já existia desde o commit inicial
   Nova aba "Supermundial" em `compsHTML` (`js/ui.js`, fica direto em `g.season`, mesmo
   padrão de `S.sel`) + `superHTML` novo reaproveitando `cupHTML` sem CSS novo. Mesmo bug do
   banner de campeão corrigido aqui também.
+- ✅ **Mata-mata continental de ida e volta (feito).** `cupComp` (`js/engine.js`) ganhou um
+  parâmetro `twoLeg`: cada estágio passa a carregar `legs` (1 ou 2), e a FINAL é sempre 1.
+  Sem o parâmetro tudo nasce com 1 — as demais copas seguem intactas e saves antigos não
+  precisam de migração. O tie ganhou `legs: [[golsA,golsB],[golsA,golsB]]` e `sa`/`sb`
+  passaram a ser o **agregado**, então `advanceCup`/`cupHTML`/lógica de campeão continuam
+  lendo os mesmos campos. `decideTie` centraliza o desempate (agregado → pênaltis) pros
+  caminhos simulado (`simTie`) e jogado (`fillTie`). Novo `CQ.engine.tieDrawn(fx,res)`
+  soma o agregado e é usado **tanto pelo motor quanto por `js/live.js`**, pra pênaltis
+  nunca divergirem entre simulação e modo ao vivo. `fx.decides === false` marca a ida
+  (empate não vai a pênaltis, confronto não é decidido); `fx.knock` segue significando
+  "é jogo de mata-mata". O calendário passou de 4 pra 7 slots continentais.
+- ✅ **Modo ao vivo por escolha (feito).** `startLive` (`js/ui.js`) centraliza a entrada no
+  modo ao vivo (com o aviso de primeira vez) e serve tanto ao caminho automático das
+  finais quanto ao botão "Ao vivo" novo, que aparece em qualquer partida `fx.knock` não
+  decisiva. `buildLive` (`js/live.js`) já era agnóstica ao tipo de partida — não precisou
+  de nenhuma mudança além da regra de pênaltis por agregado.
 - ✅ **Fatia 5 (feita): Conference League (UECL).** Extensão mecânica da cascata de
   qualificação europeia em `buildEuroSeason` (`js/engine.js`): `qual<=4→UCL`, `qual<=6→UEL`,
   `qual<=8→UECL` (mesma regra real da UEFA — quem passa perto da Europa League mas não

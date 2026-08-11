@@ -509,6 +509,7 @@ window.CQ = window.CQ || {};
         ${notices.length ? `<div class="stack mt12" style="gap:8px">${notices.join("")}</div>` : ""}
         <div class="lead-cta"><div class="btnrow">
           <button class="btn btn-pri btn-big" onclick="CQ.ui.actionPlay()">${fx.decisive ? "Entrar em campo — ao vivo" : "Jogar a partida"}</button>
+          ${fx.knock && !fx.decisive ? `<button class="btn btn-green" onclick="CQ.ui.actionPlayLive()">Ao vivo</button>` : ""}
           <button class="btn btn-gold" onclick="CQ.ui.actionRest()">Poupar</button>
           <button class="btn btn-ghost" onclick="CQ.ui.actionSim(1)">Simular</button>
           <button class="btn btn-ghost" onclick="CQ.ui.actionSim(5)">Simular 5</button>
@@ -626,36 +627,48 @@ window.CQ = window.CQ || {};
   }
 
   // ---------------- ações de jogo ----------------
+  // entra no modo ao vivo de fato (com o aviso de primeira vez). `voltar` é a ação que o
+  // botão do aviso dispara — assim o mesmo aviso serve pro caminho automático das finais
+  // e pro botão "Ao vivo" opcional do mata-mata.
+  function startLive(G, fx, voltar) {
+    if (!G.player.seenLiveIntro) {
+      G.player.seenLiveIntro = true;
+      CQ.main.save();
+      overlay(`<div class="card"><div class="card-h"><h3>Modo ao vivo</h3></div>
+        <div class="card-b">
+          <p>Esta partida você acompanha <b>minuto a minuto</b>: lances, decisões e,
+          se empatar, os pênaltis, tudo em tempo real — diferente das partidas normais,
+          que são resolvidas com um clique.</p>
+          <p class="small muted">As finais entram ao vivo sozinhas; nos outros jogos de
+          mata-mata, é escolha sua — o botão "Ao vivo" fica ao lado do de jogar.</p>
+        </div>
+        <div class="card-b" style="padding-top:0">
+          <button class="btn btn-pri btn-block" onclick="${voltar}">Entendi, vamos lá</button>
+        </div></div>`);
+      return;
+    }
+    CQ.state.live = CQ.live.buildLive(G, fx);
+    renderLiveOverlay(true);
+  }
+
   function actionPlay() {
     const G = g();
     const fx = E().currentFixture(G);
     if (!fx) { seasonEndFlow(); return; }
-    if (fx.decisive) {
-      if (!G.player.seenLiveIntro) {
-        G.player.seenLiveIntro = true;
-        CQ.main.save();
-        overlay(`<div class="card"><div class="card-h"><h3>Jogo decisivo — modo ao vivo</h3></div>
-          <div class="card-b">
-            <p>Esta partida você acompanha <b>minuto a minuto</b>: lances, decisões e,
-            se empatar, os pênaltis, tudo em tempo real — diferente das partidas normais,
-            que são resolvidas com um clique.</p>
-            <p class="small muted">Isso só acontece em finais e jogos decisivos — a
-            maioria das suas partidas continua rápida.</p>
-          </div>
-          <div class="card-b" style="padding-top:0">
-            <button class="btn btn-pri btn-block" onclick="CQ.ui.actionPlay()">Entendi, vamos lá</button>
-          </div></div>`);
-        return;
-      }
-      CQ.state.live = CQ.live.buildLive(G, fx);
-      renderLiveOverlay(true);
-      return;
-    }
+    if (fx.decisive) { startLive(G, fx, "CQ.ui.actionPlay()"); return; }
     const res = E().resolveMatch(G, fx, {});
     E().applyMatch(G, res);
     CQ.main.save();
     render();
     afterMatchFlow(res);
+  }
+
+  // modo ao vivo por escolha do jogador, em qualquer partida de mata-mata
+  function actionPlayLive() {
+    const G = g();
+    const fx = E().currentFixture(G);
+    if (!fx) { seasonEndFlow(); return; }
+    startLive(G, fx, "CQ.ui.actionPlayLive()");
   }
 
   function actionRest() {
@@ -1950,9 +1963,19 @@ window.CQ = window.CQ || {};
     const a = CQ.engine.oppObj(G, t.a), b = CQ.engine.oppObj(G, t.b);
     const mine = isMineId(G, t.a) || isMineId(G, t.b);
     const pens = t.pens ? `<span class="condsmall">(${t.pens[0]}-${t.pens[1]} pên.)</span>` : "";
+    // ida e volta: o placar principal é o AGREGADO, e as duas partidas aparecem embaixo
+    let legs = "";
+    if (t.legs && (t.legs[0] || t.legs[1])) {
+      const rot = ["ida", "volta"].map(function (nome, i) {
+        const l = t.legs[i];
+        return l ? `${nome} ${l[0]}-${l[1]}` : null;
+      }).filter(Boolean).join(" · ");
+      if (rot) legs = `<div class="br-legs">${rot}</div>`;
+    }
     return `<div class="br-tie ${mine ? "mine" : ""}">
       <div class="br-t ${t.winner === t.a ? "wn" : ""}"><span class="clubcell">${crest(a, "crest-20")} ${esc(a.short)}</span><span class="sc">${t.sa != null ? t.sa : ""}</span></div>
       <div class="br-t ${t.winner === t.b ? "wn" : ""}"><span class="clubcell">${crest(b, "crest-20")} ${esc(b.short)}</span><span class="sc">${t.sb != null ? t.sb : ""} ${pens}</span></div>
+      ${legs}
     </div>`;
   }
 
@@ -2519,7 +2542,7 @@ window.CQ = window.CQ || {};
     go: go, render: render, startCreate: startCreate,
     dset: dset, dsetPos: dsetPos, toggleLegend: toggleLegend, randomClub: randomClub,
     createNext: createNext, finishCreate: finishCreate,
-    actionPlay: actionPlay, actionRest: actionRest, actionSim: actionSim,
+    actionPlay: actionPlay, actionPlayLive: actionPlayLive, actionRest: actionRest, actionSim: actionSim,
     liveStep: liveStep, liveDecide: liveDecide, shootPick: shootPick, shootReveal: shootReveal, finishLive: finishLive,
     pickInterview: pickInterview, pickLife: pickLife,
     seasonEndFlow: seasonEndFlow, summaryNext: summaryNext, summaryNextStep: summaryNextStep, pickOffer: pickOffer, pickRenew: pickRenew,

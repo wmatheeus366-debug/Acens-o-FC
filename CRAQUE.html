@@ -541,6 +541,8 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .br-tie .br-t.wn { font-weight: 700; }
 .br-tie .br-t .sc { font-variant-numeric: tabular-nums; font-weight: 600; }
 .br-tie.mine { border-color: var(--verm); box-shadow: 1px 1px 0 var(--verm); }
+/* placar das duas partidas de um confronto de ida e volta (o número grande é o agregado) */
+.br-tie .br-legs { border-top: 1px dashed var(--rule-soft); padding: 3px 8px; font-family: var(--cond); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); text-align: center; font-variant-numeric: tabular-nums; }
 
 /* ---------------- Abas internas ---------------- */
 
@@ -3057,7 +3059,8 @@ window.CQ = window.CQ || {};
     const nR = rounds.length;
     const cdbAfter = { 8: "R16", 14: "QF", 21: "SF", 29: "F" };
     const contiGroupAfter = [3, 5, 7, 9, 11, 13];
-    const contiKoAfter = { 17: 0, 21: 1, 25: 2, 30: 3 };
+    // mata-mata continental de ida e volta: oitavas/quartas/semi têm 2 jogos, final tem 1
+    const contiKoAfter = { 16: [0, 1], 18: [0, 2], 21: [1, 1], 23: [1, 2], 26: [2, 1], 28: [2, 2], 32: [3, 0] };
     let cg = 0;
     for (let r = 1; r <= nR; r++) {
       S.queue.push({ comp: "LIGA", round: r });
@@ -3066,7 +3069,7 @@ window.CQ = window.CQ || {};
         S.queue.push({ comp: "CONTI", phase: "G", round: cg });
       }
       if (cdbAfter[r]) S.queue.push({ comp: "CDB", stage: cdbAfter[r] });
-      if (S.comps.CONTI && contiKoAfter[r] != null) S.queue.push({ comp: "CONTI", phase: "KO", ko: contiKoAfter[r] });
+      if (S.comps.CONTI && contiKoAfter[r]) S.queue.push({ comp: "CONTI", phase: "KO", ko: contiKoAfter[r][0], leg: contiKoAfter[r][1] });
     }
   }
 
@@ -3105,7 +3108,8 @@ window.CQ = window.CQ || {};
     const nR = rounds.length;
     const cupAfter = { 6: "R16", 13: "QF", 20: "SF", 28: "F" };
     const contiGroupAfter = [2, 4, 6, 8, 10, 12];
-    const contiKoAfter = { 16: 0, 20: 1, 24: 2, 30: 3 };
+    // mata-mata continental de ida e volta: oitavas/quartas/semi têm 2 jogos, final tem 1
+    const contiKoAfter = { 15: [0, 1], 17: [0, 2], 20: [1, 1], 22: [1, 2], 25: [2, 1], 27: [2, 2], 31: [3, 0] };
     let cg = 0;
     for (let r = 1; r <= nR; r++) {
       S.queue.push({ comp: "LIGA", round: r });
@@ -3114,7 +3118,7 @@ window.CQ = window.CQ || {};
         S.queue.push({ comp: "CONTI", phase: "G", round: cg });
       }
       if (cupAfter[r]) S.queue.push({ comp: "COPA", stage: cupAfter[r] });
-      if (S.comps.CONTI && contiKoAfter[r] != null) S.queue.push({ comp: "CONTI", phase: "KO", ko: contiKoAfter[r] });
+      if (S.comps.CONTI && contiKoAfter[r]) S.queue.push({ comp: "CONTI", phase: "KO", ko: contiKoAfter[r][0], leg: contiKoAfter[r][1] });
     }
   }
 
@@ -3186,13 +3190,30 @@ window.CQ = window.CQ || {};
     return [p.clubId].concat(U.shuffle(pool, rng).slice(0, 15));
   }
 
-  function cupComp(id, name, teams, stageKeys, rng) {
+  // twoLeg: mata-mata de ida e volta (competições continentais). A FINAL é sempre jogo
+  // único — formato real de Libertadores/Sul-Americana (desde 2019) e de Champions/Europa.
+  // Sem o parâmetro, todo estágio nasce com 1 partida: Copa do Brasil, copa nacional,
+  // Estadual, Supermundial e mata-mata de Seleção seguem exatamente como sempre foram.
+  function cupComp(id, name, teams, stageKeys, rng, twoLeg) {
     const order = U.shuffle(teams, rng);
     return {
       kind: "cup", id: id, name: name, teams: order,
-      stages: stageKeys.map(function (k) { return { key: k, ties: null }; }),
+      stages: stageKeys.map(function (k) { return { key: k, ties: null, legs: (twoLeg && k !== "F") ? 2 : 1 }; }),
       curStage: 0, alive: true, champion: null, eliminatedAt: null
     };
+  }
+  // quantas partidas decidem um estágio (1 = jogo único). Saves antigos não têm o campo —
+  // tratar ausência como 1 mantém o comportamento anterior sem migração nenhuma.
+  function stageLegs(compCup, stageIdx) {
+    const st = compCup && compCup.stages && compCup.stages[stageIdx];
+    return (st && st.legs) || 1;
+  }
+  // soma o agregado do confronto (ida + volta) do ponto de vista do jogador e diz se está
+  // empatado. Fixture de jogo único não tem aggMine/aggOpp → cai no placar da partida, que
+  // é o comportamento de sempre. Usada pelo motor E pelo modo ao vivo (js/live.js) — uma
+  // regra só, pra pênaltis nunca divergirem entre os dois caminhos.
+  function tieDrawn(fx, res) {
+    return ((fx.aggMine || 0) + res.gm) === ((fx.aggOpp || 0) + res.go);
   }
   const STAGE_NAMES = { R32: "Dezesseis avos de final", R16: "Oitavas de final", QF: "Quartas de final", SF: "Semifinal", F: "FINAL", G: "Fase de grupos", "3RD": "Disputa de 3º lugar" };
 
@@ -3425,11 +3446,25 @@ window.CQ = window.CQ || {};
       const prev = compCup.stages[stageIdx - 1];
       entrants = prev.ties.map(function (t) { return t.winner; });
     }
+    const nLegs = stageLegs(compCup, stageIdx);
     st.ties = [];
     for (let i = 0; i < entrants.length; i += 2) {
-      st.ties.push({ a: entrants[i], b: entrants[i + 1], sa: null, sb: null, winner: null, pens: null });
+      const tie = { a: entrants[i], b: entrants[i + 1], sa: null, sb: null, winner: null, pens: null };
+      if (nLegs > 1) tie.legs = []; // ida e volta: [[golsA, golsB], [golsA, golsB]]
+      st.ties.push(tie);
     }
     return st;
+  }
+
+  // decide o vencedor pelo agregado já gravado em sa/sb (empate → pênaltis). Compartilhado
+  // pelo caminho simulado (simTie) e pelo caminho jogado (fillTie), pra não existirem duas
+  // regras de desempate.
+  function decideTie(tie, rng) {
+    if (tie.sa === tie.sb) {
+      const pa = 3 + U.ri(0, 2, rng), pb = 3 + U.ri(0, 2, rng);
+      tie.pens = pa === pb ? [pa + 1, pb] : [pa, pb];
+      tie.winner = tie.pens[0] > tie.pens[1] ? tie.a : tie.b;
+    } else tie.winner = tie.sa > tie.sb ? tie.a : tie.b;
   }
 
   function simTie(g, compCup, stageIdx, tie, skipMine, myId) {
@@ -3438,13 +3473,19 @@ window.CQ = window.CQ || {};
     if (skipMine && (tie.a === mid || tie.b === mid)) return;
     const rng = U.rngFor(g.seed, compCup.id, g.year, "st" + stageIdx, tie.a, tie.b);
     const A = oppObj(g, tie.a), B = oppObj(g, tie.b);
-    const sc = simScore(A.str, B.str, rng, 1.5);
-    tie.sa = sc[0]; tie.sb = sc[1];
-    if (sc[0] === sc[1]) {
-      const pa = 3 + U.ri(0, 2, rng), pb = 3 + U.ri(0, 2, rng);
-      tie.pens = pa === pb ? [pa + 1, pb] : [pa, pb];
-      tie.winner = tie.pens[0] > tie.pens[1] ? tie.a : tie.b;
-    } else tie.winner = sc[0] > sc[1] ? tie.a : tie.b;
+    if (stageLegs(compCup, stageIdx) > 1) {
+      // ida na casa de A, volta na casa de B — o mando entra pelo simScore, que já dá a
+      // vantagem ao primeiro time. Agregado em sa/sb, igual ao jogo único.
+      const ida = simScore(A.str, B.str, rng, 1.5);              // A em casa
+      const volta = simScore(B.str, A.str, rng, 1.5);            // B em casa
+      tie.legs = [[ida[0], ida[1]], [volta[1], volta[0]]];       // sempre [golsA, golsB]
+      tie.sa = tie.legs[0][0] + tie.legs[1][0];
+      tie.sb = tie.legs[0][1] + tie.legs[1][1];
+    } else {
+      const sc = simScore(A.str, B.str, rng, 1.5);
+      tie.sa = sc[0]; tie.sb = sc[1];
+    }
+    decideTie(tie, rng);
   }
 
   function advanceCup(g, compCup, myId) {
@@ -3574,7 +3615,7 @@ window.CQ = window.CQ || {};
         const field = [p.clubId];
         let ci = 0;
         while (field.length < 16) { field.push(ids[ci++] || pool[ci % pool.length].id); }
-        C.bracket = cupComp(C.id, C.name, field, C.koStages, rngK);
+        C.bracket = cupComp(C.id, C.name, field, C.koStages, rngK, true); // ida e volta (final é jogo único)
       }
       if (!C.bracket) return null; // eliminado nos grupos — nunca chega a montar bracket
       const nxt = advanceCup(g, C.bracket);
@@ -3582,8 +3623,23 @@ window.CQ = window.CQ || {};
       if (!nxt || nxt.stageIdx !== slot.ko) return null;
       const tie = nxt.tie;
       const stage = C.koStages[slot.ko];
-      const home = tie.a === p.clubId;
-      return mkFix(g, C.id, C.name + " · " + STAGE_NAMES[stage], home ? [p.clubId, tie.b] : [tie.a, p.clubId], { stage: stage, knock: true, decisive: stage === "F", conti: true, tie: tie, stageIdx: nxt.stageIdx });
+      const nLegs = stageLegs(C.bracket, nxt.stageIdx);
+      const leg = nLegs > 1 ? (slot.leg || 1) : 0;
+      if (leg > nLegs) return null;
+      // ida na casa de A, volta na casa de B (jogo único: sempre na casa de A)
+      const meIsA = tie.a === p.clubId;
+      const home = leg === 2 ? !meIsA : meIsA;
+      const oppId = meIsA ? tie.b : tie.a;
+      // só a última partida do confronto decide (e leva pênaltis se o agregado empatar)
+      const decides = leg !== 1 || nLegs === 1;
+      const prev = (leg === 2 && tie.legs && tie.legs[0]) ? tie.legs[0] : null;
+      const label = C.name + " · " + STAGE_NAMES[stage] + (nLegs > 1 ? (leg === 1 ? " (ida)" : " (volta)") : "");
+      return mkFix(g, C.id, label, home ? [p.clubId, oppId] : [oppId, p.clubId], {
+        stage: stage, knock: true, decides: decides, decisive: stage === "F", conti: true,
+        tie: tie, stageIdx: nxt.stageIdx, leg: leg || undefined, tieSideA: meIsA,
+        aggMine: prev ? (meIsA ? prev[0] : prev[1]) : 0,
+        aggOpp: prev ? (meIsA ? prev[1] : prev[0]) : 0
+      });
     }
     if (slot.comp === "SEL") {
       const nat = D.NATIONS[p.nat];
@@ -3885,7 +3941,11 @@ window.CQ = window.CQ || {};
   // aplica resultado ao estado do jogo
   function applyMatch(g, res) {
     const S = g.season, p = g.player, fx = res.fixture;
-    const knockDraw = fx.knock && res.gm === res.go;
+    // "decide" = esta partida encerra o confronto. Na IDA de um mata-mata de ida e volta
+    // ela é false: empate na ida não vai pra pênaltis, quem decide é o agregado na volta.
+    // Fixture de jogo único não traz o campo (undefined), então segue como sempre foi.
+    const decides = fx.knock && fx.decides !== false;
+    const knockDraw = decides && tieDrawn(fx, res);
 
     // RNG determinístico de pós-partida (lesão, shootout automático)
     const prng = U.rngFor(g.seed, "post", g.year, S.idx);
@@ -3895,7 +3955,8 @@ window.CQ = window.CQ || {};
       res.shootout = { my: myP === opP ? myP + 1 : myP, opp: opP, auto: true };
       res.shootoutWin = res.shootout.my > res.shootout.opp;
     }
-    const advanced = fx.knock ? (res.win || (res.draw && res.shootoutWin)) : null;
+    const myAgg = (fx.aggMine || 0) + res.gm, opAgg = (fx.aggOpp || 0) + res.go;
+    const advanced = decides ? (myAgg > opAgg || (myAgg === opAgg && res.shootoutWin)) : null;
 
     // registra no estado da competição
     if (fx.compKey === "EST" && fx.round) {
@@ -3926,14 +3987,17 @@ window.CQ = window.CQ || {};
     } else if (fx.conti) {
       const C = S.comps.CONTI;
       fillTie(fx.tie, fx, res);
-      const stC = C.bracket.stages[fx.stageIdx];
-      stC.ties.forEach(function (t) { simTie(g, C.bracket, fx.stageIdx, t, true); });
-      // sincroniza o campeão real assim que a final termina, ganhando ou perdendo (mesmo
-      // raciocínio da Copa do Mundo — senão o resto do chaveamento nunca é conhecido)
-      if (fx.stage === "F" && fx.tie.winner) C.bracket.champion = oppObj(g, fx.tie.winner).name;
-      if (fx.tie.winner !== p.clubId) { C.alive = false; C.eliminatedAt = fx.stage; }
-      else if (fx.stage === "F") { C.alive = false; winTitle(g, C.id, C.name); }
-      if (C.bracket.champion && !C.champion) C.champion = C.bracket.champion;
+      // na IDA o confronto ainda está aberto: registra o placar e não decide nada
+      if (fx.decides !== false) {
+        const stC = C.bracket.stages[fx.stageIdx];
+        stC.ties.forEach(function (t) { simTie(g, C.bracket, fx.stageIdx, t, true); });
+        // sincroniza o campeão real assim que a final termina, ganhando ou perdendo (mesmo
+        // raciocínio da Copa do Mundo — senão o resto do chaveamento nunca é conhecido)
+        if (fx.stage === "F" && fx.tie.winner) C.bracket.champion = oppObj(g, fx.tie.winner).name;
+        if (fx.tie.winner !== p.clubId) { C.alive = false; C.eliminatedAt = fx.stage; }
+        else if (fx.stage === "F") { C.alive = false; winTitle(g, C.id, C.name); }
+        if (C.bracket.champion && !C.champion) C.champion = C.bracket.champion;
+      }
     } else if (fx.compKey === "CONTI" || (S.comps.CONTI && fx.compKey === S.comps.CONTI.id && fx.phase === "G")) {
       recordLeagueResult(g, S.comps.CONTI.group, fx, res);
       ensureRound(g, S.comps.CONTI.group, fx.round);
@@ -4042,10 +4106,24 @@ window.CQ = window.CQ || {};
   }
 
   function fillTie(tie, fx, res) {
-    if (fx.home) { tie.sa = res.gm; tie.sb = res.go; } else { tie.sa = res.go; tie.sb = res.gm; }
-    if (res.shootout) tie.pens = fx.home ? [res.shootout.my, res.shootout.opp] : [res.shootout.opp, res.shootout.my];
-    const meWin = fx.knock ? (res.win || (res.draw && res.shootoutWin)) : res.win;
-    tie.winner = meWin ? (fx.home ? tie.a : tie.b) : (fx.home ? tie.b : tie.a);
+    // de que lado do confronto o jogador está. Em jogo único o mando já responde isso (o
+    // fixture é montado com o jogador em casa quando ele é o lado A); na ida e volta o
+    // mando inverte na volta, então o lado vem explícito no fixture.
+    const meIsA = fx.tieSideA != null ? fx.tieSideA : fx.home;
+    if (fx.leg) {
+      tie.legs = tie.legs || [];
+      tie.legs[fx.leg - 1] = meIsA ? [res.gm, res.go] : [res.go, res.gm];
+    }
+    if (fx.decides === false) return; // ida: registra o placar e para — nada decidido ainda
+    if (fx.leg && tie.legs && tie.legs[0] && tie.legs[1]) {
+      tie.sa = tie.legs[0][0] + tie.legs[1][0];
+      tie.sb = tie.legs[0][1] + tie.legs[1][1];
+    } else if (meIsA) { tie.sa = res.gm; tie.sb = res.go; } else { tie.sa = res.go; tie.sb = res.gm; }
+    if (res.shootout) tie.pens = meIsA ? [res.shootout.my, res.shootout.opp] : [res.shootout.opp, res.shootout.my];
+    const meWin = fx.knock
+      ? (tie.sa === tie.sb ? !!res.shootoutWin : (meIsA ? tie.sa > tie.sb : tie.sb > tie.sa))
+      : res.win;
+    tie.winner = meWin ? (meIsA ? tie.a : tie.b) : (meIsA ? tie.b : tie.a);
   }
 
   function recordLeagueResult(g, comp, fx, res, myId) {
@@ -4768,7 +4846,8 @@ window.CQ = window.CQ || {};
         return { comp: C.id, label: C.name + " · Grupo, jogo " + slot.round, oppName: oppObj(g, opp).name, oppId: opp, home: pair[0] === p.clubId };
       }
       const stage = C.koStages[slot.ko];
-      return { comp: C.id, label: C.name + " · " + STAGE_NAMES[stage], oppName: null, home: null, decisive: stage === "F" };
+      const sufixo = slot.leg === 1 ? " (ida)" : slot.leg === 2 ? " (volta)" : "";
+      return { comp: C.id, label: C.name + " · " + STAGE_NAMES[stage] + sufixo, oppName: null, home: null, decisive: stage === "F" };
     }
     if (slot.comp === "SEL") {
       const nat = D.NATIONS[p.nat], T = S.sel;
@@ -4849,7 +4928,7 @@ window.CQ = window.CQ || {};
     TRAITS: TRAITS, hasTrait: hasTrait, managerConf: managerConf, ensureManager: ensureManager,
     leagueOf: leagueOf, myClub: myClub, oppObj: oppObj, natTeamObj: natTeamObj,
     refreshWorldLeagues: refreshWorldLeagues,
-    STAGE_NAMES: STAGE_NAMES, NAT_FLAGS: NAT_FLAGS, TOUR_CONF: TOUR_CONF,
+    STAGE_NAMES: STAGE_NAMES, NAT_FLAGS: NAT_FLAGS, TOUR_CONF: TOUR_CONF, tieDrawn: tieDrawn,
     teamStrength: teamStrength, simScore: simScore
   };
 })();
@@ -5690,7 +5769,10 @@ window.CQ = window.CQ || {};
         const res = live.res;
         // recalcula com o placar final (decisões podem ter mudado)
         res.win = res.gm > res.go; res.draw = res.gm === res.go; res.loss = res.gm < res.go;
-        if (live.fixture.knock && res.draw) {
+        // pênaltis só na partida que DECIDE o confronto e só se o AGREGADO empatar — numa
+        // ida de mata-mata continental um empate é resultado normal, não vai pra pênaltis
+        const decideAqui = live.fixture.knock && live.fixture.decides !== false;
+        if (decideAqui && CQ.engine.tieDrawn(live.fixture, res)) {
           live.phase = "shootout";
           live.shootout = initShootout(live);
         } else {
@@ -6308,6 +6390,7 @@ window.CQ = window.CQ || {};
         ${notices.length ? `<div class="stack mt12" style="gap:8px">${notices.join("")}</div>` : ""}
         <div class="lead-cta"><div class="btnrow">
           <button class="btn btn-pri btn-big" onclick="CQ.ui.actionPlay()">${fx.decisive ? "Entrar em campo — ao vivo" : "Jogar a partida"}</button>
+          ${fx.knock && !fx.decisive ? `<button class="btn btn-green" onclick="CQ.ui.actionPlayLive()">Ao vivo</button>` : ""}
           <button class="btn btn-gold" onclick="CQ.ui.actionRest()">Poupar</button>
           <button class="btn btn-ghost" onclick="CQ.ui.actionSim(1)">Simular</button>
           <button class="btn btn-ghost" onclick="CQ.ui.actionSim(5)">Simular 5</button>
@@ -6425,36 +6508,48 @@ window.CQ = window.CQ || {};
   }
 
   // ---------------- ações de jogo ----------------
+  // entra no modo ao vivo de fato (com o aviso de primeira vez). `voltar` é a ação que o
+  // botão do aviso dispara — assim o mesmo aviso serve pro caminho automático das finais
+  // e pro botão "Ao vivo" opcional do mata-mata.
+  function startLive(G, fx, voltar) {
+    if (!G.player.seenLiveIntro) {
+      G.player.seenLiveIntro = true;
+      CQ.main.save();
+      overlay(`<div class="card"><div class="card-h"><h3>Modo ao vivo</h3></div>
+        <div class="card-b">
+          <p>Esta partida você acompanha <b>minuto a minuto</b>: lances, decisões e,
+          se empatar, os pênaltis, tudo em tempo real — diferente das partidas normais,
+          que são resolvidas com um clique.</p>
+          <p class="small muted">As finais entram ao vivo sozinhas; nos outros jogos de
+          mata-mata, é escolha sua — o botão "Ao vivo" fica ao lado do de jogar.</p>
+        </div>
+        <div class="card-b" style="padding-top:0">
+          <button class="btn btn-pri btn-block" onclick="${voltar}">Entendi, vamos lá</button>
+        </div></div>`);
+      return;
+    }
+    CQ.state.live = CQ.live.buildLive(G, fx);
+    renderLiveOverlay(true);
+  }
+
   function actionPlay() {
     const G = g();
     const fx = E().currentFixture(G);
     if (!fx) { seasonEndFlow(); return; }
-    if (fx.decisive) {
-      if (!G.player.seenLiveIntro) {
-        G.player.seenLiveIntro = true;
-        CQ.main.save();
-        overlay(`<div class="card"><div class="card-h"><h3>Jogo decisivo — modo ao vivo</h3></div>
-          <div class="card-b">
-            <p>Esta partida você acompanha <b>minuto a minuto</b>: lances, decisões e,
-            se empatar, os pênaltis, tudo em tempo real — diferente das partidas normais,
-            que são resolvidas com um clique.</p>
-            <p class="small muted">Isso só acontece em finais e jogos decisivos — a
-            maioria das suas partidas continua rápida.</p>
-          </div>
-          <div class="card-b" style="padding-top:0">
-            <button class="btn btn-pri btn-block" onclick="CQ.ui.actionPlay()">Entendi, vamos lá</button>
-          </div></div>`);
-        return;
-      }
-      CQ.state.live = CQ.live.buildLive(G, fx);
-      renderLiveOverlay(true);
-      return;
-    }
+    if (fx.decisive) { startLive(G, fx, "CQ.ui.actionPlay()"); return; }
     const res = E().resolveMatch(G, fx, {});
     E().applyMatch(G, res);
     CQ.main.save();
     render();
     afterMatchFlow(res);
+  }
+
+  // modo ao vivo por escolha do jogador, em qualquer partida de mata-mata
+  function actionPlayLive() {
+    const G = g();
+    const fx = E().currentFixture(G);
+    if (!fx) { seasonEndFlow(); return; }
+    startLive(G, fx, "CQ.ui.actionPlayLive()");
   }
 
   function actionRest() {
@@ -7749,9 +7844,19 @@ window.CQ = window.CQ || {};
     const a = CQ.engine.oppObj(G, t.a), b = CQ.engine.oppObj(G, t.b);
     const mine = isMineId(G, t.a) || isMineId(G, t.b);
     const pens = t.pens ? `<span class="condsmall">(${t.pens[0]}-${t.pens[1]} pên.)</span>` : "";
+    // ida e volta: o placar principal é o AGREGADO, e as duas partidas aparecem embaixo
+    let legs = "";
+    if (t.legs && (t.legs[0] || t.legs[1])) {
+      const rot = ["ida", "volta"].map(function (nome, i) {
+        const l = t.legs[i];
+        return l ? `${nome} ${l[0]}-${l[1]}` : null;
+      }).filter(Boolean).join(" · ");
+      if (rot) legs = `<div class="br-legs">${rot}</div>`;
+    }
     return `<div class="br-tie ${mine ? "mine" : ""}">
       <div class="br-t ${t.winner === t.a ? "wn" : ""}"><span class="clubcell">${crest(a, "crest-20")} ${esc(a.short)}</span><span class="sc">${t.sa != null ? t.sa : ""}</span></div>
       <div class="br-t ${t.winner === t.b ? "wn" : ""}"><span class="clubcell">${crest(b, "crest-20")} ${esc(b.short)}</span><span class="sc">${t.sb != null ? t.sb : ""} ${pens}</span></div>
+      ${legs}
     </div>`;
   }
 
@@ -8318,7 +8423,7 @@ window.CQ = window.CQ || {};
     go: go, render: render, startCreate: startCreate,
     dset: dset, dsetPos: dsetPos, toggleLegend: toggleLegend, randomClub: randomClub,
     createNext: createNext, finishCreate: finishCreate,
-    actionPlay: actionPlay, actionRest: actionRest, actionSim: actionSim,
+    actionPlay: actionPlay, actionPlayLive: actionPlayLive, actionRest: actionRest, actionSim: actionSim,
     liveStep: liveStep, liveDecide: liveDecide, shootPick: shootPick, shootReveal: shootReveal, finishLive: finishLive,
     pickInterview: pickInterview, pickLife: pickLife,
     seasonEndFlow: seasonEndFlow, summaryNext: summaryNext, summaryNextStep: summaryNextStep, pickOffer: pickOffer, pickRenew: pickRenew,

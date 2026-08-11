@@ -382,6 +382,94 @@
     });
   }
 
+  // ---- Mata-mata continental de ida e volta: agregado decide, final é jogo único ----
+  function testContiTwoLeggedTies() {
+    withTempGame(function () {
+      // varre várias carreiras até achar uma que chegue ao mata-mata continental
+      let g = null, C = null, tries = 0;
+      while (tries++ < 25) {
+        g = newCareer("ATA", tries % 2 ? "fla" : "rma");
+        let n = 0; while (E().currentFixture(g) && n++ < 700) E().applyMatch(g, E().resolveMatch(g, E().currentFixture(g), {}));
+        C = g.season.comps.CONTI;
+        if (C && C.bracket) break;
+      }
+      assert("ida e volta: alcança o mata-mata continental em ≤25 carreiras", !!(C && C.bracket), "tries=" + tries);
+      if (!(C && C.bracket)) return;
+
+      let aggOk = true, aggDetail = "", legsOk = true, legsDetail = "";
+      let finalUnica = true, semVencedor = "", empateSemPens = "";
+      C.bracket.stages.forEach(function (st) {
+        (st.ties || []).forEach(function (t) {
+          if (!t.winner) semVencedor = st.key;
+          if (st.key === "F") {
+            if (t.legs) finalUnica = false;
+            return;
+          }
+          if (!t.legs || !t.legs[0] || !t.legs[1]) { legsOk = false; legsDetail = st.key; return; }
+          const sa = t.legs[0][0] + t.legs[1][0], sb = t.legs[0][1] + t.legs[1][1];
+          if (sa !== t.sa || sb !== t.sb) { aggOk = false; aggDetail = st.key + ": " + t.sa + "-" + t.sb + " vs " + sa + "-" + sb; }
+          if (sa === sb && !t.pens) empateSemPens = st.key;
+          const esperado = sa > sb ? t.a : sb > sa ? t.b : (t.pens && t.pens[0] > t.pens[1] ? t.a : t.b);
+          if (t.winner !== esperado) { aggOk = false; aggDetail = st.key + ": vencedor não bate com o agregado"; }
+        });
+      });
+      assert("ida e volta: oitavas/quartas/semi têm as duas partidas registradas", legsOk, legsDetail);
+      assert("ida e volta: sa/sb é a soma das duas partidas e o vencedor bate com o agregado", aggOk, aggDetail);
+      assert("ida e volta: agregado empatado sempre vai a pênaltis", !empateSemPens, empateSemPens);
+      assert("ida e volta: a FINAL continua jogo único (sem ida e volta)", finalUnica);
+      assert("ida e volta: todo confronto do chaveamento tem vencedor", !semVencedor, semVencedor);
+    });
+  }
+
+  // ---- Empate na IDA não pode ir a pênaltis nem decidir o confronto ----
+  function testContiFirstLegNoPenalties() {
+    withTempGame(function () {
+      let idas = 0, empatesNaIda = 0, penaltisNaIda = "", idaDecidiu = "";
+      for (let i = 0; i < 12; i++) {
+        const g = newCareer("ATA", i % 2 ? "fla" : "rma");
+        let n = 0;
+        while (n++ < 700) {
+          const fx = E().currentFixture(g);
+          if (!fx) break;
+          const res = E().resolveMatch(g, fx, {});
+          const ehIda = !!(fx.conti && fx.leg === 1);
+          E().applyMatch(g, res);
+          if (ehIda) {
+            idas++;
+            if (res.gm === res.go) {
+              empatesNaIda++;
+              if (res.shootout) penaltisNaIda = fx.stage + " " + res.gm + "-" + res.go;
+            }
+            if (fx.tie.winner) idaDecidiu = fx.stage;
+          }
+        }
+      }
+      assert("ida: o jogador chega a disputar partidas de ida", idas > 0, "n=" + idas);
+      assert("ida: empate na ida NUNCA vai a pênaltis", !penaltisNaIda, penaltisNaIda);
+      assert("ida: a ida nunca decide o confronto sozinha", !idaDecidiu, idaDecidiu);
+      assert("ida: empates na ida acontecem (o caso é realmente exercitado)", empatesNaIda > 0, "n=" + empatesNaIda);
+    });
+  }
+
+  // ---- A mudança é aditiva: as outras copas seguem com jogo único ----
+  function testOtherCupsStaySingleLeg() {
+    withTempGame(function () {
+      let ties = 0, comLegs = "";
+      for (let i = 0; i < 6; i++) {
+        const g = newCareer("ATA", i % 2 ? "fla" : "rma");
+        let n = 0; while (E().currentFixture(g) && n++ < 700) E().applyMatch(g, E().resolveMatch(g, E().currentFixture(g), {}));
+        ["CDB", "COPA"].forEach(function (k) {
+          const cup = g.season.comps[k];
+          if (!cup || !cup.stages) return;
+          cup.stages.forEach(function (st) {
+            (st.ties || []).forEach(function (t) { ties++; if (t.legs) comLegs = k + " " + st.key; });
+          });
+        });
+      }
+      assert("aditivo: Copa do Brasil / copa nacional seguem com jogo único por chave", ties > 0 && !comLegs, comLegs || ("ties=" + ties));
+    });
+  }
+
   // ---- Bug real corrigido: banner de campeão não pode comemorar quando quem venceu foi outra seleção/clube ----
   function testChampionBannerCorrectness() {
     withTempGame(function () {
@@ -626,6 +714,9 @@
     testEliminatoriasQualification();
     testSupermundial();
     testConferenceLeague();
+    testContiTwoLeggedTies();
+    testContiFirstLegNoPenalties();
+    testOtherCupsStaySingleLeg();
     testChampionBannerCorrectness();
     testRivalsCoverage();
     testClubRivalryScoreboard();

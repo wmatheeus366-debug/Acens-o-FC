@@ -890,3 +890,38 @@ bloqueador alcança e funciona até offline.
   bloqueador: 22 escudos reais, 0 vetoriais; (b) CDN bloqueado (o caso reportado): 22
   escudos **reais** (todos `data:`), 0 vetoriais; (c) filtro agressivo escondendo até as
   imagens embutidas: cai pro vetorial visível; (d) de volta ao normal: 22 reais.
+
+## Mata-mata continental de ida e volta + Ao vivo por escolha
+As competições continentais (Libertadores, Sul-Americana, Champions, Europa League e
+Conference League) passam a decidir oitavas, quartas e semifinais em **ida e volta**, como
+no futebol de verdade. A **final continua jogo único** — formato real de Libertadores/
+Sul-Americana desde 2019 e de Champions/Europa sempre. São 7 partidas de mata-mata por
+temporada em vez de 4.
+- Ida na casa do primeiro time, volta na casa do segundo; **quem decide é o agregado**, e
+  empate no agregado vai a pênaltis. Sem gol qualificado fora de casa — UEFA e CONMEBOL
+  aboliram a regra em 2021 e 2022.
+- **Empate na ida é resultado normal**, não vai a pênaltis: só a partida que fecha o
+  confronto decide. Isso vale tanto na simulação quanto no modo ao vivo (uma regra só,
+  `CQ.engine.tieDrawn`, usada pelos dois caminhos — não dá pra divergirem).
+- O chaveamento mostra o **agregado** como placar principal e as duas partidas embaixo
+  (`ida 1-0 · volta 2-2`). O rótulo da partida ganha "(ida)"/"(volta)" na home e no
+  calendário.
+- **Mudança aditiva**: cada estágio de copa agora sabe quantas partidas tem, e sem essa
+  configuração nasce com 1 — Copa do Brasil, copa nacional europeia, Estadual, Supermundial
+  e mata-mata de Seleção seguem exatamente como sempre foram, sem uma linha alterada neles.
+  Saves antigos também não precisam de migração: um bracket já em andamento não tem a
+  marcação e termina a temporada no formato antigo; a temporada seguinte já nasce no novo.
+
+**Ao vivo virou escolha.** Antes, o modo minuto a minuto só acontecia sozinho nas finais.
+Agora existe um botão "Ao vivo" ao lado do de jogar em **qualquer partida de mata-mata** —
+continental, Copa do Brasil, copa nacional, Estadual, Supermundial e mata-mata de Seleção.
+As finais continuam entrando ao vivo automaticamente. O aviso de primeira vez passou a
+cobrir os dois caminhos.
+- Validado: 112/112 testes (12 checagens novas: agregado decide, vencedor bate com o
+  agregado, empate no agregado vai a pênaltis, empate na ida **não** vai, a ida nunca
+  decide sozinha, final segue jogo único, e as outras copas seguem com 1 partida por
+  chave). Mais estresse fora da suíte: 294 confrontos de ida e volta simulados com
+  agregado conferido um a um (16 viradas, time que perdeu a ida e passou), 30 carreiras
+  jogando as próprias partidas (45 idas e 45 voltas, zero pênalti indevido na ida, zero
+  eliminação incoerente), e 40 carreiras exercitando o modo ao vivo (17 empates na ida sem
+  pênaltis, 11 agregados empatados indo a pênaltis corretamente).
