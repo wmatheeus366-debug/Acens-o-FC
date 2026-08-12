@@ -1044,3 +1044,66 @@ físico real.
   compor screenshots no meio da sessão de verificação (limitação do ambiente, não do
   código), então a cobertura visual manual ficou parcial; vale uma conferência adicional
   no navegador de verdade.
+
+## Lista grande de imersão/UX — Fatia 1 (vitórias rápidas)
+
+Pacote de 7 correções/ajustes pequenos pedidos numa lista maior (o resto virou roteiro
+documentado em `ARCHITECTURE.md`, pra depois — inclui campo Ao Vivo com bonecos 3D de
+verdade, sistema de empréstimo, volta a ex-clube, linha do tempo de marcos, sistema de
+ídolo em camadas, salvar carreira pra sempre, redes sociais dinâmicas, layout com
+painéis laterais, avatar editorial, calendário por mês, e potencial+pontos de evolução).
+
+- **Elencos: idade/overall menos absurdos.** Achado real: `REAL_SQUADS` nunca teve idade
+  de verdade (só nome+posição) — tanto `buildWorld` quanto o fallback de `squadOf`
+  sorteavam idade **uniforme entre 18-35**, então um jogador real e experiente (ex.
+  Arrascaeta) podia cair em qualquer idade do intervalo, inclusive ≤20 e entrar na aba
+  Base. Sem dado real de nascimento (isso exigiria coletar data de nascimento de ~2420
+  jogadores — fora do escopo desta fatia), a mitigação foi trocar o sorteio uniforme por
+  uma distribuição **pesada pro auge da carreira** (jovem 18-21 ~15%, auge 22-30 ~65%,
+  veterano 31-35 ~20%) e reduzir o ruído do overall em torno da força do clube. De
+  quebra, a fórmula duplicada em `js/world.js` e `js/ui.js` virou um helper só
+  (`CQ.world.rollAge`/`rollOvr`), eliminando o risco dos dois caminhos divergirem.
+- **Pênaltis sem spoiler.** A tela de disputa desenhava sempre pelo menos 5 bolinhas por
+  time (incluindo as cobranças futuras, vazias) — como a disputa inteira já é calculada
+  de uma vez antes de ser revelada lance a lance, isso entregava de graça quantas
+  cobranças ainda vinham. Agora só aparece o que já aconteceu + 1 bolinha "pendente"
+  pulsante enquanto a disputa segue.
+- **Botão "Ao vivo" some — vira o próprio botão de jogar.** Antes, qualquer mata-mata
+  não-decisivo tinha 2 botões (jogar normal + "Ao vivo" opcional). Agora o botão
+  principal já entra ao vivo em qualquer mata-mata (decisivo ou não). Jogo comum vira
+  "Acompanhar partida" quando o jogador está machucado/suspenso (não pode entrar em
+  campo mesmo clicando); "Simular" virou "Simulação rápida" pra deixar clara a diferença
+  em relação ao botão principal.
+- **Início de carreira só em clube pequeno/médio.** Escolher direto um Flamengo/Palmeiras
+  com overall de estreante prendia o jogador no banco — banco baixa a confiança do
+  técnico, que baixa ainda mais a chance de jogar (loop real, confirmado no código:
+  `benchRoll`/`bumpConf`, `js/engine.js`). A criação de personagem agora só lista clubes
+  da Série A com força ≤79 (9 opções); os tradicionais continuam alcançáveis depois,
+  pelo sistema de ofertas que já existia.
+- **Titular / Banco / Fora da lista antes da partida.** Novo badge na Home usando
+  `benchRoll` (agora exportado) com uma "espiada" segura: reconstrói o mesmo RNG que a
+  partida de verdade vai usar (mesma seed+chaves) só pra prever o resultado — não
+  perturba nada porque `rngFor` sempre recria um gerador novo a partir da seed, nunca
+  compartilha posição com a resolução real que roda depois.
+- **Campeões: mais competições no histórico.** `recordChampions` só registrava
+  LIGA/BRA/BRB/CDB/LIB/UCL/EST/seleção — SUL, UEL e UECL já rodavam de fundo pro mundo
+  inteiro todo ano, só nunca entravam no histórico da aba Campeões. Generalizado pra um
+  loop sobre as 5 competições continentais. Mundial de Clubes e Supermundial são um caso
+  à parte: só existem no mundo do jogo quando o clube do jogador é convidado (não rodam
+  de fundo pra mais ninguém), então só entram no histórico nos anos em que de fato
+  aconteceram na carreira — **bug real corrigido nessa investigação**: o Mundial de
+  Clubes só registrava o campeão quando o jogador GANHAVA; perdendo, `S.mundial.champion`
+  ficava `null` pra sempre. Agora registra o campeão de verdade nos dois casos, mesmo
+  padrão que Conti/Copa do Mundo já usavam.
+- **Banner "PENTA CAMPEÃO" por clube/competição.** `p.titles` já guardava
+  `{year,key,name,club}` — nenhuma mudança de formato salvo. `winTitle` agora calcula
+  quantas vezes o jogador já ganhou aquela competição por aquele clube/seleção
+  específico e anexa em `g.season.lastTitle`; o banner de comemoração (mata-mata/
+  continental/MUN/SUPER/seleção) e o passo de balanço de temporada (título de liga, que
+  não passa pelo banner cheio) mostram o ordinal (BICAMPEÃO, TRICAMPEÃO... PENTACAMPEÃO
+  em diante) quando é o 2º título ou mais — trocar de clube reseta a contagem.
+- Validado: 147/147 testes na última rodada limpa (10 checagens novas cobrindo os 7
+  itens). Conferido também no navegador (servido localmente): só 9 clubes pequenos/
+  médios na criação com o texto explicativo certo; badge "Banco — deve entrar" correto
+  numa partida real; botão "Jogar a partida" numa liga comum e "Jogar a partida — ao
+  vivo" numa semifinal real de mata-mata, sem nenhum botão "Ao vivo" solto ao lado.

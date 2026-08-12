@@ -650,6 +650,113 @@
     assert("brasão: crestSVGProcedural continua consistente (pattern só quando pat != plain) após extrair patternFillFor", ok, detail);
   }
 
+  // ---- Elencos: idade ponderada pro meio de carreira, nunca sai do intervalo pedido ----
+  function testWorldAgeDistribution() {
+    const rng = CQ.util.rngFor("teste-fixo-idade", "dist");
+    let young = 0, prime = 0, vet = 0, n = 2000, ok = true, detail = "";
+    for (let i = 0; i < n; i++) {
+      const age = CQ.world.rollAge(rng, 35);
+      if (age < 18 || age > 35) { ok = false; detail = "age=" + age; break; }
+      if (age <= 21) young++; else if (age <= 30) prime++; else vet++;
+    }
+    assert("idade: rollAge nunca sai do intervalo 18-35 pedido", ok, detail);
+    assert("idade: distribuição pesa pro auge da carreira (22-30 é a faixa mais comum)", prime > young && prime > vet, "jovem=" + young + " auge=" + prime + " vet=" + vet);
+    assert("idade: jovem (18-21) fica bem abaixo do antigo uniforme (~22%; esperado ~15%)", young / n < 0.22, "jovem=" + (young / n * 100).toFixed(1) + "%");
+  }
+  function testWorldOvrRange() {
+    const rng = CQ.util.rngFor("teste-fixo-ovr", "dist");
+    let ok = true, detail = "";
+    for (let i = 0; i < 500; i++) {
+      const ovr = CQ.world.rollOvr(80, rng);
+      if (ovr < 55 || ovr > 93) { ok = false; detail = "ovr=" + ovr; break; }
+    }
+    assert("overall: rollOvr nunca sai de 55-93 (clube de força 80)", ok, detail);
+  }
+  // ---- squadOf (fallback, sem CQ.world) e initClubRoster (js/world.js) nunca podem
+  // divergir — provam que a duplicação da fórmula de idade/overall foi eliminada de
+  // verdade (um helper compartilhado em CQ.world, não 2 cópias que podiam desalinhar) ----
+  function testSquadOfMatchesWorldFormula() {
+    const g = { seed: "seed-fixa-teste-elenco", year: 2026, world: null, player: { clubId: "fla" } };
+    const fromSquadOf = CQ.ui.squadOf(g);
+    const fromWorld = CQ.world.buildWorld(g).clubs.fla.roster.slice().sort(function (a, b) { return b.ovr - a.ovr; });
+    let ok = fromSquadOf.length === fromWorld.length;
+    for (let i = 0; i < fromSquadOf.length && ok; i++) {
+      if (fromSquadOf[i].age !== fromWorld[i].age || fromSquadOf[i].ov !== fromWorld[i].ovr) ok = false;
+    }
+    assert("elenco: squadOf (fallback) e buildWorld nunca divergem (mesma fórmula compartilhada)", ok, "squadOf n=" + fromSquadOf.length + " world n=" + fromWorld.length);
+  }
+
+  // ---- Criação de personagem: só clubes pequenos/médios pra começar ----
+  function testStartClubPoolExcludesBigClubs() {
+    const pool = CQ.ui.startClubPool();
+    const tooStrong = pool.filter(function (c) { return c.str > 79; });
+    assert("clube inicial: nenhum clube listado tem força > 79", tooStrong.length === 0, "n=" + tooStrong.length);
+    assert("clube inicial: ainda sobra uma escolha real (>= 5 clubes)", pool.length >= 5, "n=" + pool.length);
+    const bigNames = ["Flamengo", "Palmeiras", "Corinthians", "São Paulo"];
+    const hasBig = pool.some(function (c) { return bigNames.indexOf(c.name) >= 0; });
+    assert("clube inicial: tradicionais/fortes (Flamengo/Palmeiras/Corinthians/São Paulo) não aparecem", !hasBig);
+  }
+
+  // ---- Titular/Banco/Fora da lista: a "espiada" de benchRoll bate com o resultado real ----
+  function testBenchRollPreviewMatchesReal() {
+    withTempGame(function () {
+      const g = newCareer("ATA", "vas");
+      E().startSeason(g);
+      const fx = E().currentFixture(g);
+      if (!fx) { assert("titularidade: achou uma partida pra testar", false); return; }
+      const previewRng = CQ.util.rngFor(g.seed, "match", g.year, (g.season && g.season.idx) || 0);
+      const previewBench = E().benchRoll(g, fx, previewRng);
+      const res = E().resolveMatch(g, fx, {});
+      assert("titularidade: a 'espiada' bate com o resultado real (titular ou não)", previewBench.starts === res.starts, "preview=" + previewBench.starts + " real=" + res.starts);
+      assert("titularidade: a 'espiada' bate com o resultado real (jogou ou não)", (previewBench.minutes > 0) === res.plays, "preview=" + (previewBench.minutes > 0) + " real=" + res.plays);
+    });
+  }
+
+  // ---- Campeões: as 5 competições continentais entram no histórico todo ano (não só LIB/UCL) ----
+  function testChampsCoversAllContis() {
+    withTempGame(function () {
+      const g = newCareer("ATA", "vas");
+      E().startSeason(g);
+      let n = 0;
+      while (E().currentFixture(g) && n++ < 700) E().applyMatch(g, E().resolveMatch(g, E().currentFixture(g), {}));
+      const sum = g.pendingSummary || E().endSeason(g);
+      let ok = true, detail = "";
+      ["LIB", "SUL", "UCL", "UEL", "UECL"].forEach(function (ck) {
+        if (!(g.champs[ck] && g.champs[ck][g.year])) { ok = false; detail += ck + " "; }
+      });
+      assert("campeões: LIB/SUL/UCL/UEL/UECL todas registradas em g.champs pro ano da temporada", ok, "faltando: " + detail);
+    });
+  }
+  // ---- Bug real corrigido: Mundial de Clubes registra o campeão mesmo quando o jogador perde ----
+  function testMundialRegistersChampionEvenLosing() {
+    withTempGame(function () {
+      const g = newCareer("ATA", "fla");
+      g.year = 2027; // fora do ciclo de Supermundial (isSuperYear), pra cair no Mundial de 1 jogo só
+      g.player.titles.push({ year: 2026, key: "LIB", name: "Libertadores", club: E().myClub(g).name });
+      E().startSeason(g);
+      if (!g.season.mundial) { assert("mundial: cenário de teste montou o Mundial (pré-condição)", false, "sem g.season.mundial"); return; }
+      let n = 0;
+      while (E().currentFixture(g) && n++ < 700) E().applyMatch(g, E().resolveMatch(g, E().currentFixture(g), {}));
+      assert("mundial: g.season.mundial.champion sempre fica preenchido (ganhando ou perdendo)", !!g.season.mundial.champion, "champion=" + g.season.mundial.champion);
+    });
+  }
+
+  // ---- Banner de título por ordem: BICAMPEÃO/PENTACAMPEÃO por competição+clube ----
+  function testTituloOrdinalBanner() {
+    withTempGame(function () {
+      const g = newCareer("ATA", "vas");
+      for (let i = 1; i <= 5; i++) { g.year = 2026 + i; E().winTitle(g, "CDB", "Copa do Brasil"); }
+      assert("título: 5º título da mesma competição pelo mesmo clube vira nth=5", g.season.lastTitle.nth === 5, "nth=" + g.season.lastTitle.nth);
+      assert("título: tituloOrdinal(5) é PENTACAMPEÃO", CQ.util.tituloOrdinal(5) === "PENTACAMPEÃO", CQ.util.tituloOrdinal(5));
+      assert("título: tituloOrdinal(2) é BICAMPEÃO", CQ.util.tituloOrdinal(2) === "BICAMPEÃO", CQ.util.tituloOrdinal(2));
+      assert("título: tituloOrdinal(1) não tem ordinal (só o 2º título em diante conta)", CQ.util.tituloOrdinal(1) === "", CQ.util.tituloOrdinal(1));
+      g.player.clubId = "fla";
+      g.year = 2033;
+      E().winTitle(g, "CDB", "Copa do Brasil");
+      assert("título: mesmo torneio por OUTRO clube volta a contar do 1 (nth=1)", g.season.lastTitle.nth === 1, "nth=" + g.season.lastTitle.nth);
+    });
+  }
+
   // ---- Bug real corrigido: banner de campeão não pode comemorar quando quem venceu foi outra seleção/clube ----
   function testChampionBannerCorrectness() {
     withTempGame(function () {
@@ -906,6 +1013,14 @@
     testPitchPoseForAllEventTypes();
     testJerseySVGAllPatterns();
     testCrestProceduralStillConsistent();
+    testWorldAgeDistribution();
+    testWorldOvrRange();
+    testSquadOfMatchesWorldFormula();
+    testStartClubPoolExcludesBigClubs();
+    testBenchRollPreviewMatchesReal();
+    testChampsCoversAllContis();
+    testMundialRegistersChampionEvenLosing();
+    testTituloOrdinalBanner();
     testChampionBannerCorrectness();
     testRivalsCoverage();
     testClubRivalryScoreboard();

@@ -44,7 +44,7 @@ Fontes (Google Fonts) e bandeiras (flagcdn) vêm da web com fallback; todo o res
 
 ```
 # no navegador (index.html ou CRAQUE.html aberto), console:
-CQ.tests.run()             # tests/regression.js — ~129 checagens
+CQ.tests.run()             # tests/regression.js — ~147 checagens
 
 # balanceamento (Node, motor real num shim vm):
 node scripts/balance-runner.mjs 100   # gera docs/BALANCE_BASELINE.md + .json
@@ -243,3 +243,47 @@ que manipula o SVG já inserido no DOM (nunca recria); a posição cosmética da
 RNG **não semeada**, de propósito — nunca consome do `live.rng` que decide resultado
 real de decisões/pênaltis, preservando o determinismo do jogo independente do timing de
 clique do usuário.
+
+## Lista grande de imersão/UX — Fatia 1 (feito) + roteiro futuro
+
+Investigação (3 agentes Explore) sobre uma lista grande de pedidos confirmou que o bug
+de idade/overall dos elencos reais é **estrutural**: `REAL_SQUADS` (`js/data.js`) nunca
+teve idade real em nenhum momento (só `{posição, nome}` por jogador), então a fórmula
+antiga (`U.ri(18,35,rng)` uniforme) dava a mesma chance a um garoto de 18 e a um
+veterano badalado de 35. `CQ.world.rollAge`/`rollOvr` (`js/world.js`, exportados,
+reaproveitados por `squadOf` em `js/ui.js` — elimina a duplicação da fórmula) mitigam
+isso com uma distribuição pesada pro auge da carreira; idade real de verdade exigiria
+coletar data de nascimento de ~2420 jogadores, fica pro roteiro futuro (item 1 abaixo).
+
+Demais itens desta fatia: pênaltis sem spoiler (`dots()`, `js/ui.js`); botão "Ao vivo"
+absorvido pelo botão principal de jogar em qualquer mata-mata (`actionPlay`, `js/ui.js`);
+criação de personagem só lista clubes com força ≤79 (`startClubPool`, `js/ui.js`) —
+clubes grandes continuam alcançáveis via o sistema de ofertas já existente; badge
+Titular/Banco/Fora da lista na Home usando `benchRoll` (exportado de `CQ.engine`) com
+uma "espiada" segura de RNG (mesma seed+chaves da resolução real, sem compartilhar
+posição); `recordChampions` generalizado pras 5 competições continentais (LIB/SUL/UCL/
+UEL/UECL, antes só LIB/UCL entravam no histórico) + MUN/SUPER registrados nos anos em
+que de fato aconteceram na carreira (bug real corrigido: `S.mundial.champion` nunca era
+preenchido numa derrota); banner de título com ordinal (BICAMPEÃO...PENTACAMPEÃO) via
+`winTitle`/`g.season.lastTitle.nth` (`js/engine.js`), lido tanto por
+`showTitleCelebration` quanto pelo passo de balanço de temporada (`js/ui.js`).
+
+**Roteiro futuro (fora desta fatia, ordem sugerida):**
+1. Idade real via API-Football (`/players?team=X&season=Y` — testar cota/formato antes
+   de migrar os 129 elencos curados; chave já existe em `.env`).
+2. Campo Ao Vivo com bonecos 3D de verdade (confirmado pelo usuário mesmo sabendo do
+   tamanho — precisa de sessão de planejamento própria, escolha de biblioteca tipo
+   three.js, o que quebra a filosofia atual de zero dependência externa).
+3. Sistema de empréstimo (1-2 anos).
+4. Voltar a ex-clube depois dos 31 (ou ligação do agente).
+5. Linha do tempo de marcos da carreira.
+6. Sistema de ídolo em camadas (ídolo → ídolo da geração → maior de todos).
+7. Salvar carreira pra sempre ao aposentar ("hall da fama").
+8. Redes sociais reagindo de verdade a resultado/decisão.
+9. Layout: painéis laterais usando o espaço vazio dos modais.
+10. Avatar editorial/silhueta no lugar do retrato cartunesco.
+11. Calendário por mês + filtro por competição.
+12. Estados vazios mais interessantes (varredura geral).
+13. Comparação com jogadores da mesma idade.
+14. Potencial + pontos de evolução pra distribuir em atributos (mudança grande de
+    mecânica central — confirmado que entra no roteiro, não é imediato).

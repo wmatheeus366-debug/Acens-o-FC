@@ -1432,6 +1432,10 @@ window.CQ = window.CQ || {};
       if (M) {
         M.done = true;
         if (advanced) { winTitle(g, "MUN", "Mundial de Clubes"); M.champion = myClub(g).name; }
+        // registra o campeão de verdade mesmo perdendo — mesmo raciocínio já usado em
+        // CONTI/Copa do Mundo (sincroniza o campeão real ganhando ou perdendo, senão o
+        // resultado desse confronto nunca fica sabido em lugar nenhum)
+        else M.champion = fx.opp.name;
       }
     } else if (fx.superPhase === "KO") {
       const T = S.super;
@@ -1611,7 +1615,10 @@ window.CQ = window.CQ || {};
     p.morale = U.clamp(p.morale + 12, 5, 100);
     const bonus = ({ SUPER: 4000000, WC: 2500000, UCL: 2000000, MUN: 1500000, LIB: 1200000, UEL: 900000, GC: 700000, AC: 700000, BRA: 900000, LIGA: 900000, SUL: 600000, UECL: 600000, CDB: 500000, COPA: 400000, CA: 800000, EU: 800000, EST: 150000 }[key] || 300000);
     p.money += bonus;
-    g.season.lastTitle = { key: key, name: name, bonus: bonus };
+    // nº desse título nessa competição, por esse clube/seleção (já inclui o que acabou
+    // de entrar) — dá pro banner de comemoração mostrar "BICAMPEÃO"/"PENTACAMPEÃO"/etc.
+    const nth = p.titles.filter(function (t) { return t.key === key && t.club === withName; }).length;
+    g.season.lastTitle = { key: key, name: name, bonus: bonus, nth: nth, club: withName };
   }
 
   const FOCUS_ATTRS = {
@@ -1985,12 +1992,34 @@ window.CQ = window.CQ || {};
     if (lg !== "BRA") put("BRA", pickWeighted(D.clubsOf("BRA"), rngY).name);
     if (S.comps.CDB) put("CDB", S.comps.CDB.champion);
     else put("CDB", pickWeighted(D.clubsOf("BRA"), U.rngFor(g.seed, "cdbx", y)).name);
-    if (contiResult && (contiResult.id === "LIB")) put("LIB", contiResult.champion);
-    else put("LIB", pickWeighted(D.clubsOf("SAM").concat(D.clubsOf("BRA").filter(function (c) { return c.str >= 80; })), U.rngFor(g.seed, "libx", y)).name);
-    if (contiResult && contiResult.id === "UCL") put("UCL", contiResult.champion);
-    else {
-      const pool = D.EURO_LEAGUES.reduce(function (acc, l) { return acc.concat(D.clubsOf(l).filter(function (c) { return c.str >= 84; })); }, []);
-      put("UCL", pickWeighted(pool, U.rngFor(g.seed, "uclx", y)).name);
+    // as 5 competições continentais possíveis (antes só LIB/UCL eram registradas em
+    // g.champs — SUL/UEL/UECL já rodam de fundo pro mundo todo desde a fatia de ida e
+    // volta, só nunca tinham entrado no histórico de campeões). O jogador só disputa
+    // UMA por temporada; usa o resultado real quando é essa, senão simula por peso
+    // igual já era feito pra LIB/UCL (pool/limiar de força por competição).
+    const CONTI_TIERS = {
+      LIB: function () { return D.clubsOf("SAM").concat(D.clubsOf("BRA").filter(function (c) { return c.str >= 80; })); },
+      SUL: function () { return D.clubsOf("SAM").concat(D.clubsOf("BRA").filter(function (c) { return c.str >= 70 && c.str < 80; })); },
+      UCL: function () { return D.EURO_LEAGUES.reduce(function (acc, l) { return acc.concat(D.clubsOf(l).filter(function (c) { return c.str >= 84; })); }, []); },
+      UEL: function () { return D.EURO_LEAGUES.reduce(function (acc, l) { return acc.concat(D.clubsOf(l).filter(function (c) { return c.str >= 76 && c.str < 84; })); }, []); },
+      UECL: function () { return D.EURO_LEAGUES.reduce(function (acc, l) { return acc.concat(D.clubsOf(l).filter(function (c) { return c.str >= 68 && c.str < 76; })); }, []); }
+    };
+    Object.keys(CONTI_TIERS).forEach(function (ck) {
+      if (contiResult && contiResult.id === ck) { put(ck, contiResult.champion); return; }
+      const pool = CONTI_TIERS[ck]();
+      put(ck, pool.length ? pickWeighted(pool, U.rngFor(g.seed, "contix" + ck, y)).name : "—");
+    });
+    // Mundial de Clubes e Supermundial: diferente das ligas/copas acima, esses 2 só
+    // existem no mundo do jogo nos anos em que o CLUBE do jogador é convidado
+    // (buildMundialCycle) — não rodam de fundo pra ninguém mais. Por isso só entram no
+    // histórico nos anos em que de fato aconteceram na carreira (registrando o campeão
+    // real, mesmo quando não foi o jogador quem venceu — o chaveamento já resolve o
+    // resto do mundo de verdade). Anos sem convite ficam sem registro — não tem o que
+    // simular, o torneio simplesmente não existiu nesse ano pra ninguém.
+    if (S.mundial && S.mundial.champion) put("MUN", S.mundial.champion);
+    if (S.super && S.super.bracket) {
+      if (!S.super.bracket.champion) completeCup(g, S.super.bracket);
+      if (S.super.bracket.champion) put("SUPER", S.super.bracket.champion);
     }
     if (S.comps.EST) put("EST", S.comps.EST.knock.champion || "—");
     // campeões de TODAS as ligas europeias (as que o jogador não disputa são simuladas)
@@ -2364,6 +2393,7 @@ window.CQ = window.CQ || {};
     leagueOf: leagueOf, myClub: myClub, oppObj: oppObj, natTeamObj: natTeamObj,
     refreshWorldLeagues: refreshWorldLeagues,
     STAGE_NAMES: STAGE_NAMES, NAT_FLAGS: NAT_FLAGS, TOUR_CONF: TOUR_CONF, tieDrawn: tieDrawn, discGroup: discGroup,
-    teamStrength: teamStrength, simScore: simScore
+    teamStrength: teamStrength, simScore: simScore, benchRoll: benchRoll,
+    winTitle: winTitle, recordChampions: recordChampions
   };
 })();

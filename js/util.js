@@ -76,6 +76,11 @@ window.CQ = window.CQ || {};
   }
   function fmtNota(n) { return (Math.round(n * 10) / 10).toFixed(1).replace(".", ","); }
   function plural(n, s, p) { return n === 1 ? s : p; }
+  // "BICAMPEÃO"/"PENTACAMPEÃO"/etc — usado no banner de título quando o jogador repete
+  // a mesma competição pelo mesmo clube/seleção (n >= 2; n===1 não tem ordinal, é só o
+  // primeiro título).
+  const TITULO_ORDINAL = { 2: "BICAMPEÃO", 3: "TRICAMPEÃO", 4: "TETRACAMPEÃO", 5: "PENTACAMPEÃO", 6: "HEXACAMPEÃO", 7: "HEPTACAMPEÃO", 8: "OCTACAMPEÃO" };
+  function tituloOrdinal(n) { return TITULO_ORDINAL[n] || (n > 8 ? n + "x CAMPEÃO" : ""); }
 
   // ---------- nomes ----------
   const FIRST_BR = ["Gabriel", "Lucas", "Matheus", "Pedro", "João", "Kaio", "Vinícius", "Rafael", "Thiago", "Bruno", "Diego", "Caio", "Ítalo", "Wesley", "Yuri", "Everton", "Rodrigo", "Felipe", "Douglas", "Renan", "Igor", "Alex", "Wallace", "Robson", "Maurício", "Jean", "Vitor", "Davi", "Endrick", "Talles", "Ryan", "Luan", "Marcos", "Emerson", "Fabrício", "Nathan", "Samuel", "Erick", "Hulk", "Dener"];
@@ -300,6 +305,6 @@ window.CQ = window.CQ || {};
     hashStr, mulberry32, rngFor, ri, rf, choice, chance, shuffle, poisson, clamp,
     esc, cleanInput, fmtBRL, fmtNota, plural,
     nameGen, portraitSVG, crestSVG, crestSVGFallback, flagImg, natAvatar, I,
-    patternFillFor, jerseySVG
+    patternFillFor, jerseySVG, tituloOrdinal
   };
 })();

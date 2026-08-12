@@ -288,13 +288,24 @@ window.CQ = window.CQ || {};
       </div>`;
   }
 
+  // clubes elegíveis pra COMEÇAR a carreira: só pequenos/médios (força <= 79) — os
+  // grandes/tradicionais ficam de fora de propósito. Começar num clube forte com overall
+  // baixo de estreante prende o jogador no banco (confiança do técnico cai por não
+  // jogar, o que reduz ainda mais a chance de jogar — ver benchRoll/bumpConf,
+  // js/engine.js); clubes grandes continuam alcançáveis depois, pelo sistema de ofertas
+  // que já existe (makeOffers/acceptOffer) conforme o jogador se destaca.
+  function startClubPool() {
+    return D.clubsOf("BRA").filter(function (c) { return c.str <= 79; });
+  }
   function createStep3(d) {
-    const clubs = D.clubsOf("BRA").map(function (c) {
+    const clubs = startClubPool().map(function (c) {
       return `<button class="choice ${d.clubId === c.id ? "sel" : ""}" onclick="CQ.ui.dset('clubId','${c.id}')">
         <span style="float:right">${crest(c, "crest-24")}</span><b>${esc(c.name)}</b><small>Força ${c.str} · ${c.uf}</small></button>`;
     }).join("");
     return `
-      <p class="muted mb12">Onde começa a história? Todos os 20 clubes da Série A estão na mesa — ou deixe o destino escolher.</p>
+      <p class="muted mb12">Onde começa a história? Comece pequeno — os grandes clubes da
+      Série A te chamam com o tempo, conforme você se destaca, pelo próprio mercado de
+      transferências. Ou deixe o destino escolher.</p>
       <div class="btnrow mb12"><button class="btn btn-sm" onclick="CQ.ui.randomClub()">Clube aleatório</button></div>
       <div class="choice-grid">${clubs}</div>
       <div class="btnrow mt16">
@@ -317,7 +328,7 @@ window.CQ = window.CQ || {};
     render();
   }
   function randomClub() {
-    CQ.state.draft.clubId = U.choice(D.clubsOf("BRA")).id;
+    CQ.state.draft.clubId = U.choice(startClubPool()).id;
     render();
   }
   function createNext() {
@@ -499,6 +510,28 @@ window.CQ = window.CQ || {};
       const discHere = !fx.isNatMatch && p.disc && p.disc[CQ.engine.discGroup(fx)];
       if (discHere && discHere.susp > 0) notices.push(`<div class="notice warn">Suspenso — cumpre ${discHere.susp} ${U.plural(discHere.susp, "jogo", "jogos")} de gancho nesta competição.</div>`);
       if (p.condition < 40) notices.push(`<div class="notice warn">Condição física baixa (${Math.round(p.condition)}%). Risco de lesão elevado — considere poupar.</div>`);
+      // pode jogar? mesma checagem que resolveMatch usa de verdade (canPlay, engine.js) —
+      // aqui só decide o RÓTULO do botão principal, não o resultado.
+      const canPlayHere = p.injury <= 0 && (fx.isNatMatch || !discHere || discHere.susp <= 0);
+      // botão principal: mata-mata (decisivo ou não) já entra direto no modo Ao Vivo —
+      // não existe mais um botão "Ao vivo" separado. Jogo comum vira "Acompanhar
+      // partida" quando o jogador não pode entrar em campo (lesão/suspensão).
+      const playLabel = fx.decisive ? "Entrar em campo — ao vivo"
+        : fx.knock ? "Jogar a partida — ao vivo"
+        : canPlayHere ? "Jogar a partida" : "Acompanhar partida";
+      // status antes da partida: Titular/Banco/Fora da lista. Reconstrói o MESMO RNG
+      // que resolveMatch vai usar de verdade (mesma seed+chaves) só pra espiar o
+      // resultado de benchRoll — seguro pro determinismo porque rngFor sempre recria um
+      // gerador novo a partir da seed, nunca compartilha posição com a resolução real
+      // que vai rolar depois quando o jogador de fato clicar em jogar.
+      let statusBadge = `<span class="badge badge-verm">Fora da lista</span>`;
+      if (canPlayHere) {
+        const previewRng = U.rngFor(G.seed, "match", G.year, (G.season && G.season.idx) || 0);
+        const bench = E().benchRoll(G, fx, previewRng);
+        statusBadge = bench.starts ? `<span class="badge badge-gold">Titular</span>`
+          : bench.minutes > 0 ? `<span class="badge">Banco — deve entrar</span>`
+          : `<span class="badge badge-soft">Banco</span>`;
+      }
       lead = `<div class="lead">
         <div class="lead-kicker">${comp}${sub ? " — " + sub : ""}${fx.decisive ? '<span class="live-flag">Ao vivo</span>' : ""}</div>
         <h1 class="lead-head">${esc(leadHeadline(fx))}</h1>
@@ -508,13 +541,13 @@ window.CQ = window.CQ || {};
           <div class="lm-vs">×</div>
           <div class="lm-team">${crest(fx.home ? fx.opp : fx.myTeam, "")}<span class="lm-name">${esc(fx.home ? fx.opp.name : fx.myTeam.name)}</span><span class="lm-role">Visitante</span></div>
         </div>
+        <p class="mt8">Você: ${statusBadge}</p>
         ${matchdayBanner(G, fx)}
         ${notices.length ? `<div class="stack mt12" style="gap:8px">${notices.join("")}</div>` : ""}
         <div class="lead-cta"><div class="btnrow">
-          <button class="btn btn-pri btn-big" onclick="CQ.ui.actionPlay()">${fx.decisive ? "Entrar em campo — ao vivo" : "Jogar a partida"}</button>
-          ${fx.knock && !fx.decisive ? `<button class="btn btn-green" onclick="CQ.ui.actionPlayLive()">Ao vivo</button>` : ""}
+          <button class="btn btn-pri btn-big" onclick="CQ.ui.actionPlay()">${playLabel}</button>
           <button class="btn btn-gold" onclick="CQ.ui.actionRest()">Poupar</button>
-          <button class="btn btn-ghost" onclick="CQ.ui.actionSim(1)">Simular</button>
+          <button class="btn btn-ghost" onclick="CQ.ui.actionSim(1)">Simulação rápida</button>
           <button class="btn btn-ghost" onclick="CQ.ui.actionSim(5)">Simular 5</button>
           <button class="btn btn-ghost" onclick="CQ.ui.actionSim(10)">Simular 10</button>
         </div></div>
@@ -631,8 +664,7 @@ window.CQ = window.CQ || {};
 
   // ---------------- ações de jogo ----------------
   // entra no modo ao vivo de fato (com o aviso de primeira vez). `voltar` é a ação que o
-  // botão do aviso dispara — assim o mesmo aviso serve pro caminho automático das finais
-  // e pro botão "Ao vivo" opcional do mata-mata.
+  // botão do aviso dispara — assim o mesmo aviso serve pra qualquer partida de mata-mata.
   function startLive(G, fx, voltar) {
     if (!G.player.seenLiveIntro) {
       G.player.seenLiveIntro = true;
@@ -642,8 +674,9 @@ window.CQ = window.CQ || {};
           <p>Esta partida você acompanha <b>minuto a minuto</b>: lances, decisões e,
           se empatar, os pênaltis, tudo em tempo real — diferente das partidas normais,
           que são resolvidas com um clique.</p>
-          <p class="small muted">As finais entram ao vivo sozinhas; nos outros jogos de
-          mata-mata, é escolha sua — o botão "Ao vivo" fica ao lado do de jogar.</p>
+          <p class="small muted">Toda partida de mata-mata (final ou não) já entra ao
+          vivo direto pelo botão de jogar — jogos normais de liga continuam resolvendo
+          num clique só.</p>
         </div>
         <div class="card-b" style="padding-top:0">
           <button class="btn btn-pri btn-block" onclick="${voltar}">Entendi, vamos lá</button>
@@ -658,7 +691,9 @@ window.CQ = window.CQ || {};
     const G = g();
     const fx = E().currentFixture(G);
     if (!fx) { seasonEndFlow(); return; }
-    if (fx.decisive) { startLive(G, fx, "CQ.ui.actionPlay()"); return; }
+    // qualquer mata-mata (decisivo ou não) já entra direto ao vivo pelo botão
+    // principal — não existe mais um botão "Ao vivo" separado (era redundante).
+    if (fx.decisive || fx.knock) { startLive(G, fx, "CQ.ui.actionPlay()"); return; }
     const res = E().resolveMatch(G, fx, {});
     E().applyMatch(G, res);
     CQ.main.save();
@@ -666,7 +701,8 @@ window.CQ = window.CQ || {};
     afterMatchFlow(res);
   }
 
-  // modo ao vivo por escolha do jogador, em qualquer partida de mata-mata
+  // ainda exportada por compatibilidade (nenhum botão chama mais — actionPlay já cobre
+  // qualquer mata-mata), mantém o mesmo comportamento caso algo externo dependa dela.
   function actionPlayLive() {
     const G = g();
     const fx = E().currentFixture(G);
@@ -1117,15 +1153,16 @@ window.CQ = window.CQ || {};
   function renderShootout() {
     const live = CQ.state.live, so = live.shootout, fx = live.fixture;
     const myShort = esc(fx.myTeam.short), opShort = esc(fx.opp.short);
-    function dots(shown, total) {
-      let out = "";
-      for (let i = 0; i < Math.max(total, 5); i++) {
-        if (i < shown.length) out += `<i class="${shown[i] ? "ok" : "miss"}"></i>`;
-        else out += `<i></i>`;
-      }
+    const running = CQ.live.shootRunning(so);
+    // só desenha o que já aconteceu + 1 bolinha "pendente" enquanto a disputa segue —
+    // nunca o total de cobranças (so.log.length já é conhecido de antemão, pois
+    // runShootout calcula a disputa inteira de uma vez; mostrar esse total de cara
+    // entregava de graça quantas cobranças vão rolar, spoiler reportado pelo usuário).
+    function dots(shown) {
+      let out = shown.map(function (ok) { return `<i class="${ok ? "ok" : "miss"}"></i>`; }).join("");
+      if (running) out += `<i class="pending"></i>`;
       return out;
     }
-    const running = CQ.live.shootRunning(so);
     const myGoals = so.myShown.filter(Boolean).length;
     const opGoals = so.opShown.filter(Boolean).length;
     // qual foi o último lance revelado (para o comentário)
@@ -1139,8 +1176,8 @@ window.CQ = window.CQ || {};
     }
     const foot = $("#lv-foot");
     let footHTML = `<div class="shootout-panel">
-      <div class="shoot-team"><span>${myShort}</span><span class="shoot-dots">${dots(so.myShown, Math.ceil(so.log.length / 2))}</span><b class="tnum">${myGoals}</b></div>
-      <div class="shoot-team"><span>${opShort}</span><span class="shoot-dots">${dots(so.opShown, Math.ceil(so.log.length / 2))}</span><b class="tnum">${opGoals}</b></div>
+      <div class="shoot-team"><span>${myShort}</span><span class="shoot-dots">${dots(so.myShown)}</span><b class="tnum">${myGoals}</b></div>
+      <div class="shoot-team"><span>${opShort}</span><span class="shoot-dots">${dots(so.opShown)}</span><b class="tnum">${opGoals}</b></div>
       <p class="shoot-comment ${last && last.ok ? "ok" : last ? "miss" : ""}">${esc(lastTxt)}</p>`;
     if (running) {
       footHTML += `<button class="btn btn-pri btn-block" onclick="CQ.ui.shootReveal()">Próxima cobrança &rsaquo;</button>`;
@@ -1184,10 +1221,12 @@ window.CQ = window.CQ || {};
     const cores = [cl.c1 || "#b8330f", cl.c2 || "#f5efdf", "#9c7c1e"];
     dropConfetti(cores);
     if (CQ.audio) CQ.audio.play("trophy");
+    const ordinal = t.nth >= 2 ? U.tituloOrdinal(t.nth) : "";
     overlay(`<div class="trophy-banner">
       ${trophyIcon(t.key)}
-      <div class="tb-k">É campeão · ${g().year}</div>
+      <div class="tb-k">${ordinal ? esc(ordinal) + " · " : "É campeão · "}${g().year}</div>
       <h2>${esc(t.name)}</h2>
+      ${ordinal ? `<p class="mt4 muted">${esc((t.nth) + "º título")}${t.club ? " pelo " + esc(t.club) : ""}</p>` : ""}
       <p class="mt8">Bônus de título: <b>${U.fmtBRL(t.bonus)}</b></p>
     </div>
     <div style="padding:16px"><button class="btn btn-green btn-block btn-big" onclick="CQ.ui.closeTitle()">Levantar a taça</button></div>`);
@@ -1265,7 +1304,15 @@ window.CQ = window.CQ || {};
     const nextBtn = `<div class="btnrow mt16"><button class="btn btn-pri btn-big btn-block" onclick="CQ.ui.summaryNextStep()">Próximo ${I.arrowR}</button></div>`;
     const steps = [];
 
-    const titles = sum.titles.length ? `<div class="notice ok mb8">${I.trophy} Títulos: <b>${sum.titles.map(esc).join(", ")}</b></div>` : "";
+    // recalcula a partir de p.titles (não só sum.titles, que é só uma lista de nomes)
+    // pra poder mostrar o ordinal (BICAMPEÃO/PENTACAMPEÃO/etc) de cada título — o
+    // jogador pode ganhar mais de um título no mesmo ano (ex. liga + copa), por isso é
+    // por título individual, não um único "lastTitle" (que só guarda o último do ano).
+    const titleEntries = p.titles.filter(function (t) { return t.year === sum.year; });
+    const titles = titleEntries.length ? `<div class="notice ok mb8">${I.trophy} Títulos: <b>${titleEntries.map(function (t) {
+      const nth = p.titles.filter(function (t2) { return t2.key === t.key && t2.club === t.club && t2.year <= t.year; }).length;
+      return esc((nth >= 2 ? U.tituloOrdinal(nth) + " · " : "") + t.name);
+    }).join(", ")}</b></div>` : "";
     const idol = sum.becameIdol ? `<div class="notice ok mb8">${I.star} <b>Você virou ÍDOLO do ${esc(sum.becameIdol)}!</b> Estátua na entrada do estádio e nome eternizado na história do clube.</div>` : "";
     const capt = sum.newCaptain ? `<div class="notice ok mb8">${I.trophy} <b>Você é o novo capitão do ${esc(sum.newCaptain)}!</b> A braçadeira reconhece sua liderança.</div>` : "";
     const traitsN = sum.newTraits && sum.newTraits.length ? `<div class="notice ok mb8">${I.star} Novo traço desbloqueado: ${sum.newTraits.map(function (k) { return "<b>" + esc(CQ.engine.TRAITS[k].name) + "</b>"; }).join(", ")}.</div>` : "";
@@ -1274,10 +1321,10 @@ window.CQ = window.CQ || {};
     if (sum.moves.myMove === "up") moves.push('<div class="notice ok">ACESSO! Na próxima temporada, o clube sobe de divisão.</div>');
     const convo = sum.convNews === "convocado" ? '<div class="notice ok">Convocado para a Seleção! O ciclo internacional entra no seu calendário.</div>'
       : sum.convNews === "cortado" ? '<div class="notice warn">Você perdeu a vaga na Seleção. Rendimento manda.</div>' : "";
-    if (sum.titles.length || sum.becameIdol || sum.newCaptain || (sum.newTraits && sum.newTraits.length) || moves.length || convo) {
+    if (titleEntries.length || sum.becameIdol || sum.newCaptain || (sum.newTraits && sum.newTraits.length) || moves.length || convo) {
       steps.push({
-        confetti: sum.titles.length ? [E().myClub(G).c1 || "#b8330f", E().myClub(G).c2 || "#f5efdf", "#9c7c1e"] : null,
-        sound: sum.titles.length ? "trophy" : null,
+        confetti: titleEntries.length ? [E().myClub(G).c1 || "#b8330f", E().myClub(G).c2 || "#f5efdf", "#9c7c1e"] : null,
+        sound: titleEntries.length ? "trophy" : null,
         html: `${head}<div style="padding:16px">${titles}${idol}${capt}${traitsN}${moves.join("")}${convo}${nextBtn}</div>`
       });
     }
@@ -2370,16 +2417,18 @@ window.CQ = window.CQ || {};
         return { name: pl.name, pos: pl.pos, age: pl.age, ov: pl.ovr, real: pl.real };
       }).sort(function (a, b) { return b.ov - a.ov; });
     }
+    // fallback (sem CQ.world): mesma chave de RNG e mesmos helpers de idade/overall
+    // que initClubRoster (js/world.js) usa, pra nunca divergir do mundo persistente.
     const rng = U.rngFor(G.seed, "squad", cl.id, G.year);
     const real = D.REAL_SQUADS && D.REAL_SQUADS[cl.id];
     if (real) {
       return real.map(function (pl) {
-        return { name: pl.n, pos: pl.p, age: U.ri(18, 35, rng), ov: U.clamp(cl.str - 4 + U.ri(-6, 6, rng), 55, 93), real: true };
+        return { name: pl.n, pos: pl.p, age: CQ.world.rollAge(rng, 35), ov: CQ.world.rollOvr(cl.str, rng), real: true };
       }).sort(function (a, b) { return b.ov - a.ov; });
     }
     const POSN = ["GOL", "GOL", "ZAG", "ZAG", "ZAG", "LAT", "LAT", "LAT", "VOL", "VOL", "VOL", "MEI", "MEI", "MEI", "PON", "PON", "PON", "ATA", "ATA", "ATA"];
     return POSN.map(function (pos, i) {
-      return { name: U.nameGen(rng, "BR"), pos: pos, age: U.ri(18, 34, rng), ov: U.clamp(cl.str - 5 + U.ri(-5, 6, rng), 52, 92) };
+      return { name: U.nameGen(rng, "BR"), pos: pos, age: CQ.world.rollAge(rng, 34), ov: CQ.world.rollOvr(cl.str, rng, 5, 4, 52, 92) };
     }).sort(function (a, b) { return b.ov - a.ov; });
   }
 
@@ -2665,6 +2714,7 @@ window.CQ = window.CQ || {};
     ctab: ctab, ttab: ttab, closeTitle: closeTitle, closeDraw: closeDraw, closeCapa: closeCapa, votePoll: votePoll,
     setLogo: setLogo, clearLogo: clearLogo, toast: toast,
     requestTransfer: requestTransfer, cancelTransfer: cancelTransfer,
-    setFocus: setFocus, buyAsset: buyAsset
+    setFocus: setFocus, buyAsset: buyAsset,
+    startClubPool: startClubPool, squadOf: squadOf
   };
 })();

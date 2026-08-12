@@ -23,9 +23,34 @@ window.CQ = window.CQ || {};
     return "EN";
   }
 
-  // elenco inicial de um clube — MESMA fórmula e MESMA chave de RNG que squadOf
-  // sempre usou, pra migração de saves antigos ser invisível: reproduz byte a byte
-  // o que a tela de elenco já mostrava um instante antes de existir o mundo.
+  // idade ponderada pro meio de carreira — jovem 18-21 (~15%), auge 22 até hi-5 (~65%),
+  // veterano hi-4..hi (~20%). Substitui o antigo U.ri(18,hi,rng) uniforme, que dava a
+  // mesma chance de um garoto de 18 e um veterano de 35 (causa raiz do bug relatado:
+  // jogador real famoso e experiente podia cair em qualquer idade do intervalo,
+  // inclusive ≤20 e entrar na aba Base). Consome sempre 2 sorteios (determinístico,
+  // reproduzível pra mesma seed). Exportada — reaproveitada por squadOf (js/ui.js) pra
+  // não duplicar a fórmula em 2 lugares.
+  function rollAge(rng, hi) {
+    hi = hi || 35;
+    const roll = U.rf(0, 1, rng);
+    if (roll < 0.15) return U.ri(18, 21, rng);
+    if (roll < 0.80) return U.ri(22, hi - 5, rng);
+    return U.ri(hi - 4, hi, rng);
+  }
+  // overall ao redor da força do clube. Sem dado real de qualidade por jogador em
+  // REAL_SQUADS (só nome+posição — ver js/data.js), não dá pra saber quem é o craque e
+  // quem é reserva; a mitigação aqui é só deixar o ruído mais contido (era ±6, agora
+  // ±4 por padrão) pra não oscilar tão selvagem em torno da força do clube.
+  function rollOvr(clubStr, rng, base, noise, lo, hi) {
+    base = base == null ? 4 : base; noise = noise == null ? 4 : noise;
+    lo = lo == null ? 55 : lo; hi = hi == null ? 93 : hi;
+    return U.clamp(clubStr - base + U.ri(-noise, noise, rng), lo, hi);
+  }
+
+  // elenco inicial de um clube — MESMA chave de RNG que squadOf sempre usou, pra
+  // migração de saves antigos ser invisível (só a fórmula de idade/overall mudou nesta
+  // sessão — ver rollAge/rollOvr acima — então os valores em si são novos, mas a chave
+  // determinística continua a mesma pros dois caminhos nunca divergirem entre si).
   function initClubRoster(g, clubId) {
     const cl = D.CLUBS[clubId];
     const real = D.REAL_SQUADS && D.REAL_SQUADS[clubId];
@@ -34,7 +59,7 @@ window.CQ = window.CQ || {};
       return real.map(function (pl, idx) {
         return {
           id: clubId + "_" + idx, name: pl.n, pos: pl.p,
-          age: U.ri(18, 35, rng), ovr: U.clamp(cl.str - 4 + U.ri(-6, 6, rng), 55, 93),
+          age: rollAge(rng, 35), ovr: rollOvr(cl.str, rng),
           real: true
         };
       });
@@ -43,7 +68,7 @@ window.CQ = window.CQ || {};
     return POSN.map(function (pos, idx) {
       return {
         id: clubId + "_" + idx, name: U.nameGen(rng, natHintForClub(clubId)), pos: pos,
-        age: U.ri(18, 34, rng), ovr: U.clamp(cl.str - 5 + U.ri(-5, 6, rng), 52, 92),
+        age: rollAge(rng, 34), ovr: rollOvr(cl.str, rng, 5, 4, 52, 92),
         real: false
       };
     });
@@ -110,5 +135,5 @@ window.CQ = window.CQ || {};
     });
   }
 
-  CQ.world = { buildWorld: buildWorld, advanceWorld: advanceWorld };
+  CQ.world = { buildWorld: buildWorld, advanceWorld: advanceWorld, rollAge: rollAge, rollOvr: rollOvr };
 })();
