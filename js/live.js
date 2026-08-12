@@ -81,15 +81,20 @@ window.CQ = window.CQ || {};
       evs.push({ min: m, type: "info", text: colorTexts[i % colorTexts.length] });
     });
 
-    // eventos de atmosfera em jogos decisivos (clima quente)
-    if (fixture.decisive && U.chance(0.8)) {
+    // eventos de atmosfera em jogos de clima quente (decisivos ou mata-mata — agora que
+    // existe o botão "Ao vivo" opcional, faz sentido esses jogos também terem clima)
+    if ((fixture.decisive || fixture.knock) && U.chance(0.8)) {
       const flavorPool = [
         { t: "flare", txt: "Sinalizadores acesos na arquibancada; a fumaça toma conta do estádio." },
         { t: "brawl", txt: "Confusão generalizada! Jogadores dos dois times se estranham no gramado. O árbitro tenta apartar." },
         { t: "invasion", txt: "Um torcedor invade o campo e é retirado pelos seguranças. Jogo paralisado." },
         { t: "var", txt: "O árbitro vai ao VAR revisar um lance. Tensão total à beira do gramado." },
         { t: "coach", txt: "Discussão acalorada entre os bancos; um auxiliar recebe cartão." },
-        { t: "crowd", txt: "A torcida faz um mosaico gigante e o barulho é ensurdecedor." }
+        { t: "crowd", txt: "A torcida faz um mosaico gigante e o barulho é ensurdecedor." },
+        { t: "dog", txt: "Um cachorro entra correndo no gramado e sai com a bola debaixo do focinho! A torcida ri, o árbitro paralisa o jogo." },
+        { t: "rain", txt: "Chuva forte começa a cair; a bola escorrega e o ritmo do jogo muda." },
+        { t: "laser", txt: "Um facho de laser da torcida visitante incomoda o goleiro antes da cobrança." },
+        { t: "drone", txt: "Um drone sobrevoa o gramado carregando uma bandeira de protesto — a organizada reage aos gritos." }
       ];
       const nFlavor = fixture.stage === "F" || fixture.classic ? U.ri(2, 3) : U.ri(1, 2);
       const fmins = minutesFor(nFlavor, used, 8, 86);

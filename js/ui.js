@@ -416,7 +416,9 @@ window.CQ = window.CQ || {};
     Object.keys(buckets).forEach(function (pos) {
       out.push.apply(out, squad.filter(function (j) { return j.pos === pos; }).slice(0, buckets[pos]));
     });
-    if (p.injury === 0 && (p.susp === 0 || isNat)) {
+    const dGrp = !isNat && fx && p.disc && p.disc[CQ.engine.discGroup(fx)];
+    const suspHere = !!(dGrp && dGrp.susp > 0);
+    if (p.injury === 0 && (!suspHere || isNat)) {
       const idx = out.findIndex(function (j) { return j.pos === p.pos; });
       const me = { name: p.name, pos: p.pos, ov: p.overall, isMe: true };
       if (idx >= 0) out[idx] = me; else out.push(me);
@@ -494,7 +496,8 @@ window.CQ = window.CQ || {};
       const comp = parts[0], sub = parts.slice(1).join(" · ");
       const notices = [];
       if (p.injury > 0) notices.push(`<div class="notice">${I.injury} Lesionado — fora por aproximadamente <b>${p.injury}</b> ${U.plural(p.injury, "jogo", "jogos")}. Você não entra em campo.</div>`);
-      if (p.susp > 0 && !fx.isNatMatch) notices.push(`<div class="notice warn">Suspenso — cumpre ${p.susp} ${U.plural(p.susp, "jogo", "jogos")} de gancho.</div>`);
+      const discHere = !fx.isNatMatch && p.disc && p.disc[CQ.engine.discGroup(fx)];
+      if (discHere && discHere.susp > 0) notices.push(`<div class="notice warn">Suspenso — cumpre ${discHere.susp} ${U.plural(discHere.susp, "jogo", "jogos")} de gancho nesta competição.</div>`);
       if (p.condition < 40) notices.push(`<div class="notice warn">Condição física baixa (${Math.round(p.condition)}%). Risco de lesão elevado — considere poupar.</div>`);
       lead = `<div class="lead">
         <div class="lead-kicker">${comp}${sub ? " — " + sub : ""}${fx.decisive ? '<span class="live-flag">Ao vivo</span>' : ""}</div>
@@ -797,6 +800,11 @@ window.CQ = window.CQ || {};
     const G = g();
     if (res.hatTrick) toast("HAT-TRICK! Três gols numa partida.");
     if (res.milestones && res.milestones.length) toast("Marco batido: " + res.milestones[0].n + " " + res.milestones[0].label + "!");
+    if (res.injuryNew) toast(`Lesão: você fica fora por aproximadamente ${res.injuryNew} ${res.injuryNew === 1 ? "jogo" : "jogos"}.`);
+    // jogo importante: coletiva de 3 perguntas no lugar da entrevista de 1 pergunta —
+    // as duas juntas ficariam repetitivas pro mesmo jogo
+    const pc = res.fixture.decisive ? CQ.nar.maybePressConference(G, res) : null;
+    if (pc) { showPressConference(pc); return; }
     const itv = CQ.nar.maybeInterview(G, res);
     if (itv) { showInterview(itv, res); return; }
     afterInterview();
@@ -858,6 +866,41 @@ window.CQ = window.CQ || {};
     const itv = CQ.state.itv;
     CQ.nar.applyInterview(g(), itv, itv.options[i]);
     CQ.state.itv = null;
+    closeOverlay();
+    CQ.main.save();
+    render();
+    afterInterview();
+  }
+
+  // ---------------- coletiva de imprensa (3 perguntas, jogos importantes) ----------------
+  // mesma "casca" visual da entrevista pós-jogo, repetida 3 vezes; CQ.state.press guarda o
+  // progresso (mesmo padrão transiente de CQ.state.itv/lifeEv/summary, nunca salvo no save)
+  function showPressConference(pc) {
+    CQ.state.press = { qs: pc.questions, idx: 0 };
+    pressStepRender();
+  }
+  function pressStepRender() {
+    const s = CQ.state.press, item = s.qs[s.idx];
+    const opts = item.options.map(function (o, i) {
+      return `<button class="opt2" onclick="CQ.ui.pickPress(${i})">
+        <span class="o2-label">${esc(o.label)} <span class="o2-tone">${esc(o.tone)}</span></span>
+        ${fxChips({ rep: o.rep, fame: o.fame, morale: o.morale })}</button>`;
+    }).join("");
+    overlay(`<div class="modal2">
+      <div class="modal2-hero ev-verm">
+        <div class="modal2-icon">${I.press}</div>
+        <div class="modal2-kicker">${I.press} Coletiva de imprensa · pergunta ${s.idx + 1} de ${s.qs.length}</div>
+        <div class="modal2-title">"${esc(item.q)}"</div>
+      </div>
+      <div class="modal2-body">${opts}</div>
+    </div>`);
+  }
+  function pickPress(i) {
+    const s = CQ.state.press, item = s.qs[s.idx];
+    CQ.nar.applyInterview(g(), item, item.options[i]);
+    s.idx++;
+    if (s.idx < s.qs.length) { pressStepRender(); return; }
+    CQ.state.press = null;
     closeOverlay();
     CQ.main.save();
     render();
@@ -2544,7 +2587,7 @@ window.CQ = window.CQ || {};
     createNext: createNext, finishCreate: finishCreate,
     actionPlay: actionPlay, actionPlayLive: actionPlayLive, actionRest: actionRest, actionSim: actionSim,
     liveStep: liveStep, liveDecide: liveDecide, shootPick: shootPick, shootReveal: shootReveal, finishLive: finishLive,
-    pickInterview: pickInterview, pickLife: pickLife,
+    pickInterview: pickInterview, pickPress: pickPress, pickLife: pickLife,
     seasonEndFlow: seasonEndFlow, summaryNext: summaryNext, summaryNextStep: summaryNextStep, pickOffer: pickOffer, pickRenew: pickRenew,
     managerLine: managerLine, managerConfTier: managerConfTier, MGR_LINES: MGR_LINES,
     ctab: ctab, ttab: ttab, closeTitle: closeTitle, closeDraw: closeDraw, closeCapa: closeCapa, votePoll: votePoll,

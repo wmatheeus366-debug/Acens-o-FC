@@ -925,3 +925,75 @@ cobrir os dois caminhos.
   jogando as próprias partidas (45 idas e 45 voltas, zero pênalti indevido na ida, zero
   eliminação incoerente), e 40 carreiras exercitando o modo ao vivo (17 empates na ida sem
   pênaltis, 11 agregados empatados indo a pênaltis corretamente).
+
+## BUG-07: suspensão vazando entre competições + lesão mais rara/avisada + mais eventos aleatórios + coletiva de imprensa
+
+Reportado: o jogador foi suspenso no Brasileirão e, com a suspensão ainda ativa, não pôde
+jogar a Libertadores logo em seguida — um cartão numa competição bloqueando outra
+completamente diferente.
+
+- **BUG-07 · Suspensão era um contador único e global** (`p.susp`/`p.yellows`),
+  compartilhado por **todas** as competições de clube — só jogo de Seleção era isento.
+  Vira um mapa por competição, `p.disc = { LIGA:{y,susp}, EST:{...}, CDB:{...},
+  CONTI:{...}, MUN:{...}, SUPER:{...} }`, via nova `discGroup(fx)` (`js/engine.js`) que
+  agrupa Libertadores/Sul-Americana/Champions/Europa/Conference sob o mesmo `CONTI` (o
+  jogador só disputa uma competição continental por temporada, então unificar essas é
+  seguro) e mantém as demais separadas. `canPlay`, o desconto de suspensão e os 2 avisos
+  na Home/escalação provável passam a ler o grupo certo. De quebra, cartão vermelho
+  ganhou a mesma isenção de jogo de Seleção que o acúmulo de amarelo já tinha (faltava,
+  achado ao mexer no mesmo trecho). Migração aditiva em `save.js` (`p.disc = {}` se
+  faltar), sem bump de versão.
+  Teste: `tests/regression.js › testDiscGroupIsolation` (reproduz o cenário exato
+  reportado: cartão no Brasileirão, confirma que a Libertadores não é afetada) e
+  `› testDiscGroupMapping`.
+
+- **Lesão mais rara.** Chance base por partida caiu de 2% para 1,2%, e as penalidades por
+  condição física baixa caíram de +5%/+7% para +3%/+4% — corte de ~40% na taxa geral,
+  mantendo a mecânica (nunca zerada, condição ruim ainda pesa mais). Também passou a ser
+  **avisada na hora**: `afterMatchInterview` (`js/ui.js`) mostra um toast imediato de
+  quantos jogos de baixa, no mesmo lugar onde hat-trick/marco já avisam hoje — antes só
+  aparecia no feed, sem interromper a tela.
+  Teste: `› testInjuryRateLower` (simula ~220 partidas, confirma queda de taxa e que pelo
+  menos 1 lesão real acontece na amostra).
+
+- **Mais eventos aleatórios em qualquer partida.** O clima de jogo (`flavorPool`,
+  `js/live.js`) só existia dentro do modo ao vivo e só em partidas decisivas — a imensa
+  maioria das partidas do jogo é resolvida num clique, então praticamente nunca
+  aparecia. Dois reforços:
+  - Novo `MATCH_NOTES` (`js/narrative.js`, 10 curiosidades — cachorro invade o campo e
+    sai com a bola, torcedor pula a grade, apagão, pipoca voando, pombos cruzando o
+    gramado, granizo, fumaça colorida, repórter escorrega, mascote quase brigando, bola
+    nas arquibancadas) sorteado dentro de `onMatch` — o único ponto que já dispara
+    exatamente 1x por partida, seja ela simulada ou jogada ao vivo. Chance pequena
+    (~6%) para continuar sendo um extra, não o normal.
+  - `flavorPool` ganhou 4 textos novos (cachorro, chuva, laser de torcida, drone) e passou
+    a valer em **qualquer** mata-mata (`fixture.knock`), não só decisivo — agora que existe
+    o botão "Ao vivo" por escolha (feature anterior), faz sentido essas partidas também
+    terem clima quando o jogador decide acompanhar.
+  - 3 eventos novos em `LIFE_EVENTS` (`js/narrative.js`), no mesmo formato dos já
+    existentes: namorada ligando precisando resolver algo, convite de patrocínio de casa
+    de apostas (aceitar rende dinheiro com custo de reputação, ou recusar), convite do
+    presidente do clube para um evento.
+  Testes: `› testMatchNotesAnyMatch`.
+
+- **Coletiva de imprensa** — 3 perguntas sempre diferentes (vida, temporada, carreira),
+  em jogos importantes. Nova `maybePressConference` (`js/narrative.js`) dispara em
+  qualquer partida decisiva (a mesma definição de "jogo importante" que já liga o modo ao
+  vivo automático) e sorteia 1 pergunta de cada categoria sem repetir até esgotar o pool
+  (mesmo padrão de não-repetição que os eventos de vida já usam). Em jogo decisivo, a
+  coletiva substitui a entrevista de 1 pergunta de hoje (evita duas rodadas de perguntas
+  pro mesmo jogo); os demais jogos continuam com a entrevista de sempre. Tela nova
+  (`showPressConference`/`pressStepRender`/`pickPress`, `js/ui.js`) reaproveita o mesmo
+  padrão de "um passo por vez com botão Próximo" já usado no balanço de temporada, e as
+  respostas usam a mesma função de aplicar efeito que a entrevista de pós-jogo já usava
+  (rep/fama/moral).
+  Teste: `› testPressConferenceStructure`.
+
+- **Validado**: 124/124 testes (12 checagens novas). Fora da suíte: 15 carreiras
+  simuladas até o fim (120 temporadas, ~4.900 partidas) cobrindo suspensão + lesão +
+  eventos + coletiva juntos, sem nenhuma exceção — 283 lesões (taxa observada ~2,7%,
+  batendo com a redução esperada), 372 notas de partida, 203 coletivas de imprensa
+  disparadas, e nenhum vazamento de suspensão entre grupos de competição em nenhuma
+  amostra. Fluxo de coletiva também conferido ponta a ponta manualmente (gera 3
+  perguntas de categorias diferentes → 3 respostas em sequência → estado limpa
+  corretamente → estatísticas do jogador atualizadas pelas respostas).

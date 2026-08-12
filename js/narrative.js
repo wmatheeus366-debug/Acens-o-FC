@@ -177,12 +177,35 @@ window.CQ = window.CQ || {};
     return fx;
   }
 
+  // curiosidades/flavor de estádio — rolada em QUALQUER partida (onMatch roda depois de
+  // toda partida, simulada ou ao vivo, uma vez só). O flavorPool de js/live.js só existe
+  // dentro do modo ao vivo (minoria das partidas); isto aqui cobre o resto: um post curto
+  // no feed, sem interação, sem efeito no jogo — só cor.
+  const MATCH_NOTES = [
+    "Um cachorro invadiu o gramado durante o jogo e saiu correndo com a bola — a torcida aplaudiu de pé.",
+    "Um torcedor pulou o alambrado pra abraçar o ídolo e foi retirado pela segurança em meio a risadas.",
+    "Faltou luz por alguns segundos no estádio; o jogo parou até o gerador entrar.",
+    "Um vendedor de pipoca 'invadiu' a bola de vista da câmera e virou meme nas redes ainda durante a partida.",
+    "A bola bateu na trave e voltou tão forte que quicou até a arquibancada — susto geral.",
+    "Um bando de pombos atravessou o gramado no meio de um lance e atrapalhou a jogada.",
+    "Choveu granizo por 5 minutos; a partida seguiu debaixo de guarda-chuvas na área técnica.",
+    "A organizada soltou fumaça colorida demais e o jogo ficou parado até a fumaça baixar.",
+    "Um repórter caiu no gramado tentando fugir de um chute que foi longe demais — está tudo bem, ele levantou rindo.",
+    "O mascote do time adversário tentou provocar a torcida e quase apanhou dos seguranças."
+  ];
+  function maybeMatchNote(g) {
+    if (!U.chance(0.06)) return;
+    post(g, "torcida", U.choice(MATCH_NOTES));
+  }
+
   // ---------- reações pós-jogo ----------
   function onMatch(g, res) {
     const p = g.player, fx = res.fixture;
     const opp = fx.opp.name;
     const score = res.gm + " a " + res.go;
     const meName = fx.isNatMatch ? fx.myTeam.name : CQ.engine.myClub(g).name;
+
+    maybeMatchNote(g);
 
     if (res.injuryNew) {
       post(g, "imprensa", "🚑 Baixa no " + meName + ": " + p.name + " deixa o gramado lesionado e vira dúvida pelas próximas " + res.injuryNew + " rodadas.", { hot: true });
@@ -252,6 +275,111 @@ window.CQ = window.CQ || {};
     const h = g.h2h;
     post(g, "mesa", "DUELO DE GERAÇÃO: " + g.player.name + " x " + r.name + " se reencontram nesta rodada. Retrospecto do confronto: " + h.v + "V " + h.e + "E " + h.d + "D. Quem leva a melhor?", { hot: true });
     if (U.chance(0.6)) post(g, "rival", "Rodada especial essa... Alguém aí vai assistir de camarote de novo? 😏", {});
+  }
+
+  // ---------- coletiva de imprensa (jogos importantes) ----------
+  // 3 perguntas sempre de categorias diferentes (vida/temporada/carreira), nunca repetindo
+  // dentro da mesma categoria até esgotar o pool — mesmo raciocínio de g.lifeSeen.
+  // Mesmo formato de opção que a entrevista pós-jogo (tone/label/rep/fame/morale), reaproveitado.
+  const PRESS_Q = {
+    vida: [
+      { q: "Como está sendo conciliar a vida pessoal com a pressão da temporada?", options: [
+        { tone: "humilde", label: "\"Não é fácil, mas minha família me ajuda a manter os pés no chão.\"", rep: +4, fame: 0, morale: +1 },
+        { tone: "confiante", label: "\"Aprendi a lidar com isso. Hoje consigo separar bem as coisas.\"", rep: 0, fame: +2, morale: +2 },
+        { tone: "provocador", label: "\"Prefiro não falar da minha vida pessoal aqui, não é da conta de vocês.\"", rep: -4, fame: +3, morale: 0 }
+      ] },
+      { q: "Muita gente comenta sua vida fora de campo. Como você lida com a exposição?", options: [
+        { tone: "humilde", label: "\"Sei que faz parte da profissão. Tento não deixar isso me afetar.\"", rep: +3, fame: +1, morale: +1 },
+        { tone: "confiante", label: "\"Já me acostumei. Quanto mais falam, mais sei que estou fazendo diferença.\"", rep: 0, fame: +4, morale: +1 },
+        { tone: "provocador", label: "\"Tem gente com tempo demais pra ficar comentando a vida dos outros.\"", rep: -5, fame: +3, morale: +1 }
+      ] },
+      { q: "Dá pra ter vida normal sendo quem você é hoje?", options: [
+        { tone: "humilde", label: "\"Não totalmente, mas não troco por nada. É o preço do sonho.\"", rep: +4, fame: 0, morale: +2 },
+        { tone: "confiante", label: "\"Eu vivo do meu jeito, sem me importar muito com o que acham.\"", rep: 0, fame: +2, morale: +2 },
+        { tone: "provocador", label: "\"Vida normal? Isso ficou pra trás faz tempo, e tá ótimo assim.\"", rep: -3, fame: +4, morale: +1 }
+      ] },
+      { q: "O que te tira do sério fora das quatro linhas?", options: [
+        { tone: "humilde", label: "\"Prefiro focar no que me deixa bem. Não vale a pena alimentar isso.\"", rep: +3, fame: 0, morale: +1 },
+        { tone: "confiante", label: "\"Nada me tira do sério hoje em dia. Aprendi a controlar as coisas.\"", rep: +1, fame: +2, morale: +2 },
+        { tone: "provocador", label: "\"Gente que fala sem saber o que eu passo. Isso me incomoda, sim.\"", rep: -4, fame: +3, morale: 0 }
+      ] },
+      { q: "Como sua família tem lidado com a sua rotina de jogador profissional?", options: [
+        { tone: "humilde", label: "\"Eles são minha base. Sem eles eu não estaria aqui.\"", rep: +5, fame: 0, morale: +2 },
+        { tone: "confiante", label: "\"Todo mundo já entendeu a rotina. Funciona bem do nosso jeito.\"", rep: +1, fame: +1, morale: +1 },
+        { tone: "provocador", label: "\"Minha família é assunto meu, não de entrevista.\"", rep: -3, fame: +1, morale: 0 }
+      ] }
+    ],
+    temporada: [
+      { q: "Como você avalia a temporada até aqui?", options: [
+        { tone: "humilde", label: "\"Ainda dá pra melhorar muito. O grupo sabe disso.\"", rep: +3, fame: 0, morale: +1 },
+        { tone: "confiante", label: "\"Estamos no caminho certo. Temporada sólida até aqui.\"", rep: 0, fame: +2, morale: +2 },
+        { tone: "provocador", label: "\"Pra mim está sendo ótima. Quem acha o contrário não está prestando atenção.\"", rep: -3, fame: +3, morale: +2 }
+      ] },
+      { q: "A cobrança por títulos aumentou. Como o grupo lida com essa pressão?", options: [
+        { tone: "humilde", label: "\"É natural cobrarem. A gente trabalha pra merecer essa expectativa.\"", rep: +4, fame: 0, morale: +1 },
+        { tone: "confiante", label: "\"A pressão é combustível pra gente. Time grande vive disso.\"", rep: 0, fame: +3, morale: +2 },
+        { tone: "provocador", label: "\"Pressão é pra quem não está preparado. Aqui a gente já sabe lidar.\"", rep: -4, fame: +4, morale: +2 }
+      ] },
+      { q: "Qual é a meta de vocês pra reta final da temporada?", options: [
+        { tone: "humilde", label: "\"Focar jogo a jogo. É assim que a gente vai longe.\"", rep: +3, fame: 0, morale: +1 },
+        { tone: "confiante", label: "\"Nossa meta é clara: brigar por tudo até o fim.\"", rep: 0, fame: +2, morale: +2 },
+        { tone: "provocador", label: "\"Nossa meta é ganhar tudo. Quem duvidar vai ver.\"", rep: -3, fame: +4, morale: +2 }
+      ] },
+      { q: "O que precisa melhorar no time pro restante do ano?", options: [
+        { tone: "humilde", label: "\"Vários detalhes. A gente treina isso todo dia.\"", rep: +3, fame: 0, morale: +1 },
+        { tone: "confiante", label: "\"Pequenos ajustes. A base do time já está muito boa.\"", rep: 0, fame: +2, morale: +1 },
+        { tone: "provocador", label: "\"O time está bom. Talvez falte a imprensa reconhecer isso.\"", rep: -3, fame: +3, morale: +1 }
+      ] },
+      { q: "Você sente que o nível de exigência mudou desde o início da temporada?", options: [
+        { tone: "humilde", label: "\"Sim, e é justo. Quanto mais crescemos, mais se espera da gente.\"", rep: +4, fame: 0, morale: +1 },
+        { tone: "confiante", label: "\"Mudou, mas a gente também evoluiu junto. Está tudo sob controle.\"", rep: 0, fame: +2, morale: +2 },
+        { tone: "provocador", label: "\"Sempre exigiram muito de mim. Isso não é novidade.\"", rep: -3, fame: +3, morale: +1 }
+      ] }
+    ],
+    carreira: [
+      { q: "Olhando pra trás, você mudaria alguma decisão na sua carreira?", options: [
+        { tone: "humilde", label: "\"Cada escolha me trouxe até aqui. Não mudaria nada.\"", rep: +4, fame: 0, morale: +2 },
+        { tone: "confiante", label: "\"Talvez um ou outro detalhe, mas no geral trilhei o caminho certo.\"", rep: +1, fame: +2, morale: +1 },
+        { tone: "provocador", label: "\"Mudaria ter ignorado quem duvidou de mim mais cedo.\"", rep: -3, fame: +3, morale: +1 }
+      ] },
+      { q: "O que ainda falta pra você conquistar no futebol?", options: [
+        { tone: "humilde", label: "\"Muita coisa ainda. Sigo trabalhando um passo de cada vez.\"", rep: +4, fame: 0, morale: +1 },
+        { tone: "confiante", label: "\"Sei exatamente o que quero conquistar, e vou atrás.\"", rep: 0, fame: +3, morale: +2 },
+        { tone: "provocador", label: "\"Já conquistei mais que muita gente que fala da minha carreira.\"", rep: -4, fame: +4, morale: +2 }
+      ] },
+      { q: "Como você imagina o resto da sua carreira daqui pra frente?", options: [
+        { tone: "humilde", label: "\"Um degrau de cada vez, sem pular etapas.\"", rep: +3, fame: 0, morale: +1 },
+        { tone: "confiante", label: "\"Vejo um futuro grande pela frente, e vou atrás dele.\"", rep: 0, fame: +3, morale: +2 },
+        { tone: "provocador", label: "\"Vejo meu nome onde poucos chegaram. E vai ser assim mesmo.\"", rep: -3, fame: +4, morale: +2 }
+      ] },
+      { q: "Que conselho você daria pro jogador que você era no início?", options: [
+        { tone: "humilde", label: "\"Diria pra ter paciência. Tudo tem seu tempo.\"", rep: +4, fame: 0, morale: +1 },
+        { tone: "confiante", label: "\"Diria pra confiar mais no próprio taco desde cedo.\"", rep: +1, fame: +2, morale: +2 },
+        { tone: "provocador", label: "\"Diria pra ignorar quem nunca acreditou. Eu tinha razão.\"", rep: -3, fame: +3, morale: +1 }
+      ] },
+      { q: "Existe algum título ou marca que você sonha em alcançar?", options: [
+        { tone: "humilde", label: "\"Sonho em ajudar meu time a conquistar o que for possível.\"", rep: +4, fame: 0, morale: +1 },
+        { tone: "confiante", label: "\"Tenho metas bem claras na cabeça, e trabalho todo dia por elas.\"", rep: 0, fame: +3, morale: +2 },
+        { tone: "provocador", label: "\"Quero um lugar que poucos ocupam na história. Sem medo de dizer isso.\"", rep: -3, fame: +4, morale: +2 }
+      ] }
+    ]
+  };
+  function maybePressConference(g, res) {
+    const fx = res.fixture;
+    if (!fx.decisive) return null;
+    g.pressSeen = g.pressSeen || [];
+    const cats = ["vida", "temporada", "carreira"];
+    const questions = cats.map(function (cat) {
+      let pool = PRESS_Q[cat].filter(function (item) { return g.pressSeen.indexOf(cat + ":" + item.q) < 0; });
+      if (!pool.length) {
+        g.pressSeen = g.pressSeen.filter(function (id) { return id.indexOf(cat + ":") !== 0; });
+        pool = PRESS_Q[cat];
+      }
+      const picked = U.choice(pool);
+      g.pressSeen.push(cat + ":" + picked.q);
+      return picked;
+    });
+    return { questions: questions };
   }
 
   // ---------- entrevistas pós-jogo ----------
@@ -415,6 +543,33 @@ window.CQ = window.CQ || {};
         { label: "Doar uma parte e mobilizar", fx: { money: -150000, rep: +5 }, note: "Você deu o pontapé; a comunidade completou." },
         { label: "Prometer ajudar mais pra frente", fx: { rep: -2 }, note: "A promessa ficou no ar." }
       ]
+    },
+    {
+      id: "namorada_liga", title: "Ligação da namorada",
+      desc: "Ela ligou no meio da sua rotina de treinos: um imprevisto em casa e ela precisa que você resolva agora.",
+      opts: [
+        { label: "Largar tudo e ir resolver", fx: { morale: +6, cond: -3 }, note: "Ela sentiu que pode contar com você. Vale mais que qualquer treino." },
+        { label: "Resolver por telefone e seguir treinando", fx: { morale: +1, cond: +1 }, note: "Deu pra equilibrar, mas ela ficou com um gosto de pouco caso." },
+        { label: "Prometer que resolve depois do treino", fx: { morale: -5 }, note: "A ligação terminou seca. Um clima ficou no ar." }
+      ]
+    },
+    {
+      id: "bets", title: "Convite de casa de apostas",
+      desc: "Uma casa de apostas esportivas ofereceu um contrato alto pra estampar seu nome em campanha publicitária.",
+      opts: [
+        { label: "Assinar o contrato milionário", fx: { money: 900000, fame: +5, rep: -6 }, note: "Cachê gordo, mas parte da torcida não gostou de ver o ídolo estampando aposta." },
+        { label: "Negociar uma campanha de jogo responsável", fx: { money: 400000, rep: +3, fame: +2 }, note: "Meio-termo bem recebido: dinheiro no bolso sem abrir mão da imagem." },
+        { label: "Recusar o convite", fx: { rep: +4 }, note: "Ficou de fora da polêmica — e de uma bolada." }
+      ]
+    },
+    {
+      id: "presidente_evento", title: "Convite do presidente do clube",
+      desc: "O presidente do clube fez questão de te chamar pessoalmente pra prestigiar um evento institucional na próxima semana.",
+      opts: [
+        { label: "Comparecer e discursar", fx: { rep: +5, morale: +3, cond: -3 }, note: "Discurso emocionado, aplausos de pé. O presidente saiu satisfeito." },
+        { label: "Ir e ficar discreto", fx: { rep: +2 }, note: "Presença cumprida, sem holofote." },
+        { label: "Recusar por causa da rotina de treinos", fx: { rep: -3, cond: +4 }, note: "O presidente entendeu, mas anotou a ausência." }
+      ]
     }
   ];
 
@@ -478,6 +633,7 @@ window.CQ = window.CQ || {};
     PROFILES: PROFILES,
     post: post, onMatch: onMatch, preMatch: preMatch, onSeasonEnd: onSeasonEnd,
     maybeInterview: maybeInterview, applyInterview: applyInterview,
+    maybePressConference: maybePressConference,
     maybeLifeEvent: maybeLifeEvent, applyLifeEvent: applyLifeEvent,
     maybePoll: maybePoll, applyVote: applyVote
   };

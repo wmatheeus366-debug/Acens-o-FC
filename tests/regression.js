@@ -470,6 +470,110 @@
     });
   }
 
+  // ---- Bug real corrigido: suspensão de uma competição não pode bloquear outra ----
+  function testDiscGroupIsolation() {
+    withTempGame(function () {
+      const g = newCareer("VOL", "fla"); // volante: cartão mais provável, mas força mesmo assim
+      // acha uma partida de LIGA realmente jogada pelo jogador e força um cartão vermelho
+      // nela (sem depender de sorte de cartão, só de bench/condição pra ele estar em campo)
+      let n = 0, forced = false;
+      while (n++ < 700 && !forced) {
+        const fx = E().currentFixture(g);
+        if (!fx) break;
+        const res = E().resolveMatch(g, fx, {});
+        if (fx.compKey === "LIGA" && res.plays) {
+          res.cardR = true; // força expulsão nesta partida de LIGA
+          E().applyMatch(g, res);
+          forced = true;
+          continue;
+        }
+        E().applyMatch(g, res);
+      }
+      assert("suspensão: consegue forçar um cartão vermelho numa partida de LIGA jogada", forced);
+      if (!forced) return;
+      assert("suspensão: LIGA fica com suspensão pendente no grupo certo", !!(g.player.disc.LIGA && g.player.disc.LIGA.susp > 0), JSON.stringify(g.player.disc));
+      // nenhuma outra competição de clube pode ter sido afetada pelo cartão da LIGA — este
+      // é exatamente o bug relatado (suspenso no Brasileirão, barrado também na Libertadores)
+      let vazou = "";
+      ["LIB", "SUL", "UCL", "UEL", "UECL", "CDB", "COPA", "EST", "MUN", "SUPER"].forEach(function (ck) {
+        const grp = E().discGroup({ compKey: ck });
+        const d = g.player.disc[grp];
+        if (d && d.susp > 0) vazou = ck + " (grupo " + grp + ")";
+      });
+      assert("suspensão: cartão na LIGA não vaza pra nenhuma outra competição de clube", !vazou, vazou);
+    });
+  }
+
+  // ---- discGroup: mapeia todas as competições continentais pro mesmo grupo CONTI ----
+  function testDiscGroupMapping() {
+    const map = { LIGA: "LIGA", EST: "EST", CDB: "CDB", COPA: "CDB", LIB: "CONTI", SUL: "CONTI", UCL: "CONTI", UEL: "CONTI", UECL: "CONTI", MUN: "MUN", SUPER: "SUPER" };
+    let ok = true, detail = "";
+    Object.keys(map).forEach(function (k) {
+      const got = E().discGroup({ compKey: k });
+      if (got !== map[k]) { ok = false; detail = k + " -> " + got + " (esperado " + map[k] + ")"; }
+    });
+    assert("discGroup: mapeia cada competição pro grupo de disciplina certo", ok, detail);
+  }
+
+  // ---- Lesão mais rara: taxa observada não pode ficar perto do antigo teto de 14% ----
+  function testInjuryRateLower() {
+    withTempGame(function () {
+      let matches = 0, injuries = 0;
+      for (let i = 0; i < 8; i++) {
+        const g = newCareer("ATA", i % 2 ? "fla" : "rma");
+        let n = 0;
+        while (E().currentFixture(g) && n++ < 700) {
+          const fx = E().currentFixture(g);
+          const res = E().resolveMatch(g, fx, {});
+          if (res.plays) matches++;
+          E().applyMatch(g, res); // res.injuryNew só é escrito aqui dentro — checar depois
+          if (res.injuryNew) injuries++;
+        }
+      }
+      const rate = matches ? injuries / matches : 0;
+      assert("lesão: pelo menos 1 lesão aconteceu na amostra (a mecânica não quebrou)", injuries > 0, "matches=" + matches);
+      assert("lesão: taxa observada bem abaixo do antigo teto de 14% (condição baixa)", rate < 0.08, "matches=" + matches + " injuries=" + injuries + " rate=" + (rate * 100).toFixed(1) + "%");
+    });
+  }
+
+  // ---- Notas de partida (MATCH_NOTES): rolam em qualquer partida, não só decisiva ----
+  function testMatchNotesAnyMatch() {
+    withTempGame(function () {
+      const g = newCareer("ATA", "fla");
+      const feedBefore = g.feed.length;
+      let n = 0;
+      while (E().currentFixture(g) && n++ < 700) {
+        const fx = E().currentFixture(g);
+        E().applyMatch(g, E().resolveMatch(g, fx, {}));
+      }
+      const notas = g.feed.filter(function (item) { return item.k === "torcida" && /invadiu|pombos|granizo|pipoca|cachorro|repórter|mascote|luz|trave|fumaça/i.test(item.text); });
+      assert("eventos: pelo menos 1 nota de partida aleatória apareceu numa temporada inteira", notas.length > 0, "n=" + notas.length);
+    });
+  }
+
+  // ---- Coletiva de imprensa: sempre 3 perguntas de categorias diferentes em jogo decisivo ----
+  function testPressConferenceStructure() {
+    const g = { year: 2026, pressSeen: [] };
+    const fakeRes = { plays: true, fixture: { decisive: true } };
+    const pc = CQ.nar.maybePressConference(g, fakeRes);
+    assert("coletiva: dispara em jogo decisivo", !!pc);
+    if (!pc) return;
+    assert("coletiva: sempre 3 perguntas", pc.questions.length === 3, "n=" + pc.questions.length);
+    const semQ = pc.questions.filter(function (q) { return typeof q.q !== "string" || !q.q; });
+    assert("coletiva: toda pergunta tem texto e 3 opções", semQ.length === 0 && pc.questions.every(function (q) { return q.options && q.options.length === 3; }));
+    // jogo não-decisivo não dispara coletiva
+    const pc2 = CQ.nar.maybePressConference(g, { plays: true, fixture: { decisive: false } });
+    assert("coletiva: não dispara fora de jogo decisivo", pc2 === null);
+    // rodando várias vezes, as perguntas variam (não é sempre o mesmo trio) — evidência de
+    // que o sorteio/controle de repetição está de fato funcionando
+    const vistos = {};
+    for (let i = 0; i < 12; i++) {
+      const pcN = CQ.nar.maybePressConference(g, fakeRes);
+      pcN.questions.forEach(function (q) { vistos[q.q] = true; });
+    }
+    assert("coletiva: perguntas variam ao longo de várias coletivas (sem repetir sempre o mesmo trio)", Object.keys(vistos).length > 3, "n=" + Object.keys(vistos).length);
+  }
+
   // ---- Bug real corrigido: banner de campeão não pode comemorar quando quem venceu foi outra seleção/clube ----
   function testChampionBannerCorrectness() {
     withTempGame(function () {
@@ -717,6 +821,11 @@
     testContiTwoLeggedTies();
     testContiFirstLegNoPenalties();
     testOtherCupsStaySingleLeg();
+    testDiscGroupIsolation();
+    testDiscGroupMapping();
+    testInjuryRateLower();
+    testMatchNotesAnyMatch();
+    testPressConferenceStructure();
     testChampionBannerCorrectness();
     testRivalsCoverage();
     testClubRivalryScoreboard();

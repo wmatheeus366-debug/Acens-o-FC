@@ -38,6 +38,9 @@ window.CQ = window.CQ || {};
     if (!p.assets) p.assets = [];
     if (!p.ballon) p.ballon = [];
     if (!p.records) p.records = { hatTricks: 0, bestSeasonG: 0, bestSeasonAvg: 0, biggestWin: null };
+    // suspensão passou de contador único global pra um por competição (p.disc[grupo]) —
+    // qualquer suspensão em andamento no momento exato da migração se perde (caso raro)
+    if (!p.disc) p.disc = {};
     if (!p.clubGoals) p.clubGoals = {};
     if (!p.idolClubs) p.idolClubs = [];
     if (!p.compGoals) p.compGoals = {};

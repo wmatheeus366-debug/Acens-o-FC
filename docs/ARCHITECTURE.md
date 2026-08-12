@@ -43,7 +43,7 @@ Fontes (Google Fonts) e bandeiras (flagcdn) vêm da web com fallback; todo o res
 
 ```
 # no navegador (index.html ou CRAQUE.html aberto), console:
-CQ.tests.run()             # tests/regression.js — 112 checagens
+CQ.tests.run()             # tests/regression.js — 124 checagens
 
 # balanceamento (Node, motor real num shim vm):
 node scripts/balance-runner.mjs 100   # gera docs/BALANCE_BASELINE.md + .json
@@ -206,3 +206,25 @@ horizontal; aviso único (`p.seenLiveIntro`, `js/engine.js`/`js/save.js`) explic
 Home (o Ticker já cobre isso, com mais detalhe); dicas de consequência (idade/pé) no passo
 0 da criação de personagem. Único item que segue como próxima fatia: eliminatórias com
 risco real.
+
+## Disciplina por competição, lesão, eventos aleatórios e coletiva de imprensa (feito)
+Ver BUG-07 no CHANGELOG para o bug original (suspensão vazando entre competições).
+- **`p.disc`** (`js/engine.js`) substitui os antigos `p.susp`/`p.yellows` globais por um
+  mapa por grupo de competição, via nova `discGroup(fx)` — `LIGA`/`EST`/`CDB`/`MUN`/
+  `SUPER` isolados, `LIB`/`SUL`/`UCL`/`UEL`/`UECL` unificados sob `CONTI` (só uma
+  competição continental por temporada). `resolveMatch`, `applyMatch` e os avisos de
+  suspensão em `js/ui.js` (Home + escalação provável) leem/escrevem no grupo do fixture
+  atual, nunca num contador global. Migração aditiva em `save.js`.
+- **Lesão**: `pInj` em `applyMatch` (`js/engine.js`) reduzido em ~40% (base e penalidades
+  por condição). Aviso passou a ser imediato: `afterMatchInterview` (`js/ui.js`) dispara
+  um toast na hora, além do já existente post no feed.
+- **Eventos aleatórios em qualquer partida**: `MATCH_NOTES` (`js/narrative.js`), sorteado
+  dentro de `onMatch` — o hook que já roda exatamente 1x por partida (simulada ou ao
+  vivo). `flavorPool` (`js/live.js`) ganhou mais textos e passou a valer em qualquer
+  mata-mata (`fixture.knock`), não só decisivo. 3 novos `LIFE_EVENTS`.
+- **Coletiva de imprensa**: `maybePressConference` (`js/narrative.js`) — 3 perguntas
+  (vida/temporada/carreira) sem repetir até esgotar o pool, dispara em jogo decisivo e
+  substitui a entrevista de 1 pergunta desse jogo. Tela nova em `js/ui.js`
+  (`showPressConference`/`pressStepRender`/`pickPress`) segue o mesmo padrão de "um passo
+  por vez" do balanço de temporada, reaproveitando `applyInterview` já existente para
+  aplicar o efeito de cada resposta.

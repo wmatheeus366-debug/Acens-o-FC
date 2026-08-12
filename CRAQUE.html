@@ -2616,6 +2616,14 @@ window.CQ = window.CQ || {};
   function club(id) { return D.CLUBS[id]; }
   function myClub(g) { return D.CLUBS[g.player.clubId]; }
   function isBrazilLeague(l) { return l === "BRA" || l === "BRB"; }
+  // disciplina (cartão/suspensão) por competição: um cartão no Brasileirão não pode
+  // suspender o jogador na Libertadores nem vice-versa — cada grupo tem seu próprio
+  // contador (p.disc[grupo]). Seleção continua isenta via isNatMatch (checado à parte,
+  // nunca chama esta função) — mesma regra que já existia.
+  const DISC_GROUP = { LIB: "CONTI", SUL: "CONTI", UCL: "CONTI", UEL: "CONTI", UECL: "CONTI", COPA: "CDB" };
+  function discGroup(fx) {
+    return DISC_GROUP[fx.compKey] || fx.compKey; // LIGA/EST/CDB/MUN/SUPER já usam o próprio compKey
+  }
   function natTeamObj(name) {
     const flag = NAT_FLAGS[name] || null;
     return { id: "nat:" + name, name: name, short: name.slice(0, 3).toUpperCase(), str: D.NAT_STR[name] || 74, c1: "#1a4c9c", c2: "#f2c500", pat: "half", isNation: true, flag: flag, rivals: [] };
@@ -2673,7 +2681,7 @@ window.CQ = window.CQ || {};
         pot: Math.min(99, ov + U.ri(6, 24, rng)),
         clubId: opts.clubId, salary: salary, contractEnd: 2026 + U.ri(1, 2, rng),
         condition: 100, morale: 70, fame: opts.natId === "BR" ? 8 : 5, rep: 55, money: 0, xp: 0,
-        injury: 0, yellows: 0, susp: 0,
+        injury: 0, disc: {},
         legendIds: opts.legendIds || [],
         takerPen: false, takerFK: false,
         natTeam: { convocado: false, caps: 0, goals: 0, qualified: true },
@@ -2895,7 +2903,7 @@ window.CQ = window.CQ || {};
     g.season = S;
     const rngS = U.rngFor(g.seed, "season", g.year);
 
-    p.yellows = 0; p.susp = 0;
+    p.disc = {}; // cartões/suspensão zeram por temporada, por competição (ver discGroup)
     p.stats = freshStats();
     S.brazil = isBrazilLeague(lg);
 
@@ -3852,7 +3860,8 @@ window.CQ = window.CQ || {};
     opts = opts || {};
     const p = g.player;
     const rng = U.rngFor(g.seed, "match", g.year, (g.season && g.season.idx) || 0);
-    const canPlay = !opts.rest && p.injury <= 0 && (fixture.isNatMatch || p.susp <= 0);
+    const myDisc = fixture.isNatMatch ? null : (p.disc && p.disc[discGroup(fixture)]);
+    const canPlay = !opts.rest && p.injury <= 0 && (fixture.isNatMatch || !myDisc || myDisc.susp <= 0);
     const bench = canPlay ? benchRoll(g, fixture, rng) : { starts: false, minutes: 0 };
     const plays = canPlay && bench.minutes > 0;
 
@@ -3930,7 +3939,7 @@ window.CQ = window.CQ || {};
 
     return {
       fixture: fixture, plays: plays, starts: bench.starts, minutes: bench.minutes,
-      rest: !!opts.rest, injured: p.injury > 0, susp: !fixture.isNatMatch && p.susp > 0,
+      rest: !!opts.rest, injured: p.injury > 0, susp: !fixture.isNatMatch && !!myDisc && myDisc.susp > 0,
       gm: gm, go: go, pg: pg, pa: pa, saves: saves, bigSaves: bigSaves, nota: nota,
       tackles: tackles, intercepts: intercepts, duels: duels, clearances: clearances, keyPasses: keyPasses, error: error,
       cardY: cardY, cardR: cardR, isGK: isGK,
@@ -4055,14 +4064,20 @@ window.CQ = window.CQ || {};
       let xp = Math.max(0, res.nota - 6.1) * 1.35 + 0.3;
       xp *= p.age <= 23 ? 1.5 : p.age <= 27 ? 1.1 : p.age <= 30 ? 0.7 : p.age <= 32 ? 0.35 : p.age <= 34 ? 0.12 : 0.03;
       p.xp += xp;
-      // cartões
-      if (res.cardR) p.susp = U.ri(1, 2, prng);
-      else if (res.cardY && !fx.isNatMatch) {
-        p.yellows++;
-        if (p.yellows % 3 === 0) { p.susp = 1; res.suspNext = true; }
+      // cartões (por competição — um vermelho/acúmulo no Brasileirão não pode suspender na
+      // Libertadores nem vice-versa; jogo de seleção nunca gera suspensão de clube)
+      if (!fx.isNatMatch && (res.cardR || res.cardY)) {
+        p.disc = p.disc || {};
+        const grp = discGroup(fx);
+        const d = p.disc[grp] || (p.disc[grp] = { y: 0, susp: 0 });
+        if (res.cardR) d.susp = U.ri(1, 2, prng);
+        else {
+          d.y++;
+          if (d.y % 3 === 0) { d.susp = 1; res.suspNext = true; }
+        }
       }
       // lesão (determinística por partida)
-      let pInj = 0.02 + (p.condition < 45 ? 0.05 : 0) + (p.condition < 28 ? 0.07 : 0);
+      let pInj = 0.012 + (p.condition < 45 ? 0.03 : 0) + (p.condition < 28 ? 0.04 : 0);
       if (U.chance(pInj, prng)) { p.injury = U.ri(3, 8, prng); res.injuryNew = p.injury; }
       // cobrador oficial
       if (!p.takerPen && (p.attrs.bp >= 74 || p.fame >= 55) && (p.attrs.fin >= 68 || p.pos === "MEI" || p.attrs.bp >= 80)) {
@@ -4074,7 +4089,10 @@ window.CQ = window.CQ || {};
       if (!res.rest && !res.injured && !res.susp) { p.morale = U.clamp(p.morale - 3, 5, 100); if (!fx.isNatMatch) bumpConf(g, -0.7); }
     }
     if (p.injury > 0 && !res.plays) p.injury--;
-    else if (p.susp > 0 && !res.plays && !fx.isNatMatch) p.susp = Math.max(0, p.susp - 1);
+    else if (!res.plays && !fx.isNatMatch) {
+      const dGrp = p.disc && p.disc[discGroup(fx)];
+      if (dGrp && dGrp.susp > 0) dGrp.susp = Math.max(0, dGrp.susp - 1);
+    }
 
     spendXP(g);
 
@@ -4928,7 +4946,7 @@ window.CQ = window.CQ || {};
     TRAITS: TRAITS, hasTrait: hasTrait, managerConf: managerConf, ensureManager: ensureManager,
     leagueOf: leagueOf, myClub: myClub, oppObj: oppObj, natTeamObj: natTeamObj,
     refreshWorldLeagues: refreshWorldLeagues,
-    STAGE_NAMES: STAGE_NAMES, NAT_FLAGS: NAT_FLAGS, TOUR_CONF: TOUR_CONF, tieDrawn: tieDrawn,
+    STAGE_NAMES: STAGE_NAMES, NAT_FLAGS: NAT_FLAGS, TOUR_CONF: TOUR_CONF, tieDrawn: tieDrawn, discGroup: discGroup,
     teamStrength: teamStrength, simScore: simScore
   };
 })();
@@ -5234,12 +5252,35 @@ window.CQ = window.CQ || {};
     return fx;
   }
 
+  // curiosidades/flavor de estádio — rolada em QUALQUER partida (onMatch roda depois de
+  // toda partida, simulada ou ao vivo, uma vez só). O flavorPool de js/live.js só existe
+  // dentro do modo ao vivo (minoria das partidas); isto aqui cobre o resto: um post curto
+  // no feed, sem interação, sem efeito no jogo — só cor.
+  const MATCH_NOTES = [
+    "Um cachorro invadiu o gramado durante o jogo e saiu correndo com a bola — a torcida aplaudiu de pé.",
+    "Um torcedor pulou o alambrado pra abraçar o ídolo e foi retirado pela segurança em meio a risadas.",
+    "Faltou luz por alguns segundos no estádio; o jogo parou até o gerador entrar.",
+    "Um vendedor de pipoca 'invadiu' a bola de vista da câmera e virou meme nas redes ainda durante a partida.",
+    "A bola bateu na trave e voltou tão forte que quicou até a arquibancada — susto geral.",
+    "Um bando de pombos atravessou o gramado no meio de um lance e atrapalhou a jogada.",
+    "Choveu granizo por 5 minutos; a partida seguiu debaixo de guarda-chuvas na área técnica.",
+    "A organizada soltou fumaça colorida demais e o jogo ficou parado até a fumaça baixar.",
+    "Um repórter caiu no gramado tentando fugir de um chute que foi longe demais — está tudo bem, ele levantou rindo.",
+    "O mascote do time adversário tentou provocar a torcida e quase apanhou dos seguranças."
+  ];
+  function maybeMatchNote(g) {
+    if (!U.chance(0.06)) return;
+    post(g, "torcida", U.choice(MATCH_NOTES));
+  }
+
   // ---------- reações pós-jogo ----------
   function onMatch(g, res) {
     const p = g.player, fx = res.fixture;
     const opp = fx.opp.name;
     const score = res.gm + " a " + res.go;
     const meName = fx.isNatMatch ? fx.myTeam.name : CQ.engine.myClub(g).name;
+
+    maybeMatchNote(g);
 
     if (res.injuryNew) {
       post(g, "imprensa", "🚑 Baixa no " + meName + ": " + p.name + " deixa o gramado lesionado e vira dúvida pelas próximas " + res.injuryNew + " rodadas.", { hot: true });
@@ -5309,6 +5350,111 @@ window.CQ = window.CQ || {};
     const h = g.h2h;
     post(g, "mesa", "DUELO DE GERAÇÃO: " + g.player.name + " x " + r.name + " se reencontram nesta rodada. Retrospecto do confronto: " + h.v + "V " + h.e + "E " + h.d + "D. Quem leva a melhor?", { hot: true });
     if (U.chance(0.6)) post(g, "rival", "Rodada especial essa... Alguém aí vai assistir de camarote de novo? 😏", {});
+  }
+
+  // ---------- coletiva de imprensa (jogos importantes) ----------
+  // 3 perguntas sempre de categorias diferentes (vida/temporada/carreira), nunca repetindo
+  // dentro da mesma categoria até esgotar o pool — mesmo raciocínio de g.lifeSeen.
+  // Mesmo formato de opção que a entrevista pós-jogo (tone/label/rep/fame/morale), reaproveitado.
+  const PRESS_Q = {
+    vida: [
+      { q: "Como está sendo conciliar a vida pessoal com a pressão da temporada?", options: [
+        { tone: "humilde", label: "\"Não é fácil, mas minha família me ajuda a manter os pés no chão.\"", rep: +4, fame: 0, morale: +1 },
+        { tone: "confiante", label: "\"Aprendi a lidar com isso. Hoje consigo separar bem as coisas.\"", rep: 0, fame: +2, morale: +2 },
+        { tone: "provocador", label: "\"Prefiro não falar da minha vida pessoal aqui, não é da conta de vocês.\"", rep: -4, fame: +3, morale: 0 }
+      ] },
+      { q: "Muita gente comenta sua vida fora de campo. Como você lida com a exposição?", options: [
+        { tone: "humilde", label: "\"Sei que faz parte da profissão. Tento não deixar isso me afetar.\"", rep: +3, fame: +1, morale: +1 },
+        { tone: "confiante", label: "\"Já me acostumei. Quanto mais falam, mais sei que estou fazendo diferença.\"", rep: 0, fame: +4, morale: +1 },
+        { tone: "provocador", label: "\"Tem gente com tempo demais pra ficar comentando a vida dos outros.\"", rep: -5, fame: +3, morale: +1 }
+      ] },
+      { q: "Dá pra ter vida normal sendo quem você é hoje?", options: [
+        { tone: "humilde", label: "\"Não totalmente, mas não troco por nada. É o preço do sonho.\"", rep: +4, fame: 0, morale: +2 },
+        { tone: "confiante", label: "\"Eu vivo do meu jeito, sem me importar muito com o que acham.\"", rep: 0, fame: +2, morale: +2 },
+        { tone: "provocador", label: "\"Vida normal? Isso ficou pra trás faz tempo, e tá ótimo assim.\"", rep: -3, fame: +4, morale: +1 }
+      ] },
+      { q: "O que te tira do sério fora das quatro linhas?", options: [
+        { tone: "humilde", label: "\"Prefiro focar no que me deixa bem. Não vale a pena alimentar isso.\"", rep: +3, fame: 0, morale: +1 },
+        { tone: "confiante", label: "\"Nada me tira do sério hoje em dia. Aprendi a controlar as coisas.\"", rep: +1, fame: +2, morale: +2 },
+        { tone: "provocador", label: "\"Gente que fala sem saber o que eu passo. Isso me incomoda, sim.\"", rep: -4, fame: +3, morale: 0 }
+      ] },
+      { q: "Como sua família tem lidado com a sua rotina de jogador profissional?", options: [
+        { tone: "humilde", label: "\"Eles são minha base. Sem eles eu não estaria aqui.\"", rep: +5, fame: 0, morale: +2 },
+        { tone: "confiante", label: "\"Todo mundo já entendeu a rotina. Funciona bem do nosso jeito.\"", rep: +1, fame: +1, morale: +1 },
+        { tone: "provocador", label: "\"Minha família é assunto meu, não de entrevista.\"", rep: -3, fame: +1, morale: 0 }
+      ] }
+    ],
+    temporada: [
+      { q: "Como você avalia a temporada até aqui?", options: [
+        { tone: "humilde", label: "\"Ainda dá pra melhorar muito. O grupo sabe disso.\"", rep: +3, fame: 0, morale: +1 },
+        { tone: "confiante", label: "\"Estamos no caminho certo. Temporada sólida até aqui.\"", rep: 0, fame: +2, morale: +2 },
+        { tone: "provocador", label: "\"Pra mim está sendo ótima. Quem acha o contrário não está prestando atenção.\"", rep: -3, fame: +3, morale: +2 }
+      ] },
+      { q: "A cobrança por títulos aumentou. Como o grupo lida com essa pressão?", options: [
+        { tone: "humilde", label: "\"É natural cobrarem. A gente trabalha pra merecer essa expectativa.\"", rep: +4, fame: 0, morale: +1 },
+        { tone: "confiante", label: "\"A pressão é combustível pra gente. Time grande vive disso.\"", rep: 0, fame: +3, morale: +2 },
+        { tone: "provocador", label: "\"Pressão é pra quem não está preparado. Aqui a gente já sabe lidar.\"", rep: -4, fame: +4, morale: +2 }
+      ] },
+      { q: "Qual é a meta de vocês pra reta final da temporada?", options: [
+        { tone: "humilde", label: "\"Focar jogo a jogo. É assim que a gente vai longe.\"", rep: +3, fame: 0, morale: +1 },
+        { tone: "confiante", label: "\"Nossa meta é clara: brigar por tudo até o fim.\"", rep: 0, fame: +2, morale: +2 },
+        { tone: "provocador", label: "\"Nossa meta é ganhar tudo. Quem duvidar vai ver.\"", rep: -3, fame: +4, morale: +2 }
+      ] },
+      { q: "O que precisa melhorar no time pro restante do ano?", options: [
+        { tone: "humilde", label: "\"Vários detalhes. A gente treina isso todo dia.\"", rep: +3, fame: 0, morale: +1 },
+        { tone: "confiante", label: "\"Pequenos ajustes. A base do time já está muito boa.\"", rep: 0, fame: +2, morale: +1 },
+        { tone: "provocador", label: "\"O time está bom. Talvez falte a imprensa reconhecer isso.\"", rep: -3, fame: +3, morale: +1 }
+      ] },
+      { q: "Você sente que o nível de exigência mudou desde o início da temporada?", options: [
+        { tone: "humilde", label: "\"Sim, e é justo. Quanto mais crescemos, mais se espera da gente.\"", rep: +4, fame: 0, morale: +1 },
+        { tone: "confiante", label: "\"Mudou, mas a gente também evoluiu junto. Está tudo sob controle.\"", rep: 0, fame: +2, morale: +2 },
+        { tone: "provocador", label: "\"Sempre exigiram muito de mim. Isso não é novidade.\"", rep: -3, fame: +3, morale: +1 }
+      ] }
+    ],
+    carreira: [
+      { q: "Olhando pra trás, você mudaria alguma decisão na sua carreira?", options: [
+        { tone: "humilde", label: "\"Cada escolha me trouxe até aqui. Não mudaria nada.\"", rep: +4, fame: 0, morale: +2 },
+        { tone: "confiante", label: "\"Talvez um ou outro detalhe, mas no geral trilhei o caminho certo.\"", rep: +1, fame: +2, morale: +1 },
+        { tone: "provocador", label: "\"Mudaria ter ignorado quem duvidou de mim mais cedo.\"", rep: -3, fame: +3, morale: +1 }
+      ] },
+      { q: "O que ainda falta pra você conquistar no futebol?", options: [
+        { tone: "humilde", label: "\"Muita coisa ainda. Sigo trabalhando um passo de cada vez.\"", rep: +4, fame: 0, morale: +1 },
+        { tone: "confiante", label: "\"Sei exatamente o que quero conquistar, e vou atrás.\"", rep: 0, fame: +3, morale: +2 },
+        { tone: "provocador", label: "\"Já conquistei mais que muita gente que fala da minha carreira.\"", rep: -4, fame: +4, morale: +2 }
+      ] },
+      { q: "Como você imagina o resto da sua carreira daqui pra frente?", options: [
+        { tone: "humilde", label: "\"Um degrau de cada vez, sem pular etapas.\"", rep: +3, fame: 0, morale: +1 },
+        { tone: "confiante", label: "\"Vejo um futuro grande pela frente, e vou atrás dele.\"", rep: 0, fame: +3, morale: +2 },
+        { tone: "provocador", label: "\"Vejo meu nome onde poucos chegaram. E vai ser assim mesmo.\"", rep: -3, fame: +4, morale: +2 }
+      ] },
+      { q: "Que conselho você daria pro jogador que você era no início?", options: [
+        { tone: "humilde", label: "\"Diria pra ter paciência. Tudo tem seu tempo.\"", rep: +4, fame: 0, morale: +1 },
+        { tone: "confiante", label: "\"Diria pra confiar mais no próprio taco desde cedo.\"", rep: +1, fame: +2, morale: +2 },
+        { tone: "provocador", label: "\"Diria pra ignorar quem nunca acreditou. Eu tinha razão.\"", rep: -3, fame: +3, morale: +1 }
+      ] },
+      { q: "Existe algum título ou marca que você sonha em alcançar?", options: [
+        { tone: "humilde", label: "\"Sonho em ajudar meu time a conquistar o que for possível.\"", rep: +4, fame: 0, morale: +1 },
+        { tone: "confiante", label: "\"Tenho metas bem claras na cabeça, e trabalho todo dia por elas.\"", rep: 0, fame: +3, morale: +2 },
+        { tone: "provocador", label: "\"Quero um lugar que poucos ocupam na história. Sem medo de dizer isso.\"", rep: -3, fame: +4, morale: +2 }
+      ] }
+    ]
+  };
+  function maybePressConference(g, res) {
+    const fx = res.fixture;
+    if (!fx.decisive) return null;
+    g.pressSeen = g.pressSeen || [];
+    const cats = ["vida", "temporada", "carreira"];
+    const questions = cats.map(function (cat) {
+      let pool = PRESS_Q[cat].filter(function (item) { return g.pressSeen.indexOf(cat + ":" + item.q) < 0; });
+      if (!pool.length) {
+        g.pressSeen = g.pressSeen.filter(function (id) { return id.indexOf(cat + ":") !== 0; });
+        pool = PRESS_Q[cat];
+      }
+      const picked = U.choice(pool);
+      g.pressSeen.push(cat + ":" + picked.q);
+      return picked;
+    });
+    return { questions: questions };
   }
 
   // ---------- entrevistas pós-jogo ----------
@@ -5472,6 +5618,33 @@ window.CQ = window.CQ || {};
         { label: "Doar uma parte e mobilizar", fx: { money: -150000, rep: +5 }, note: "Você deu o pontapé; a comunidade completou." },
         { label: "Prometer ajudar mais pra frente", fx: { rep: -2 }, note: "A promessa ficou no ar." }
       ]
+    },
+    {
+      id: "namorada_liga", title: "Ligação da namorada",
+      desc: "Ela ligou no meio da sua rotina de treinos: um imprevisto em casa e ela precisa que você resolva agora.",
+      opts: [
+        { label: "Largar tudo e ir resolver", fx: { morale: +6, cond: -3 }, note: "Ela sentiu que pode contar com você. Vale mais que qualquer treino." },
+        { label: "Resolver por telefone e seguir treinando", fx: { morale: +1, cond: +1 }, note: "Deu pra equilibrar, mas ela ficou com um gosto de pouco caso." },
+        { label: "Prometer que resolve depois do treino", fx: { morale: -5 }, note: "A ligação terminou seca. Um clima ficou no ar." }
+      ]
+    },
+    {
+      id: "bets", title: "Convite de casa de apostas",
+      desc: "Uma casa de apostas esportivas ofereceu um contrato alto pra estampar seu nome em campanha publicitária.",
+      opts: [
+        { label: "Assinar o contrato milionário", fx: { money: 900000, fame: +5, rep: -6 }, note: "Cachê gordo, mas parte da torcida não gostou de ver o ídolo estampando aposta." },
+        { label: "Negociar uma campanha de jogo responsável", fx: { money: 400000, rep: +3, fame: +2 }, note: "Meio-termo bem recebido: dinheiro no bolso sem abrir mão da imagem." },
+        { label: "Recusar o convite", fx: { rep: +4 }, note: "Ficou de fora da polêmica — e de uma bolada." }
+      ]
+    },
+    {
+      id: "presidente_evento", title: "Convite do presidente do clube",
+      desc: "O presidente do clube fez questão de te chamar pessoalmente pra prestigiar um evento institucional na próxima semana.",
+      opts: [
+        { label: "Comparecer e discursar", fx: { rep: +5, morale: +3, cond: -3 }, note: "Discurso emocionado, aplausos de pé. O presidente saiu satisfeito." },
+        { label: "Ir e ficar discreto", fx: { rep: +2 }, note: "Presença cumprida, sem holofote." },
+        { label: "Recusar por causa da rotina de treinos", fx: { rep: -3, cond: +4 }, note: "O presidente entendeu, mas anotou a ausência." }
+      ]
     }
   ];
 
@@ -5535,6 +5708,7 @@ window.CQ = window.CQ || {};
     PROFILES: PROFILES,
     post: post, onMatch: onMatch, preMatch: preMatch, onSeasonEnd: onSeasonEnd,
     maybeInterview: maybeInterview, applyInterview: applyInterview,
+    maybePressConference: maybePressConference,
     maybeLifeEvent: maybeLifeEvent, applyLifeEvent: applyLifeEvent,
     maybePoll: maybePoll, applyVote: applyVote
   };
@@ -5624,15 +5798,20 @@ window.CQ = window.CQ || {};
       evs.push({ min: m, type: "info", text: colorTexts[i % colorTexts.length] });
     });
 
-    // eventos de atmosfera em jogos decisivos (clima quente)
-    if (fixture.decisive && U.chance(0.8)) {
+    // eventos de atmosfera em jogos de clima quente (decisivos ou mata-mata — agora que
+    // existe o botão "Ao vivo" opcional, faz sentido esses jogos também terem clima)
+    if ((fixture.decisive || fixture.knock) && U.chance(0.8)) {
       const flavorPool = [
         { t: "flare", txt: "Sinalizadores acesos na arquibancada; a fumaça toma conta do estádio." },
         { t: "brawl", txt: "Confusão generalizada! Jogadores dos dois times se estranham no gramado. O árbitro tenta apartar." },
         { t: "invasion", txt: "Um torcedor invade o campo e é retirado pelos seguranças. Jogo paralisado." },
         { t: "var", txt: "O árbitro vai ao VAR revisar um lance. Tensão total à beira do gramado." },
         { t: "coach", txt: "Discussão acalorada entre os bancos; um auxiliar recebe cartão." },
-        { t: "crowd", txt: "A torcida faz um mosaico gigante e o barulho é ensurdecedor." }
+        { t: "crowd", txt: "A torcida faz um mosaico gigante e o barulho é ensurdecedor." },
+        { t: "dog", txt: "Um cachorro entra correndo no gramado e sai com a bola debaixo do focinho! A torcida ri, o árbitro paralisa o jogo." },
+        { t: "rain", txt: "Chuva forte começa a cair; a bola escorrega e o ritmo do jogo muda." },
+        { t: "laser", txt: "Um facho de laser da torcida visitante incomoda o goleiro antes da cobrança." },
+        { t: "drone", txt: "Um drone sobrevoa o gramado carregando uma bandeira de protesto — a organizada reage aos gritos." }
       ];
       const nFlavor = fixture.stage === "F" || fixture.classic ? U.ri(2, 3) : U.ri(1, 2);
       const fmins = minutesFor(nFlavor, used, 8, 86);
@@ -6297,7 +6476,9 @@ window.CQ = window.CQ || {};
     Object.keys(buckets).forEach(function (pos) {
       out.push.apply(out, squad.filter(function (j) { return j.pos === pos; }).slice(0, buckets[pos]));
     });
-    if (p.injury === 0 && (p.susp === 0 || isNat)) {
+    const dGrp = !isNat && fx && p.disc && p.disc[CQ.engine.discGroup(fx)];
+    const suspHere = !!(dGrp && dGrp.susp > 0);
+    if (p.injury === 0 && (!suspHere || isNat)) {
       const idx = out.findIndex(function (j) { return j.pos === p.pos; });
       const me = { name: p.name, pos: p.pos, ov: p.overall, isMe: true };
       if (idx >= 0) out[idx] = me; else out.push(me);
@@ -6375,7 +6556,8 @@ window.CQ = window.CQ || {};
       const comp = parts[0], sub = parts.slice(1).join(" · ");
       const notices = [];
       if (p.injury > 0) notices.push(`<div class="notice">${I.injury} Lesionado — fora por aproximadamente <b>${p.injury}</b> ${U.plural(p.injury, "jogo", "jogos")}. Você não entra em campo.</div>`);
-      if (p.susp > 0 && !fx.isNatMatch) notices.push(`<div class="notice warn">Suspenso — cumpre ${p.susp} ${U.plural(p.susp, "jogo", "jogos")} de gancho.</div>`);
+      const discHere = !fx.isNatMatch && p.disc && p.disc[CQ.engine.discGroup(fx)];
+      if (discHere && discHere.susp > 0) notices.push(`<div class="notice warn">Suspenso — cumpre ${discHere.susp} ${U.plural(discHere.susp, "jogo", "jogos")} de gancho nesta competição.</div>`);
       if (p.condition < 40) notices.push(`<div class="notice warn">Condição física baixa (${Math.round(p.condition)}%). Risco de lesão elevado — considere poupar.</div>`);
       lead = `<div class="lead">
         <div class="lead-kicker">${comp}${sub ? " — " + sub : ""}${fx.decisive ? '<span class="live-flag">Ao vivo</span>' : ""}</div>
@@ -6678,6 +6860,11 @@ window.CQ = window.CQ || {};
     const G = g();
     if (res.hatTrick) toast("HAT-TRICK! Três gols numa partida.");
     if (res.milestones && res.milestones.length) toast("Marco batido: " + res.milestones[0].n + " " + res.milestones[0].label + "!");
+    if (res.injuryNew) toast(`Lesão: você fica fora por aproximadamente ${res.injuryNew} ${res.injuryNew === 1 ? "jogo" : "jogos"}.`);
+    // jogo importante: coletiva de 3 perguntas no lugar da entrevista de 1 pergunta —
+    // as duas juntas ficariam repetitivas pro mesmo jogo
+    const pc = res.fixture.decisive ? CQ.nar.maybePressConference(G, res) : null;
+    if (pc) { showPressConference(pc); return; }
     const itv = CQ.nar.maybeInterview(G, res);
     if (itv) { showInterview(itv, res); return; }
     afterInterview();
@@ -6739,6 +6926,41 @@ window.CQ = window.CQ || {};
     const itv = CQ.state.itv;
     CQ.nar.applyInterview(g(), itv, itv.options[i]);
     CQ.state.itv = null;
+    closeOverlay();
+    CQ.main.save();
+    render();
+    afterInterview();
+  }
+
+  // ---------------- coletiva de imprensa (3 perguntas, jogos importantes) ----------------
+  // mesma "casca" visual da entrevista pós-jogo, repetida 3 vezes; CQ.state.press guarda o
+  // progresso (mesmo padrão transiente de CQ.state.itv/lifeEv/summary, nunca salvo no save)
+  function showPressConference(pc) {
+    CQ.state.press = { qs: pc.questions, idx: 0 };
+    pressStepRender();
+  }
+  function pressStepRender() {
+    const s = CQ.state.press, item = s.qs[s.idx];
+    const opts = item.options.map(function (o, i) {
+      return `<button class="opt2" onclick="CQ.ui.pickPress(${i})">
+        <span class="o2-label">${esc(o.label)} <span class="o2-tone">${esc(o.tone)}</span></span>
+        ${fxChips({ rep: o.rep, fame: o.fame, morale: o.morale })}</button>`;
+    }).join("");
+    overlay(`<div class="modal2">
+      <div class="modal2-hero ev-verm">
+        <div class="modal2-icon">${I.press}</div>
+        <div class="modal2-kicker">${I.press} Coletiva de imprensa · pergunta ${s.idx + 1} de ${s.qs.length}</div>
+        <div class="modal2-title">"${esc(item.q)}"</div>
+      </div>
+      <div class="modal2-body">${opts}</div>
+    </div>`);
+  }
+  function pickPress(i) {
+    const s = CQ.state.press, item = s.qs[s.idx];
+    CQ.nar.applyInterview(g(), item, item.options[i]);
+    s.idx++;
+    if (s.idx < s.qs.length) { pressStepRender(); return; }
+    CQ.state.press = null;
     closeOverlay();
     CQ.main.save();
     render();
@@ -8425,7 +8647,7 @@ window.CQ = window.CQ || {};
     createNext: createNext, finishCreate: finishCreate,
     actionPlay: actionPlay, actionPlayLive: actionPlayLive, actionRest: actionRest, actionSim: actionSim,
     liveStep: liveStep, liveDecide: liveDecide, shootPick: shootPick, shootReveal: shootReveal, finishLive: finishLive,
-    pickInterview: pickInterview, pickLife: pickLife,
+    pickInterview: pickInterview, pickPress: pickPress, pickLife: pickLife,
     seasonEndFlow: seasonEndFlow, summaryNext: summaryNext, summaryNextStep: summaryNextStep, pickOffer: pickOffer, pickRenew: pickRenew,
     managerLine: managerLine, managerConfTier: managerConfTier, MGR_LINES: MGR_LINES,
     ctab: ctab, ttab: ttab, closeTitle: closeTitle, closeDraw: closeDraw, closeCapa: closeCapa, votePoll: votePoll,
@@ -8476,6 +8698,9 @@ window.CQ = window.CQ || {};
     if (!p.assets) p.assets = [];
     if (!p.ballon) p.ballon = [];
     if (!p.records) p.records = { hatTricks: 0, bestSeasonG: 0, bestSeasonAvg: 0, biggestWin: null };
+    // suspensão passou de contador único global pra um por competição (p.disc[grupo]) —
+    // qualquer suspensão em andamento no momento exato da migração se perde (caso raro)
+    if (!p.disc) p.disc = {};
     if (!p.clubGoals) p.clubGoals = {};
     if (!p.idolClubs) p.idolClubs = [];
     if (!p.compGoals) p.compGoals = {};

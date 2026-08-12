@@ -33,6 +33,14 @@ window.CQ = window.CQ || {};
   function club(id) { return D.CLUBS[id]; }
   function myClub(g) { return D.CLUBS[g.player.clubId]; }
   function isBrazilLeague(l) { return l === "BRA" || l === "BRB"; }
+  // disciplina (cartão/suspensão) por competição: um cartão no Brasileirão não pode
+  // suspender o jogador na Libertadores nem vice-versa — cada grupo tem seu próprio
+  // contador (p.disc[grupo]). Seleção continua isenta via isNatMatch (checado à parte,
+  // nunca chama esta função) — mesma regra que já existia.
+  const DISC_GROUP = { LIB: "CONTI", SUL: "CONTI", UCL: "CONTI", UEL: "CONTI", UECL: "CONTI", COPA: "CDB" };
+  function discGroup(fx) {
+    return DISC_GROUP[fx.compKey] || fx.compKey; // LIGA/EST/CDB/MUN/SUPER já usam o próprio compKey
+  }
   function natTeamObj(name) {
     const flag = NAT_FLAGS[name] || null;
     return { id: "nat:" + name, name: name, short: name.slice(0, 3).toUpperCase(), str: D.NAT_STR[name] || 74, c1: "#1a4c9c", c2: "#f2c500", pat: "half", isNation: true, flag: flag, rivals: [] };
@@ -90,7 +98,7 @@ window.CQ = window.CQ || {};
         pot: Math.min(99, ov + U.ri(6, 24, rng)),
         clubId: opts.clubId, salary: salary, contractEnd: 2026 + U.ri(1, 2, rng),
         condition: 100, morale: 70, fame: opts.natId === "BR" ? 8 : 5, rep: 55, money: 0, xp: 0,
-        injury: 0, yellows: 0, susp: 0,
+        injury: 0, disc: {},
         legendIds: opts.legendIds || [],
         takerPen: false, takerFK: false,
         natTeam: { convocado: false, caps: 0, goals: 0, qualified: true },
@@ -312,7 +320,7 @@ window.CQ = window.CQ || {};
     g.season = S;
     const rngS = U.rngFor(g.seed, "season", g.year);
 
-    p.yellows = 0; p.susp = 0;
+    p.disc = {}; // cartões/suspensão zeram por temporada, por competição (ver discGroup)
     p.stats = freshStats();
     S.brazil = isBrazilLeague(lg);
 
@@ -1269,7 +1277,8 @@ window.CQ = window.CQ || {};
     opts = opts || {};
     const p = g.player;
     const rng = U.rngFor(g.seed, "match", g.year, (g.season && g.season.idx) || 0);
-    const canPlay = !opts.rest && p.injury <= 0 && (fixture.isNatMatch || p.susp <= 0);
+    const myDisc = fixture.isNatMatch ? null : (p.disc && p.disc[discGroup(fixture)]);
+    const canPlay = !opts.rest && p.injury <= 0 && (fixture.isNatMatch || !myDisc || myDisc.susp <= 0);
     const bench = canPlay ? benchRoll(g, fixture, rng) : { starts: false, minutes: 0 };
     const plays = canPlay && bench.minutes > 0;
 
@@ -1347,7 +1356,7 @@ window.CQ = window.CQ || {};
 
     return {
       fixture: fixture, plays: plays, starts: bench.starts, minutes: bench.minutes,
-      rest: !!opts.rest, injured: p.injury > 0, susp: !fixture.isNatMatch && p.susp > 0,
+      rest: !!opts.rest, injured: p.injury > 0, susp: !fixture.isNatMatch && !!myDisc && myDisc.susp > 0,
       gm: gm, go: go, pg: pg, pa: pa, saves: saves, bigSaves: bigSaves, nota: nota,
       tackles: tackles, intercepts: intercepts, duels: duels, clearances: clearances, keyPasses: keyPasses, error: error,
       cardY: cardY, cardR: cardR, isGK: isGK,
@@ -1472,14 +1481,20 @@ window.CQ = window.CQ || {};
       let xp = Math.max(0, res.nota - 6.1) * 1.35 + 0.3;
       xp *= p.age <= 23 ? 1.5 : p.age <= 27 ? 1.1 : p.age <= 30 ? 0.7 : p.age <= 32 ? 0.35 : p.age <= 34 ? 0.12 : 0.03;
       p.xp += xp;
-      // cartões
-      if (res.cardR) p.susp = U.ri(1, 2, prng);
-      else if (res.cardY && !fx.isNatMatch) {
-        p.yellows++;
-        if (p.yellows % 3 === 0) { p.susp = 1; res.suspNext = true; }
+      // cartões (por competição — um vermelho/acúmulo no Brasileirão não pode suspender na
+      // Libertadores nem vice-versa; jogo de seleção nunca gera suspensão de clube)
+      if (!fx.isNatMatch && (res.cardR || res.cardY)) {
+        p.disc = p.disc || {};
+        const grp = discGroup(fx);
+        const d = p.disc[grp] || (p.disc[grp] = { y: 0, susp: 0 });
+        if (res.cardR) d.susp = U.ri(1, 2, prng);
+        else {
+          d.y++;
+          if (d.y % 3 === 0) { d.susp = 1; res.suspNext = true; }
+        }
       }
       // lesão (determinística por partida)
-      let pInj = 0.02 + (p.condition < 45 ? 0.05 : 0) + (p.condition < 28 ? 0.07 : 0);
+      let pInj = 0.012 + (p.condition < 45 ? 0.03 : 0) + (p.condition < 28 ? 0.04 : 0);
       if (U.chance(pInj, prng)) { p.injury = U.ri(3, 8, prng); res.injuryNew = p.injury; }
       // cobrador oficial
       if (!p.takerPen && (p.attrs.bp >= 74 || p.fame >= 55) && (p.attrs.fin >= 68 || p.pos === "MEI" || p.attrs.bp >= 80)) {
@@ -1491,7 +1506,10 @@ window.CQ = window.CQ || {};
       if (!res.rest && !res.injured && !res.susp) { p.morale = U.clamp(p.morale - 3, 5, 100); if (!fx.isNatMatch) bumpConf(g, -0.7); }
     }
     if (p.injury > 0 && !res.plays) p.injury--;
-    else if (p.susp > 0 && !res.plays && !fx.isNatMatch) p.susp = Math.max(0, p.susp - 1);
+    else if (!res.plays && !fx.isNatMatch) {
+      const dGrp = p.disc && p.disc[discGroup(fx)];
+      if (dGrp && dGrp.susp > 0) dGrp.susp = Math.max(0, dGrp.susp - 1);
+    }
 
     spendXP(g);
 
@@ -2345,7 +2363,7 @@ window.CQ = window.CQ || {};
     TRAITS: TRAITS, hasTrait: hasTrait, managerConf: managerConf, ensureManager: ensureManager,
     leagueOf: leagueOf, myClub: myClub, oppObj: oppObj, natTeamObj: natTeamObj,
     refreshWorldLeagues: refreshWorldLeagues,
-    STAGE_NAMES: STAGE_NAMES, NAT_FLAGS: NAT_FLAGS, TOUR_CONF: TOUR_CONF, tieDrawn: tieDrawn,
+    STAGE_NAMES: STAGE_NAMES, NAT_FLAGS: NAT_FLAGS, TOUR_CONF: TOUR_CONF, tieDrawn: tieDrawn, discGroup: discGroup,
     teamStrength: teamStrength, simScore: simScore
   };
 })();
