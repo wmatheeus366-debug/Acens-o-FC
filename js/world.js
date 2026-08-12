@@ -46,20 +46,36 @@ window.CQ = window.CQ || {};
     lo = lo == null ? 55 : lo; hi = hi == null ? 93 : hi;
     return U.clamp(clubStr - base + U.ri(-noise, noise, rng), lo, hi);
   }
+  // idade REAL de um jogador, quando existir (js/birthdates.js, gerado por
+  // scripts/sync-ages.mjs) — nunca obrigatório: clube/jogador ausente do mapa continua
+  // usando rollAge normalmente. null quando não tem dado (chamador decide o fallback).
+  function realAge(g, clubId, name) {
+    const rec = CQ.BIRTHDATES && CQ.BIRTHDATES[clubId] && CQ.BIRTHDATES[clubId][name];
+    if (!rec) return null;
+    const year = parseInt(String(rec).slice(0, 4), 10);
+    return year ? g.year - year : null;
+  }
 
   // elenco inicial de um clube — MESMA chave de RNG que squadOf sempre usou, pra
   // migração de saves antigos ser invisível (só a fórmula de idade/overall mudou nesta
   // sessão — ver rollAge/rollOvr acima — então os valores em si são novos, mas a chave
   // determinística continua a mesma pros dois caminhos nunca divergirem entre si).
+  // rollAge SEMPRE é chamado (mesmo quando existe idade real) pra manter o consumo de
+  // RNG idêntico independente de quantos jogadores já têm data de nascimento — assim,
+  // preencher js/birthdates.js aos poucos (scripts/sync-ages.mjs é resumível, roda em
+  // várias execuções) só muda a idade DAQUELE jogador específico, nunca reembaralha o
+  // overall dos outros do mesmo elenco.
   function initClubRoster(g, clubId) {
     const cl = D.CLUBS[clubId];
     const real = D.REAL_SQUADS && D.REAL_SQUADS[clubId];
     const rng = U.rngFor(g.seed, "squad", clubId, g.year);
     if (real) {
       return real.map(function (pl, idx) {
+        const rolled = rollAge(rng, 35);
+        const trueAge = realAge(g, clubId, pl.n);
         return {
           id: clubId + "_" + idx, name: pl.n, pos: pl.p,
-          age: rollAge(rng, 35), ovr: rollOvr(cl.str, rng),
+          age: trueAge != null ? trueAge : rolled, ovr: rollOvr(cl.str, rng),
           real: true
         };
       });
@@ -135,5 +151,5 @@ window.CQ = window.CQ || {};
     });
   }
 
-  CQ.world = { buildWorld: buildWorld, advanceWorld: advanceWorld, rollAge: rollAge, rollOvr: rollOvr };
+  CQ.world = { buildWorld: buildWorld, advanceWorld: advanceWorld, rollAge: rollAge, rollOvr: rollOvr, realAge: realAge };
 })();

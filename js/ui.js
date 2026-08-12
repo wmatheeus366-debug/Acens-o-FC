@@ -2423,7 +2423,9 @@ window.CQ = window.CQ || {};
     const real = D.REAL_SQUADS && D.REAL_SQUADS[cl.id];
     if (real) {
       return real.map(function (pl) {
-        return { name: pl.n, pos: pl.p, age: CQ.world.rollAge(rng, 35), ov: CQ.world.rollOvr(cl.str, rng), real: true };
+        const rolled = CQ.world.rollAge(rng, 35); // sempre rola (consumo de RNG constante — ver comentário em initClubRoster)
+        const trueAge = CQ.world.realAge(G, cl.id, pl.n);
+        return { name: pl.n, pos: pl.p, age: trueAge != null ? trueAge : rolled, ov: CQ.world.rollOvr(cl.str, rng), real: true };
       }).sort(function (a, b) { return b.ov - a.ov; });
     }
     const POSN = ["GOL", "GOL", "ZAG", "ZAG", "ZAG", "LAT", "LAT", "LAT", "VOL", "VOL", "VOL", "MEI", "MEI", "MEI", "PON", "PON", "PON", "ATA", "ATA", "ATA"];

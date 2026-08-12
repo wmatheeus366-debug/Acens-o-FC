@@ -9,7 +9,8 @@ Desenvolvimento com arquivos separados; distribuição num arquivo único `CRAQU
 |---|---|---|---|
 | `js/util.js` | `CQ.util` | RNG por seed, formatação, sanitização, retratos/escudos/bandeiras SVG, ícones | — |
 | `js/data.js` | `CQ.DATA` | Clubes, ligas, seleções, lendas, posições, elencos reais, recordes | util |
-| `js/world.js` | `CQ.world` | Mundo persistente: identidade estável de NPCs nos 191 clubes, envelhecimento/aposentadoria ano a ano | util, DATA |
+| `js/birthdates.js` | `CQ.BIRTHDATES` | Data de nascimento REAL de jogadores de `REAL_SQUADS` (gerado, cresce aos poucos — `scripts/sync-ages.mjs`) | — |
+| `js/world.js` | `CQ.world` | Mundo persistente: identidade estável de NPCs nos 191 clubes, envelhecimento/aposentadoria ano a ano | util, DATA, (BIRTHDATES) |
 | `js/pitch.js` | `CQ.pitch` | Campo 2D animado do modo Ao Vivo: formação, SVG do campo/camisas, tradução evento→pose visual | util, DATA |
 | `js/engine.js` | `CQ.engine` | Modelo, calendário, simulação, prêmios, mercado, técnico, traços, aposentadoria | util, DATA, world, (nar) |
 | `js/market.js` | `CQ.market` | Mercado autônomo entre NPCs: clubes comprando/vendendo jogadores entre si a cada temporada | util, DATA, world, engine |
@@ -44,7 +45,10 @@ Fontes (Google Fonts) e bandeiras (flagcdn) vêm da web com fallback; todo o res
 
 ```
 # no navegador (index.html ou CRAQUE.html aberto), console:
-CQ.tests.run()             # tests/regression.js — ~147 checagens
+CQ.tests.run()             # tests/regression.js — ~150 checagens
+
+# idade real dos elencos (resumível — roda até bater na cota diária, ~100 req/dia):
+node scripts/sync-ages.mjs [teto de chamadas ao vivo, padrão 90]
 
 # balanceamento (Node, motor real num shim vm):
 node scripts/balance-runner.mjs 100   # gera docs/BALANCE_BASELINE.md + .json
@@ -269,8 +273,11 @@ preenchido numa derrota); banner de título com ordinal (BICAMPEÃO...PENTACAMPE
 `showTitleCelebration` quanto pelo passo de balanço de temporada (`js/ui.js`).
 
 **Roteiro futuro (fora desta fatia, ordem sugerida):**
-1. Idade real via API-Football (`/players?team=X&season=Y` — testar cota/formato antes
-   de migrar os 129 elencos curados; chave já existe em `.env`).
+1. 🔄 **Idade real via API-Football (em andamento).** `scripts/sync-ages.mjs` +
+   `js/birthdates.js` (`CQ.BIRTHDATES`) já shippados e funcionando — ver seção própria
+   abaixo. 8/129 clubes sincronizados até agora (parou sozinho na cota diária de 100
+   requisições); continuar rodando `node scripts/sync-ages.mjs` em dias seguintes até
+   cobrir os 129.
 2. Campo Ao Vivo com bonecos 3D de verdade (confirmado pelo usuário mesmo sabendo do
    tamanho — precisa de sessão de planejamento própria, escolha de biblioteca tipo
    three.js, o que quebra a filosofia atual de zero dependência externa).
@@ -287,3 +294,36 @@ preenchido numa derrota); banner de título com ordinal (BICAMPEÃO...PENTACAMPE
 13. Comparação com jogadores da mesma idade.
 14. Potencial + pontos de evolução pra distribuir em atributos (mudança grande de
     mecânica central — confirmado que entra no roteiro, não é imediato).
+
+## Idade real dos elencos via API-Football (item 1, em andamento)
+
+`REAL_SQUADS` (`js/data.js`) nunca teve idade — só `{posição, nome}` — então o `rollAge`
+da fatia anterior mitigava, mas não resolvia. `D.CREST_MAP` já tinha o ID de time da
+API-Football pros 191 clubes (mesmo ID que os escudos embutidos usam), o que eliminou a
+etapa de descobrir IDs.
+
+- **`scripts/sync-ages.mjs`** (novo, resumível, mesmo padrão de `sync-squads.mjs`): lê
+  `.env`/`API_FOOTBALL_KEY`, itera `REAL_SQUADS` (20 curados à mão primeiro), busca
+  `/players?team=X&season=2024` por clube, casa nome curado ↔ nome completo da API de
+  forma tolerante a acento/abreviação mas **conservadora** (só aceita correspondência
+  inequívoca — 1 candidato só; ambiguidade vira log "revisar depois", nunca palpite),
+  cacheia por clube em `scripts/.cache/ages/` (gitignored), gera/faz merge em
+  `js/birthdates.js`. Teto de segurança configurável por execução (padrão 90 chamadas
+  ao vivo) — plano Free tem 100/dia.
+- **2 armadilhas reais da API, descobertas rodando de verdade e já corrigidas no
+  script**: plano Free nunca aceita pedir a página 4 de `/players` (erro
+  `"Free plans are limited to a maximum value of 3"`) — script agora nunca pede além da
+  3ª e nunca descarta as páginas já coletadas quando isso acontece; e o limite por
+  minuto (não só o diário) precisa de pausa também **entre clubes diferentes**, não só
+  entre páginas do mesmo clube.
+- **`js/birthdates.js`** (`CQ.BIRTHDATES = { clubId: { "Nome": "AAAA-MM-DD" } }`) —
+  aditivo, cresce a cada execução, nunca obrigatório. `initClubRoster` (`js/world.js`) e
+  `squadOf` (`js/ui.js`, fallback) usam a idade real quando disponível, senão caem no
+  `rollAge` de sempre — `rollAge` é sempre chamado independente disso (consome RNG do
+  mesmo jeito), então preencher o mapa aos poucos nunca reembaralha o overall de outros
+  jogadores do mesmo elenco.
+- **Status**: 8/129 clubes sincronizados (Flamengo, Palmeiras, Corinthians, São Paulo,
+  Fluminense, Barcelona, PSG, Inter de Milão), 84 jogadores com idade real — parou
+  sozinho ao bater na cota diária (confirmado pela própria API). Rodar
+  `node scripts/sync-ages.mjs` em dias seguintes continua de onde parou, sem perder
+  progresso.

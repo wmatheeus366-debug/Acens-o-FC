@@ -1107,3 +1107,45 @@ painéis laterais, avatar editorial, calendário por mês, e potencial+pontos de
   médios na criação com o texto explicativo certo; badge "Banco — deve entrar" correto
   numa partida real; botão "Jogar a partida" numa liga comum e "Jogar a partida — ao
   vivo" numa semifinal real de mata-mata, sem nenhum botão "Ao vivo" solto ao lado.
+
+## Idade real dos elencos via API-Football (item 1 do roteiro — em andamento, dia 1)
+
+Testei viabilidade com 1 chamada isolada à API-Football: traz `birth.date` real de
+verdade. Achado que simplificou tudo: `D.CREST_MAP` (`js/data.js`) já tinha o ID de time
+da API pros 191 clubes (mesmo ID que os escudos embutidos já usavam) — não precisou
+descobrir nenhum ID novo.
+
+- **Novo `scripts/sync-ages.mjs`**: itera os 129 clubes de `REAL_SQUADS` (20 curados à
+  mão primeiro — nomes mais fáceis de casar e mais visíveis pro jogador), casa o nome
+  curado (ex. "Arrascaeta") com o nome completo que a API devolve (ex. "Giorgian De
+  Arrascaeta") de forma tolerante a acento/abreviação, mas **conservadora**: só aceita
+  quando exatamente 1 candidato bate — ambiguidade vira "revisar depois", nunca um
+  chute. Cache local resumível (mesmo padrão de `sync-squads.mjs`), gera/atualiza
+  `js/birthdates.js` (`CQ.BIRTHDATES`, aditivo — clube/jogador sem data cai no `rollAge`
+  de sempre, nunca quebra nada).
+- **2 bugs reais encontrados e corrigidos no próprio script durante a primeira
+  execução**: (1) o plano Free da API tem teto de 3 páginas por time — pedir a 4ª
+  descartava TODO o progresso das 3 páginas anteriores por causa de um `throw`
+  genérico demais; agora para na página 3 e mantém o que já foi coletado. (2) só havia
+  pausa entre páginas do MESMO time, não entre times diferentes — times de 1 página só
+  disparavam quase sem intervalo e estouravam o limite por minuto do plano Free bem
+  antes do teto diário; adicionada pausa também entre times.
+- **`initClubRoster`** (`js/world.js`) e **`squadOf`** (`js/ui.js`, fallback) passam a
+  usar a idade real quando `CQ.BIRTHDATES` tiver o jogador, caindo no `rollAge` de
+  sempre quando não tiver. `rollAge` continua sendo chamado sempre mesmo quando não
+  usado (consumo de RNG constante) — assim preencher `js/birthdates.js` aos poucos não
+  reembaralha o overall de nenhum outro jogador do elenco.
+- **Resultado do dia 1** (parou sozinho ao bater no teto diário de 100 requisições,
+  confirmado pela própria API — "You have reached the request limit for the day"): 8
+  dos 20 clubes curados à mão sincronizados (Flamengo, Palmeiras, Corinthians, São
+  Paulo, Fluminense, Barcelona, PSG, Inter de Milão), **84 jogadores com idade real**.
+  Confirmado especificamente o caso do bug relatado: Arrascaeta agora tem 32 anos
+  (nascimento real 1994-06-01) e não aparece mais na aba Base. Os outros 12 clubes
+  curados + 109 auto-sincronizados continuam no `rollAge` de sempre até as próximas
+  execuções (script é resumível — só rodar de novo, retoma sozinho de onde parou).
+- Validado: 150/150 testes (2 checagens novas, determinísticas — não dependem dos
+  dados raspados de verdade: injeta um `CQ.BIRTHDATES` falso e confirma que a idade
+  real sobrescreve `rollAge` tanto em `initClubRoster` quanto em `squadOf`, e que
+  `CQ.BIRTHDATES` ausente/undefined nunca quebra nada). Conferido também com o jogo de
+  verdade rodando o caminho real (não só o teste injetado): Arrascaeta sai com 32 anos
+  e fora da Base.

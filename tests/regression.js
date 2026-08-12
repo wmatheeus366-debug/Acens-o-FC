@@ -686,6 +686,37 @@
     assert("elenco: squadOf (fallback) e buildWorld nunca divergem (mesma fórmula compartilhada)", ok, "squadOf n=" + fromSquadOf.length + " world n=" + fromWorld.length);
   }
 
+  // ---- Idade real (js/birthdates.js, scripts/sync-ages.mjs): sobrescreve rollAge
+  // quando disponível; ausência nunca quebra nada (mapa cresce aos poucos) ----
+  function testRealAgeOverridesRollAge() {
+    const savedBD = CQ.BIRTHDATES;
+    try {
+      const g = { seed: "seed-idade-real", year: 2026, world: null, player: { clubId: "fla" } };
+      const baseline = CQ.world.buildWorld(g).clubs.fla.roster.find(function (p) { return p.real; });
+      if (!baseline) { assert("idade real: achou jogador real do Flamengo pra testar", false); return; }
+      CQ.BIRTHDATES = { fla: {} };
+      CQ.BIRTHDATES.fla[baseline.name] = (g.year - 27) + "-05-10"; // força 27 anos de propósito
+      const withReal = CQ.world.buildWorld(g).clubs.fla.roster.find(function (p) { return p.name === baseline.name; });
+      assert("idade real: initClubRoster usa a idade real quando CQ.BIRTHDATES tem o jogador", withReal.age === 27, "age=" + withReal.age);
+      const viaSquadOf = CQ.ui.squadOf(g).find(function (p) { return p.name === baseline.name; });
+      assert("idade real: squadOf (fallback) também usa a idade real, igual buildWorld", viaSquadOf.age === 27, "age=" + viaSquadOf.age);
+    } finally {
+      CQ.BIRTHDATES = savedBD;
+    }
+  }
+  function testRealAgeAbsentNeverBreaks() {
+    const savedBD = CQ.BIRTHDATES;
+    try {
+      CQ.BIRTHDATES = undefined;
+      const g = { seed: "seed-sem-bd", year: 2026, world: null, player: { clubId: "fla" } };
+      let ok = true, detail = "";
+      try { CQ.world.buildWorld(g); CQ.ui.squadOf(g); } catch (e) { ok = false; detail = e.message; }
+      assert("idade real: CQ.BIRTHDATES ausente/undefined nunca quebra buildWorld/squadOf", ok, detail);
+    } finally {
+      CQ.BIRTHDATES = savedBD;
+    }
+  }
+
   // ---- Criação de personagem: só clubes pequenos/médios pra começar ----
   function testStartClubPoolExcludesBigClubs() {
     const pool = CQ.ui.startClubPool();
@@ -1016,6 +1047,8 @@
     testWorldAgeDistribution();
     testWorldOvrRange();
     testSquadOfMatchesWorldFormula();
+    testRealAgeOverridesRollAge();
+    testRealAgeAbsentNeverBreaks();
     testStartClubPoolExcludesBigClubs();
     testBenchRollPreviewMatchesReal();
     testChampsCoversAllContis();
