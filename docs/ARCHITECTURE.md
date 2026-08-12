@@ -10,6 +10,7 @@ Desenvolvimento com arquivos separados; distribuição num arquivo único `CRAQU
 | `js/util.js` | `CQ.util` | RNG por seed, formatação, sanitização, retratos/escudos/bandeiras SVG, ícones | — |
 | `js/data.js` | `CQ.DATA` | Clubes, ligas, seleções, lendas, posições, elencos reais, recordes | util |
 | `js/world.js` | `CQ.world` | Mundo persistente: identidade estável de NPCs nos 191 clubes, envelhecimento/aposentadoria ano a ano | util, DATA |
+| `js/pitch.js` | `CQ.pitch` | Campo 2D animado do modo Ao Vivo: formação, SVG do campo/camisas, tradução evento→pose visual | util, DATA |
 | `js/engine.js` | `CQ.engine` | Modelo, calendário, simulação, prêmios, mercado, técnico, traços, aposentadoria | util, DATA, world, (nar) |
 | `js/market.js` | `CQ.market` | Mercado autônomo entre NPCs: clubes comprando/vendendo jogadores entre si a cada temporada | util, DATA, world, engine |
 | `js/narrative.js` | `CQ.nar` | Feed, entrevistas, eventos de vida, enquetes, rival | util, DATA, engine |
@@ -43,7 +44,7 @@ Fontes (Google Fonts) e bandeiras (flagcdn) vêm da web com fallback; todo o res
 
 ```
 # no navegador (index.html ou CRAQUE.html aberto), console:
-CQ.tests.run()             # tests/regression.js — 124 checagens
+CQ.tests.run()             # tests/regression.js — ~129 checagens
 
 # balanceamento (Node, motor real num shim vm):
 node scripts/balance-runner.mjs 100   # gera docs/BALANCE_BASELINE.md + .json
@@ -228,3 +229,17 @@ Ver BUG-07 no CHANGELOG para o bug original (suspensão vazando entre competiç�
   (`showPressConference`/`pressStepRender`/`pickPress`) segue o mesmo padrão de "um passo
   por vez" do balanço de temporada, reaproveitando `applyInterview` já existente para
   aplicar o efeito de cada resposta.
+
+## Campo 2D animado no modo Ao Vivo (feito)
+Visualização estilizada, não um replay físico — reage aos mesmos eventos abstratos que
+`js/live.js` já gera, sincronizada 1:1 com o clique-a-clique existente (sem timer, sem
+física nova). Novo `js/pitch.js` (`CQ.pitch`), lógica pura sem tocar DOM: `FORMATION`
+(11 posições, mesma contagem de `probableLineup`), `buildPitchSVG` (22 marcadores +
+bola) e `poseFor`/`poseForKick` (evento → posição/destaque/ícone). Uniformes usam as
+mesmas cores/padrão (`c1`/`c2`/`pat`) que o brasão vetorial já usava — `patternFillFor`
+foi extraído de `crestSVGProcedural` (`js/util.js`) pra virar a base tanto do brasão
+quanto da nova `jerseySVG`. `js/ui.js` (`pitchReact`/`applyPitchPose`) é o único lugar
+que manipula o SVG já inserido no DOM (nunca recria); a posição cosmética da bola usa
+RNG **não semeada**, de propósito — nunca consome do `live.rng` que decide resultado
+real de decisões/pênaltis, preservando o determinismo do jogo independente do timing de
+clique do usuário.

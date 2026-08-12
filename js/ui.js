@@ -955,8 +955,75 @@ window.CQ = window.CQ || {};
       <span class="lh-comp">${esc(fx.label)}</span>
       <span class="live-clock"><span class="liveblink"></span><span id="lv-score" class="tnum">${liveScoreStr(live)}</span></span>
     </div>`;
-    overlay(`${header}<div class="mm-feed" id="lv-feed"></div><div id="lv-foot" style="padding:12px 16px"></div>`, false);
+    // campo 2D animado (js/pitch.js): SVG puro, inserido 1x e mantido vivo no DOM daqui
+    // pra frente — liveStep()/liveDecide()/shootReveal() só mexem em classe/transform
+    // dele depois, nunca recriam (mesmo padrão de #lv-feed/#lv-score/#lv-foot). Modo
+    // largo do overlay dá espaço pro campo sem espremer o feed de texto.
+    const pitchHtml = (CQ.pitch && CQ.pitch.buildPitchSVG) ? CQ.pitch.buildPitchSVG(fx, live.res, g().player) : "";
+    overlay(`<div class="live-sticky">${header}${pitchHtml}</div><div class="mm-feed" id="lv-feed"></div><div id="lv-foot" style="padding:12px 16px"></div>`, true);
     if (fresh) { if (CQ.audio) CQ.audio.play("whistle"); liveStep(); }
+  }
+
+  // ---------------- campo 2D animado: reação a cada evento revelado ----------------
+  // Importante pro determinismo do projeto: a posição cosmética da bola/zona (info,
+  // falta, contra-ataque) usa RNG NÃO semeada (U.ri sem passar live.rng), de propósito
+  // — nunca consome do mesmo gerador que decide resultado real de jogo (live.rng), pra
+  // não arriscar mudar a ordem de sorteios reais (chooseDecision/runShootout) conforme
+  // o timing de clique do usuário. Mesmo espírito de flavor/feed já usado no projeto:
+  // decorativo é decorativo, não precisa ser reproduzível.
+  function applyPitchPose(pose) {
+    if (!pose) return;
+    const reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const ball = $("#pv-ball");
+    if (ball && pose.ball) ball.setAttribute("transform", `translate(${pose.ball[0]},${pose.ball[1]})`);
+    if (pose.goalSide) {
+      const svg = $(".pv-svg");
+      if (svg) {
+        const cls = pose.goalSide === "right" ? "pv-flash-r" : "pv-flash-l";
+        svg.classList.remove("pv-flash-r", "pv-flash-l");
+        void svg.offsetWidth;
+        svg.classList.add(cls);
+      }
+    }
+    if (pose.highlight) {
+      const sel = pose.highlight === "me" ? ".pv-me" :
+        pose.highlight === "mate" ? ".pv-team-mine .pv-player:not(.pv-me)" : ".pv-team-opp .pv-player";
+      const nodes = document.querySelectorAll(sel);
+      if (nodes.length) {
+        const node = nodes.length > 1 ? nodes[U.ri(0, nodes.length - 1)] : nodes[0];
+        const cls = pose.cardType === "y" ? "pv-pulse-y" : pose.cardType === "r" ? "pv-pulse-r" : "pv-pulse-go";
+        node.classList.remove("pv-pulse-y", "pv-pulse-r", "pv-pulse-go");
+        void node.offsetWidth;
+        node.classList.add(cls);
+      }
+    }
+    const wrap = $(".live-pitch");
+    if (wrap) wrap.classList.toggle("pv-hold", !!pose.hold);
+    if (pose.badge) {
+      const b = $("#pv-badge");
+      if (b) {
+        b.textContent = pose.badge;
+        b.classList.remove("pv-badge-show");
+        if (!reduced) { void b.offsetWidth; b.classList.add("pv-badge-show"); }
+      }
+    }
+  }
+
+  // vários eventos podem chegar de um só clique (step() só pausa em gol/intervalo/
+  // decisão — lances neutros/cartão/clima antes disso vêm juntos); espaça a reação
+  // visual pra dar tempo de cada uma se ver, exceto com reduced-motion (aplica só o
+  // estado final, sem atraso decorativo — mesmo padrão de animateCount/dropConfetti).
+  function pitchReact(events) {
+    if (!CQ.pitch || !events || !events.length) return;
+    const live = CQ.state.live;
+    const reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced) { applyPitchPose(CQ.pitch.poseFor(events[events.length - 1])); return; }
+    events.forEach(function (e, i) {
+      setTimeout(function () {
+        if (CQ.state.live !== live) return; // partida encerrada/trocada antes do timeout
+        applyPitchPose(CQ.pitch.poseFor(e));
+      }, i * 550);
+    });
   }
 
   function liveScoreStr(live) {
@@ -989,6 +1056,10 @@ window.CQ = window.CQ || {};
       if (e.type === "goal") goalSplash(true, e.min + "'");
       else if (e.type === "oppgoal") goalSplash(false, "");
     });
+    pitchReact(revealed);
+    // a decisão em si não entra em "revealed" (step() para antes de empurrá-la) — reage
+    // no campo também, senão ele fica parado na última pose enquanto o painel aparece.
+    if (live.phase === "decision" && live.decision) pitchReact([{ type: "decision", dec: live.decision }]);
     const sc = $("#lv-score");
     if (sc) sc.textContent = liveScoreStr(live).replace(/&amp;/g, "&");
     const foot = $("#lv-foot");
@@ -1086,7 +1157,8 @@ window.CQ = window.CQ || {};
 
   function shootReveal() {
     const live = CQ.state.live;
-    CQ.live.shootStep(live);
+    const l = CQ.live.shootStep(live);
+    if (l && CQ.pitch && CQ.pitch.poseForKick) applyPitchPose(CQ.pitch.poseForKick(l));
     renderShootout();
   }
 

@@ -208,11 +208,12 @@ window.CQ = window.CQ || {};
     }
     return crestSVGProcedural(club, cls);
   }
-  // brasão vetorial procedural (sem depender de imagem externa) — usado quando o clube
-  // não tem escudo real mapeado, ou como fallback se a imagem real falhar ao carregar.
-  function crestSVGProcedural(club, cls) {
+  // preenchimento (cor sólida ou <pattern> listrado) de um clube por c1/c2/pat — usado
+  // tanto pelo brasão vetorial (crestSVGProcedural) quanto pela camisa do campo 2D
+  // animado (jerseySVG, js/pitch.js). uid precisa ser único por elemento renderizado
+  // (2 <svg> na mesma página não podem compartilhar id de <pattern>).
+  function patternFillFor(club, uid) {
     const c1 = club.c1 || "#888", c2 = club.c2 || "#fff";
-    const uid = "cr" + hashStr(club.id);
     let fillDef = "", body = `fill="${c1}"`;
     if (club.pat === "stripes") {
       fillDef = `<pattern id="${uid}" width="10" height="10" patternUnits="userSpaceOnUse"><rect width="10" height="10" fill="${c2}"/><rect width="5" height="10" fill="${c1}"/></pattern>`;
@@ -227,14 +228,30 @@ window.CQ = window.CQ || {};
       fillDef = `<pattern id="${uid}" width="40" height="40" patternUnits="userSpaceOnUse"><rect width="20" height="40" fill="${c1}"/><rect x="20" width="20" height="40" fill="${c2}"/></pattern>`;
       body = `fill="url(#${uid})"`;
     }
+    return { fillDef: fillDef, body: body, c1: c1, c2: c2 };
+  }
+  // brasão vetorial procedural (sem depender de imagem externa) — usado quando o clube
+  // não tem escudo real mapeado, ou como fallback se a imagem real falhar ao carregar.
+  function crestSVGProcedural(club, cls) {
+    const uid = "cr" + hashStr(club.id);
+    const pf = patternFillFor(club, uid);
     const ini = esc((club.short || club.name || "?").slice(0, 3).toUpperCase());
     const txtFill = "#fffdf6";
     return `<span class="crest ${cls || ""}"><svg viewBox="0 0 40 44" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${esc(club.name)}">
-      <defs>${fillDef}</defs>
-      <path d="M20 43 Q4 36 3 20 L3 4 Q12 1 20 1 Q28 1 37 4 L37 20 Q36 36 20 43Z" ${body} stroke="#1b1812" stroke-width="1.6"/>
+      <defs>${pf.fillDef}</defs>
+      <path d="M20 43 Q4 36 3 20 L3 4 Q12 1 20 1 Q28 1 37 4 L37 20 Q36 36 20 43Z" ${pf.body} stroke="#1b1812" stroke-width="1.6"/>
       <path d="M3 4 Q12 1 20 1 Q28 1 37 4 L37 12 L3 12 Z" fill="#1b1812" opacity=".88"/>
       <text x="20" y="10" text-anchor="middle" font-family="'Barlow Condensed','Arial Narrow',sans-serif" font-weight="700" font-size="8.4" fill="${txtFill}" letter-spacing=".6">${ini}</text>
     </svg></span>`;
+  }
+  // "camisa" simplificada de um clube pro campo 2D animado (js/pitch.js) — um círculo
+  // preenchido com o mesmo padrão do brasão (listras/faixas/metade), sem escudo/sigla.
+  // uid precisa ser único (ex: inclui o índice do marcador no campo, não só o clube,
+  // já que os 2 times podem repetir clube em confrontos hipotéticos de teste). r é o
+  // raio do círculo, na unidade do viewBox de quem chama (pitch.js decide a escala).
+  function jerseySVG(club, uid, r) {
+    const pf = patternFillFor(club, uid);
+    return `<defs>${pf.fillDef}</defs><circle r="${r || 3}" ${pf.body} stroke="#1b1812" stroke-width=".5"/>`;
   }
   // usado só pelo onerror do <img> do escudo real — busca o clube pelo id e vai
   // direto pro vetor procedural, sem tentar a imagem real de novo (evita loop).
@@ -282,6 +299,7 @@ window.CQ = window.CQ || {};
   CQ.util = {
     hashStr, mulberry32, rngFor, ri, rf, choice, chance, shuffle, poisson, clamp,
     esc, cleanInput, fmtBRL, fmtNota, plural,
-    nameGen, portraitSVG, crestSVG, crestSVGFallback, flagImg, natAvatar, I
+    nameGen, portraitSVG, crestSVG, crestSVGFallback, flagImg, natAvatar, I,
+    patternFillFor, jerseySVG
   };
 })();

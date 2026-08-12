@@ -997,3 +997,50 @@ completamente diferente.
   amostra. Fluxo de coletiva também conferido ponta a ponta manualmente (gera 3
   perguntas de categorias diferentes → 3 respostas em sequência → estado limpa
   corretamente → estatísticas do jogador atualizadas pelas respostas).
+
+## Campo 2D animado no modo Ao Vivo
+
+Pedido do usuário: acompanhar os lances de jogos decisivos com "bonecos" nos uniformes
+certos do time, na linha de Soccer Champs/New Star Soccer. Como um jogo 3D de verdade (o
+que Soccer Champs realmente é) fica fora de escala pra um site estático em JS puro, a
+entrega foi um campo 2D visto de cima — estilizado, sincronizado com os mesmos eventos
+abstratos que o modo Ao Vivo já gera (gol/cartão/lance/clima/decisão), não um replay
+físico real.
+
+- **Novo `js/pitch.js` (`CQ.pitch`)**: `FORMATION` (11 posições em %, mesma contagem por
+  função que `probableLineup` já usa: 1 GOL, 2 ZAG, 2 LAT, 2 VOL, 2 MEI, 1 PON, 1 ATA),
+  `buildPitchSVG` (monta os 22 marcadores + bola num SVG puro) e `poseFor`/`poseForKick`
+  (traduzem cada evento numa posição de bola/destaque/ícone de canto). Meu time sempre
+  desenhado atacando a direita, adversário a esquerda — simplificação de apresentação
+  deliberada, não depende do mando de campo real.
+- **Uniformes reais sem arte nova**: as cores (`c1`/`c2`) e o padrão de listra (`pat`) já
+  existiam por clube — é o mesmo dado que o brasão vetorial já usava. `crestSVGProcedural`
+  (`js/util.js`) teve seu preenchimento de `<pattern>` extraído pra um helper
+  (`patternFillFor`, sem mudar o resultado do brasão) e reaproveitado numa `jerseySVG`
+  nova, bem mais simples (um círculo, não um brasão completo).
+- **O campo reage a cada clique, nunca roda sozinho** — o modo Ao Vivo já é 100%
+  orientado a clique (sem timer), então a animação do campo segue exatamente esse
+  princípio: cada evento revelado (gol, cartão, lance, clima, decisão, disputa de
+  pênaltis) move a bola/destaca um marcador/mostra um ícone de canto, sem loop contínuo
+  nem física nova. `js/live.js` ganhou só 3 campos aditivos pra isso (`who` no gol,
+  `t` no clima) — zero mudança na simulação/RNG do jogo.
+- **Determinismo preservado de propósito**: a posição cosmética da bola (zona de lance
+  neutro, deslocamento de falta/contra-ataque) usa RNG **não semeada** — nunca consome do
+  mesmo gerador (`live.rng`) que decide resultado real de decisões/pênaltis, pro timing
+  de clique do usuário nunca poder mudar um sorteio de verdade. Mesmo espírito que o
+  próprio projeto já usa pra flavor/feed (decorativo não precisa ser reproduzível).
+- Overlay do Ao Vivo passou a usar o modo largo (860px) pra caber o campo sem espremer o
+  feed de texto; campo e cabeçalho ficam fixos no topo (sticky) enquanto o feed rola por
+  baixo.
+- Validado: suíte completa passando (129/129 nesta rodada — o total varia ±poucas
+  unidades entre execuções por causa de checagens condicionais já existentes, padrão já
+  documentado nesta sessão) com 4 checagens novas — geometria da formação, `poseFor`/
+  `poseForKick` sem exceção pra nenhum evento real do jogo, cor certa em cada padrão de
+  camisa, e que o brasão continua consistente após a extração). Também conferido
+  visualmente no navegador nesta sessão (servido localmente via HTTP, já que `file://`
+  direto não abre no painel de preview): cores dos dois times corretas, bola indo pro
+  lado certo do gol em cada tipo de gol, anel + número do próprio jogador sempre
+  visível, bola posicionada certo numa decisão de contra-ataque — o painel parou de
+  compor screenshots no meio da sessão de verificação (limitação do ambiente, não do
+  código), então a cobertura visual manual ficou parcial; vale uma conferência adicional
+  no navegador de verdade.

@@ -574,6 +574,82 @@
     assert("coletiva: perguntas variam ao longo de várias coletivas (sem repetir sempre o mesmo trio)", Object.keys(vistos).length > 3, "n=" + Object.keys(vistos).length);
   }
 
+  // ---- Campo 2D animado: formação sempre 11 posições, contagem batendo com probableLineup ----
+  function testPitchFormation() {
+    const F = CQ.pitch.FORMATION;
+    assert("campo: formação tem exatamente 11 posições", F.length === 11, "n=" + F.length);
+    const counts = {};
+    F.forEach(function (f) { counts[f.pos] = (counts[f.pos] || 0) + 1; });
+    const esperado = { GOL: 1, ZAG: 2, LAT: 2, VOL: 2, MEI: 2, PON: 1, ATA: 1 };
+    let ok = true, detail = "";
+    Object.keys(esperado).forEach(function (k) {
+      if (counts[k] !== esperado[k]) { ok = false; detail += k + ":" + (counts[k] || 0) + " "; }
+    });
+    assert("campo: contagem por posição bate com probableLineup (1/2/2/2/2/1/1)", ok, detail);
+    const foraDaFaixa = F.filter(function (f) { return f.x < 0 || f.x > 100 || f.y < 0 || f.y > 100; });
+    assert("campo: todas as coordenadas x/y ficam entre 0 e 100", foraDaFaixa.length === 0, "fora=" + foraDaFaixa.length);
+  }
+
+  // ---- Campo 2D animado: poseFor/poseForKick não lançam exceção pra nenhum evento real ----
+  function testPitchPoseForAllEventTypes() {
+    let ok = true, detail = "";
+    ["ko", "goal", "oppgoal", "card", "redcard", "info", "ht", "ft"].forEach(function (t) {
+      try {
+        const pose = CQ.pitch.poseFor({ type: t, who: "me" });
+        if (!pose || typeof pose !== "object") { ok = false; detail += t + ":vazio "; }
+      } catch (e) { ok = false; detail += t + ":" + e.message + " "; }
+    });
+    // flavor com cada tag do flavorPool (js/live.js) e sem tag (defensivo)
+    ["dog", "rain", "flare", "brawl", "invasion", "var", "coach", "crowd", "laser", "drone", undefined].forEach(function (tag) {
+      try {
+        const pose = CQ.pitch.poseFor({ type: "flavor", t: tag });
+        if (!pose.badge) { ok = false; detail += "flavor(" + tag + "):sem badge "; }
+      } catch (e) { ok = false; detail += "flavor(" + tag + "):" + e.message + " "; }
+    });
+    // as 5 variantes de decisão que makeDecision (js/live.js) pode gerar
+    ["gk-pen", "gk-launch", "pen", "fk", "counter"].forEach(function (kind) {
+      try {
+        const pose = CQ.pitch.poseFor({ type: "decision", dec: { kind: kind } });
+        if (!pose.ball || pose.ball.length !== 2) { ok = false; detail += "dec(" + kind + "):sem bola "; }
+      } catch (e) { ok = false; detail += "dec(" + kind + "):" + e.message + " "; }
+    });
+    // lances da disputa de pênaltis (js/live.js runShootout/so.log)
+    [{ side: "my", ok: true }, { side: "my", ok: false }, { side: "op", ok: true }, { side: "op", ok: false }].forEach(function (l) {
+      try {
+        const pose = CQ.pitch.poseForKick(l);
+        if (!pose.ball || !pose.goalSide) { ok = false; detail += "kick(" + l.side + "," + l.ok + "):incompleto "; }
+      } catch (e) { ok = false; detail += "kick:" + e.message + " "; }
+    });
+    try { CQ.pitch.poseFor({ type: "???" }); } catch (e) { ok = false; detail += "desconhecido:" + e.message; }
+    assert("campo: poseFor/poseForKick não lançam exceção pra nenhum evento real do jogo", ok, detail);
+  }
+
+  // ---- Campo 2D animado: jerseySVG usa a cor real do clube em cada padrão de listra ----
+  function testJerseySVGAllPatterns() {
+    const amostra = { plain: "pal", hoops: "fla", stripes: "bot", sash: "sao" };
+    let ok = true, detail = "";
+    Object.keys(amostra).forEach(function (pat) {
+      const club = CQ.DATA.CLUBS[amostra[pat]];
+      if (!club || club.pat !== pat) { ok = false; detail += pat + ":amostra não bate(" + (club && club.pat) + ") "; return; }
+      const svg = CQ.util.jerseySVG(club, "test-" + pat, 3);
+      if (!svg || svg.indexOf(club.c1) < 0) { ok = false; detail += pat + ":sem c1 "; }
+    });
+    assert("camisa: jerseySVG contém a cor real do clube em cada padrão de listra", ok, detail);
+  }
+
+  // ---- Refatoração do brasão: crestSVGProcedural continua consistente após extrair patternFillFor ----
+  function testCrestProceduralStillConsistent() {
+    let ok = true, detail = "";
+    Object.keys(CQ.DATA.CLUBS).slice(0, 30).forEach(function (id) {
+      const club = CQ.DATA.CLUBS[id];
+      const svg = CQ.util.crestSVGFallback(id, "");
+      const hasPattern = club.pat && club.pat !== "plain";
+      if (hasPattern && svg.indexOf("<pattern") < 0) { ok = false; detail += id + ":sem pattern esperado "; }
+      if (!hasPattern && svg.indexOf("<pattern") >= 0) { ok = false; detail += id + ":pattern inesperado "; }
+    });
+    assert("brasão: crestSVGProcedural continua consistente (pattern só quando pat != plain) após extrair patternFillFor", ok, detail);
+  }
+
   // ---- Bug real corrigido: banner de campeão não pode comemorar quando quem venceu foi outra seleção/clube ----
   function testChampionBannerCorrectness() {
     withTempGame(function () {
@@ -826,6 +902,10 @@
     testInjuryRateLower();
     testMatchNotesAnyMatch();
     testPressConferenceStructure();
+    testPitchFormation();
+    testPitchPoseForAllEventTypes();
+    testJerseySVGAllPatterns();
+    testCrestProceduralStillConsistent();
     testChampionBannerCorrectness();
     testRivalsCoverage();
     testClubRivalryScoreboard();

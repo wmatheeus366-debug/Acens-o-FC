@@ -30,20 +30,24 @@ window.CQ = window.CQ || {};
 
     const evs = [];
     myGoalMin.forEach(function (m) {
-      let who, text, big = false;
+      let who, text, big = false, tag = "team";
       if (pgLeft > 0) {
         pgLeft--;
         who = p.name;
         text = "GOOOOL! " + p.name + " marca para " + (fixture.home ? "o " + meName : "o " + meName + " fora de casa") + "!";
         big = true;
+        tag = "me";
       } else if (paLeft > 0) {
         paLeft--;
         text = "Gol do " + meName + "! Assistência primorosa de " + p.name + ".";
         big = true;
+        tag = "assist";
       } else {
         text = "Gol do " + meName + "! A equipe amplia a pressão.";
       }
-      evs.push({ min: m, type: "goal", text: text, big: big });
+      // who (campo do campo 2D animado, js/pitch.js): "me" = o próprio gol do jogador,
+      // "assist" = assistência dele num gol do time, "team" = gol anônimo do time
+      evs.push({ min: m, type: "goal", text: text, big: big, who: tag });
     });
     opGoalMin.forEach(function (m) {
       evs.push({ min: m, type: "oppgoal", text: "Gol do " + fixture.opp.name + ". Silêncio no setor " + (fixture.home ? "da casa" : "visitante") + "..." });
@@ -101,7 +105,9 @@ window.CQ = window.CQ || {};
       const chosen = U.shuffle(flavorPool);
       fmins.forEach(function (m, i) {
         const f = chosen[i % chosen.length];
-        evs.push({ min: m, type: "flavor", text: f.txt });
+        // t (campo do campo 2D animado, js/pitch.js): tipo do lance de clima, pra
+        // escolher o ícone certo de canto sem precisar reanalisar o texto
+        evs.push({ min: m, type: "flavor", text: f.txt, t: f.t });
       });
     }
 
@@ -196,7 +202,10 @@ window.CQ = window.CQ || {};
     const res = live.res;
     const text = ok ? opt.ok : opt.fail;
     const min = live.events[live.i - 1] ? live.events[live.i - 1].min : 45;
-    const ins = { min: min, type: ok ? (fx.myGoal || fx.teamGoal ? "goal" : "info") : (fx.oppGoal ? "oppgoal" : "info"), text: text, big: ok && (fx.myGoal || fx.teamGoal || fx.nota >= 1) };
+    // who (campo do campo 2D animado, js/pitch.js): mesma semântica do gol normal —
+    // "me" = gol do próprio jogador na decisão, "assist" = assistência dele, "team" = time
+    const who = fx.myGoal ? "me" : fx.assist ? "assist" : fx.teamGoal ? "team" : undefined;
+    const ins = { min: min, type: ok ? (fx.myGoal || fx.teamGoal ? "goal" : "info") : (fx.oppGoal ? "oppgoal" : "info"), text: text, big: ok && (fx.myGoal || fx.teamGoal || fx.nota >= 1), who: who };
     // atualiza APENAS o resultado da partida (res). O placar visual (live.score)
     // é alterado exclusivamente por step(), ao revelar o evento inserido — assim
     // cada gol conta exatamente uma vez no placar.

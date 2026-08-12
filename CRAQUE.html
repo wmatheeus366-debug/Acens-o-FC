@@ -389,16 +389,41 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 @keyframes pop { from { transform: translateY(8px); opacity: 0.6; } to { transform: none; opacity: 1; } }
 .overlay-box.wide { width: min(860px, 100%); }
 
+.live-sticky { position: sticky; top: 0; z-index: 3; background: var(--paper); }
 .live-head {
   background: var(--ink); color: var(--paper);
   padding: 10px 16px;
   display: flex; justify-content: space-between; align-items: center; gap: 10px;
-  position: sticky; top: 0; z-index: 2;
 }
 .live-head .lh-comp { font-family: var(--cond); font-size: 12px; text-transform: uppercase; letter-spacing: 0.16em; color: var(--rule); }
 .live-clock { font-family: var(--serif); font-weight: 900; font-size: 20px; font-variant-numeric: tabular-nums; }
 .live-clock .liveblink { display: inline-block; width: 8px; height: 8px; background: var(--verm); border-radius: 50%; margin-right: 7px; animation: blink 1s infinite; vertical-align: 2px; }
 @keyframes blink { 50% { opacity: 0.25; } }
+
+/* ---------------- Campo 2D animado (modo Ao Vivo) ---------------- */
+.live-pitch { padding: 8px 12px 10px; border-bottom: 1px solid var(--rule-soft); }
+.pv-svg { display: block; width: 100%; height: auto; aspect-ratio: 15 / 9; background: var(--paper); }
+.pv-grass { fill: var(--green); }
+.pv-lines { fill: none; stroke: rgba(255, 253, 246, .55); stroke-width: .6; }
+:root[data-theme="dark"] .pv-lines { stroke: rgba(255, 253, 246, .3); }
+.pv-player .pv-inner circle { stroke: #1b1812; }
+.pv-player .pv-ring { fill: none; stroke: var(--gold); stroke-width: .7; opacity: 0; }
+.pv-me .pv-ring { opacity: .9; }
+.pv-num { font-size: 3px; font-weight: 700; fill: #fffdf6; text-anchor: middle; font-family: var(--cond); pointer-events: none; }
+#pv-ball { transition: transform .6s cubic-bezier(.32, .7, .38, 1); }
+#pv-ball circle { fill: #fffdf6; stroke: #1b1812; stroke-width: .3; }
+.pv-badge { font-size: 6.5px; opacity: 0; pointer-events: none; }
+.pv-badge-show { animation: pv-badge-fade 1.6s ease forwards; }
+@keyframes pv-badge-fade { 0% { opacity: 0; transform: translateY(-2px); } 18% { opacity: 1; transform: none; } 78% { opacity: 1; } 100% { opacity: 0; } }
+.pv-pulse-y .pv-inner, .pv-pulse-r .pv-inner, .pv-pulse-go .pv-inner { animation: pv-pulse .9s ease; transform-origin: center; }
+.pv-pulse-y .pv-ring { stroke: var(--gold); animation: pv-ring-flash .9s ease; }
+.pv-pulse-r .pv-ring { stroke: var(--verm); animation: pv-ring-flash .9s ease; }
+@keyframes pv-pulse { 0%, 100% { transform: scale(1); } 32% { transform: scale(1.7); } }
+@keyframes pv-ring-flash { 0%, 100% { opacity: .9; } 32% { opacity: 1; stroke-width: 1.3; } }
+.pv-flash-r, .pv-flash-l { animation: pv-flash .55s ease; }
+@keyframes pv-flash { 0% { filter: none; } 38% { filter: brightness(1.55); } 100% { filter: none; } }
+.pv-hold .pv-svg { animation: pv-hold 1.3s ease-in-out infinite; }
+@keyframes pv-hold { 0%, 100% { opacity: 1; } 50% { opacity: .84; } }
 
 .mm-feed { padding: 6px 0; }
 .mm-ev { display: grid; grid-template-columns: 46px 22px 1fr; gap: 8px; padding: 7px 16px; align-items: baseline; animation: evin 0.25s ease; border-bottom: 1px dashed var(--rule-soft); }
@@ -1460,11 +1485,12 @@ window.CQ = window.CQ || {};
     }
     return crestSVGProcedural(club, cls);
   }
-  // brasão vetorial procedural (sem depender de imagem externa) — usado quando o clube
-  // não tem escudo real mapeado, ou como fallback se a imagem real falhar ao carregar.
-  function crestSVGProcedural(club, cls) {
+  // preenchimento (cor sólida ou <pattern> listrado) de um clube por c1/c2/pat — usado
+  // tanto pelo brasão vetorial (crestSVGProcedural) quanto pela camisa do campo 2D
+  // animado (jerseySVG, js/pitch.js). uid precisa ser único por elemento renderizado
+  // (2 <svg> na mesma página não podem compartilhar id de <pattern>).
+  function patternFillFor(club, uid) {
     const c1 = club.c1 || "#888", c2 = club.c2 || "#fff";
-    const uid = "cr" + hashStr(club.id);
     let fillDef = "", body = `fill="${c1}"`;
     if (club.pat === "stripes") {
       fillDef = `<pattern id="${uid}" width="10" height="10" patternUnits="userSpaceOnUse"><rect width="10" height="10" fill="${c2}"/><rect width="5" height="10" fill="${c1}"/></pattern>`;
@@ -1479,14 +1505,30 @@ window.CQ = window.CQ || {};
       fillDef = `<pattern id="${uid}" width="40" height="40" patternUnits="userSpaceOnUse"><rect width="20" height="40" fill="${c1}"/><rect x="20" width="20" height="40" fill="${c2}"/></pattern>`;
       body = `fill="url(#${uid})"`;
     }
+    return { fillDef: fillDef, body: body, c1: c1, c2: c2 };
+  }
+  // brasão vetorial procedural (sem depender de imagem externa) — usado quando o clube
+  // não tem escudo real mapeado, ou como fallback se a imagem real falhar ao carregar.
+  function crestSVGProcedural(club, cls) {
+    const uid = "cr" + hashStr(club.id);
+    const pf = patternFillFor(club, uid);
     const ini = esc((club.short || club.name || "?").slice(0, 3).toUpperCase());
     const txtFill = "#fffdf6";
     return `<span class="crest ${cls || ""}"><svg viewBox="0 0 40 44" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${esc(club.name)}">
-      <defs>${fillDef}</defs>
-      <path d="M20 43 Q4 36 3 20 L3 4 Q12 1 20 1 Q28 1 37 4 L37 20 Q36 36 20 43Z" ${body} stroke="#1b1812" stroke-width="1.6"/>
+      <defs>${pf.fillDef}</defs>
+      <path d="M20 43 Q4 36 3 20 L3 4 Q12 1 20 1 Q28 1 37 4 L37 20 Q36 36 20 43Z" ${pf.body} stroke="#1b1812" stroke-width="1.6"/>
       <path d="M3 4 Q12 1 20 1 Q28 1 37 4 L37 12 L3 12 Z" fill="#1b1812" opacity=".88"/>
       <text x="20" y="10" text-anchor="middle" font-family="'Barlow Condensed','Arial Narrow',sans-serif" font-weight="700" font-size="8.4" fill="${txtFill}" letter-spacing=".6">${ini}</text>
     </svg></span>`;
+  }
+  // "camisa" simplificada de um clube pro campo 2D animado (js/pitch.js) — um círculo
+  // preenchido com o mesmo padrão do brasão (listras/faixas/metade), sem escudo/sigla.
+  // uid precisa ser único (ex: inclui o índice do marcador no campo, não só o clube,
+  // já que os 2 times podem repetir clube em confrontos hipotéticos de teste). r é o
+  // raio do círculo, na unidade do viewBox de quem chama (pitch.js decide a escala).
+  function jerseySVG(club, uid, r) {
+    const pf = patternFillFor(club, uid);
+    return `<defs>${pf.fillDef}</defs><circle r="${r || 3}" ${pf.body} stroke="#1b1812" stroke-width=".5"/>`;
   }
   // usado só pelo onerror do <img> do escudo real — busca o clube pelo id e vai
   // direto pro vetor procedural, sem tentar a imagem real de novo (evita loop).
@@ -1534,7 +1576,8 @@ window.CQ = window.CQ || {};
   CQ.util = {
     hashStr, mulberry32, rngFor, ri, rf, choice, chance, shuffle, poisson, clamp,
     esc, cleanInput, fmtBRL, fmtNota, plural,
-    nameGen, portraitSVG, crestSVG, crestSVGFallback, flagImg, natAvatar, I
+    nameGen, portraitSVG, crestSVG, crestSVGFallback, flagImg, natAvatar, I,
+    patternFillFor, jerseySVG
   };
 })();
 
@@ -2578,6 +2621,138 @@ window.CQ = window.CQ || {};
   }
 
   CQ.world = { buildWorld: buildWorld, advanceWorld: advanceWorld };
+})();
+
+/* ===== js/pitch.js ===== */
+/* CRAQUE — campo 2D animado do modo Ao Vivo: formação, desenho do campo (SVG) e
+   tradução de cada evento da partida num "alvo visual" (posição da bola, quem destacar,
+   que ícone mostrar). Puramente lógica/geração de string — nenhuma manipulação de DOM
+   aqui (isso é trabalho de js/ui.js, que já é o único módulo que toca o DOM no projeto).
+
+   É uma visualização ESTILIZADA sincronizada com os mesmos eventos abstratos que
+   js/live.js já gera (gol/cartão/lance/clima/decisão) — não é um replay físico real,
+   não simula posse de bola nem movimento livre de 22 jogadores com IA. Time do jogador
+   sempre desenhado atacando a direita, adversário a esquerda, independente do mando de
+   campo real — simplificação de apresentação deliberada. */
+window.CQ = window.CQ || {};
+
+(function () {
+  "use strict";
+  const U = CQ.util;
+
+  // 11 posições por time, em % (0-100) dentro do campo inteiro — meu time ocupa a
+  // metade esquerda (x até ~54, o suficiente pra alcançar o meio-campo), espelhado
+  // (100-x) pro adversário. Contagem por função idêntica à de probableLineup
+  // (js/ui.js): 1 GOL, 2 ZAG, 2 LAT, 2 VOL, 2 MEI, 1 PON, 1 ATA = 11.
+  const FORMATION = [
+    { pos: "GOL", x: 6, y: 50 },
+    { pos: "ZAG", x: 16, y: 34 }, { pos: "ZAG", x: 16, y: 66 },
+    { pos: "LAT", x: 22, y: 12 }, { pos: "LAT", x: 22, y: 88 },
+    { pos: "VOL", x: 30, y: 38 }, { pos: "VOL", x: 30, y: 62 },
+    { pos: "MEI", x: 40, y: 26 }, { pos: "MEI", x: 40, y: 74 },
+    { pos: "PON", x: 48, y: 16 },
+    { pos: "ATA", x: 54, y: 50 }
+  ];
+
+  // ícone de canto por tipo de lance de clima (js/live.js flavorPool) — chaves iguais
+  // ao campo "t" que cada entrada do flavorPool já carrega.
+  const FLAVOR_ICON = {
+    flare: "🔥", brawl: "🥊", invasion: "🏃", var: "📺", coach: "🗣️",
+    crowd: "📣", dog: "🐶", rain: "🌧️", laser: "🔺", drone: "🛸"
+  };
+
+  function buildPitchSVG(fx, res, player) {
+    const mine = fx.myTeam, opp = fx.opp;
+    const myPlayers = FORMATION.map(function (f, i) {
+      return { pos: f.pos, x: f.x, y: f.y, uid: "pvm" + i };
+    });
+    const opPlayers = FORMATION.map(function (f, i) {
+      return { pos: f.pos, x: 100 - f.x, y: f.y, uid: "pvo" + i };
+    });
+    // marca o jogador do usuário no primeiro slot da posição dele, se estiver em campo
+    let mineIdx = -1;
+    if (res && res.plays && player) {
+      mineIdx = FORMATION.findIndex(function (f) { return f.pos === player.pos; });
+    }
+    function playerG(p, i, side, isMe) {
+      const jersey = U.jerseySVG(side === "mine" ? mine : opp, p.uid, 3);
+      const ring = isMe ? `<circle r="4.1" class="pv-ring"/><text y="1.1" text-anchor="middle" class="pv-num">${U.esc(String((player && player.num) || ""))}</text>` : "";
+      // .pv-inner sem transform próprio: CSS Transforms sobrescreve (não soma) o atributo
+      // transform="translate(...)" do SVG quando ambos caem no mesmo elemento — o pulso
+      // (transform:scale via CSS) precisa animar um filho sem posição própria, senão a
+      // animação "teleportaria" o marcador pra origem do campo a cada pulso.
+      return `<g class="pv-player pv-${side}${isMe ? " pv-me" : ""}" data-slot="${side === "mine" ? "m" : "o"}${i}" transform="translate(${p.x},${p.y})"><g class="pv-inner">${jersey}${ring}</g></g>`;
+    }
+    const myG = myPlayers.map(function (p, i) { return playerG(p, i, "mine", i === mineIdx); }).join("");
+    const opG = opPlayers.map(function (p, i) { return playerG(p, i, "opp", false); }).join("");
+    return `<div class="live-pitch"><svg viewBox="0 0 100 100" preserveAspectRatio="none" class="pv-svg" role="img" aria-label="Campo da partida">
+      <rect x="0" y="0" width="100" height="100" class="pv-grass"/>
+      <g class="pv-lines">
+        <rect x="2" y="3" width="96" height="94" fill="none"/>
+        <line x1="50" y1="3" x2="50" y2="97"/>
+        <circle cx="50" cy="50" r="11" fill="none"/>
+        <rect x="2" y="28" width="12" height="44" fill="none"/>
+        <rect x="86" y="28" width="12" height="44" fill="none"/>
+      </g>
+      <g class="pv-team-mine">${myG}</g>
+      <g class="pv-team-opp">${opG}</g>
+      <g id="pv-ball" class="pv-ball" transform="translate(50,50)"><circle r="1.7"/></g>
+      <text id="pv-badge" class="pv-badge" x="50" y="14" text-anchor="middle"></text>
+    </svg></div>`;
+  }
+
+  function poseForDecision(dec, rng) {
+    const k = dec && dec.kind;
+    if (k === "gk-pen") return { ball: [12, 50], highlight: "me" };
+    if (k === "pen") return { ball: [88, 50], highlight: "me" };
+    if (k === "fk") return { ball: [76, 22 + U.ri(0, 56, rng)], highlight: "me" };
+    if (k === "gk-launch") return { ball: [20, 50], highlight: "me" };
+    return { ball: [64, 22 + U.ri(0, 56, rng)], highlight: "me" }; // counter
+  }
+
+  // traduz um evento de js/live.js (buildLive/chooseDecision) num "alvo visual":
+  // { ball:[x,y]|null, highlight:"me"|"mate"|"opp"|null, cardType:"y"|"r"|null,
+  //   badge:string|null, goalSide:"left"|"right"|null, hold:boolean }
+  // ball:null significa "não mexe" (mantém onde estava). rng é o mesmo live.rng já
+  // semeado pela partida — determinístico, reproduzível como o resto do projeto.
+  function poseFor(ev, rng) {
+    switch (ev.type) {
+      case "ko":
+        return { ball: [50, 50], highlight: null, cardType: null, badge: null, goalSide: null, hold: false };
+      case "goal":
+        return { ball: [88, 30 + U.ri(0, 40, rng)], highlight: ev.who === "me" ? "me" : "mate", cardType: null, badge: null, goalSide: "right", hold: false };
+      case "oppgoal":
+        return { ball: [12, 30 + U.ri(0, 40, rng)], highlight: "opp", cardType: null, badge: null, goalSide: "left", hold: false };
+      case "card":
+        return { ball: null, highlight: "me", cardType: "y", badge: null, goalSide: null, hold: false };
+      case "redcard":
+        return { ball: null, highlight: "me", cardType: "r", badge: null, goalSide: null, hold: false };
+      case "info":
+        return { ball: [26 + U.ri(0, 48, rng), 12 + U.ri(0, 76, rng)], highlight: null, cardType: null, badge: null, goalSide: null, hold: false };
+      case "flavor":
+        return { ball: null, highlight: null, cardType: null, badge: (ev.t && FLAVOR_ICON[ev.t]) || FLAVOR_ICON.crowd, goalSide: null, hold: false };
+      case "decision": {
+        const p = poseForDecision(ev.dec, rng);
+        return { ball: p.ball, highlight: p.highlight, cardType: null, badge: null, goalSide: null, hold: true };
+      }
+      case "ht":
+        return { ball: [50, 50], highlight: null, cardType: null, badge: "⏸️", goalSide: null, hold: false };
+      case "ft":
+        return { ball: [50, 50], highlight: null, cardType: null, badge: "🏁", goalSide: null, hold: false };
+      default:
+        return { ball: null, highlight: null, cardType: null, badge: null, goalSide: null, hold: false };
+    }
+  }
+
+  // pose de um lance específico da disputa de pênaltis (js/live.js runShootout/log[i]).
+  // side "my" = eu bato (contra o gol deles, direita); "op" = eles batem contra o meu
+  // goleiro (contra o meu gol, esquerda).
+  function poseForKick(l) {
+    const side = l.side === "my" ? "right" : "left";
+    return { ball: [l.side === "my" ? 88 : 12, 50], result: l.ok ? "goal" : "miss", goalSide: side };
+  }
+
+  CQ.pitch = { FORMATION: FORMATION, FLAVOR_ICON: FLAVOR_ICON, buildPitchSVG: buildPitchSVG, poseFor: poseFor, poseForKick: poseForKick };
 })();
 
 /* ===== js/engine.js ===== */
@@ -5747,20 +5922,24 @@ window.CQ = window.CQ || {};
 
     const evs = [];
     myGoalMin.forEach(function (m) {
-      let who, text, big = false;
+      let who, text, big = false, tag = "team";
       if (pgLeft > 0) {
         pgLeft--;
         who = p.name;
         text = "GOOOOL! " + p.name + " marca para " + (fixture.home ? "o " + meName : "o " + meName + " fora de casa") + "!";
         big = true;
+        tag = "me";
       } else if (paLeft > 0) {
         paLeft--;
         text = "Gol do " + meName + "! Assistência primorosa de " + p.name + ".";
         big = true;
+        tag = "assist";
       } else {
         text = "Gol do " + meName + "! A equipe amplia a pressão.";
       }
-      evs.push({ min: m, type: "goal", text: text, big: big });
+      // who (campo do campo 2D animado, js/pitch.js): "me" = o próprio gol do jogador,
+      // "assist" = assistência dele num gol do time, "team" = gol anônimo do time
+      evs.push({ min: m, type: "goal", text: text, big: big, who: tag });
     });
     opGoalMin.forEach(function (m) {
       evs.push({ min: m, type: "oppgoal", text: "Gol do " + fixture.opp.name + ". Silêncio no setor " + (fixture.home ? "da casa" : "visitante") + "..." });
@@ -5818,7 +5997,9 @@ window.CQ = window.CQ || {};
       const chosen = U.shuffle(flavorPool);
       fmins.forEach(function (m, i) {
         const f = chosen[i % chosen.length];
-        evs.push({ min: m, type: "flavor", text: f.txt });
+        // t (campo do campo 2D animado, js/pitch.js): tipo do lance de clima, pra
+        // escolher o ícone certo de canto sem precisar reanalisar o texto
+        evs.push({ min: m, type: "flavor", text: f.txt, t: f.t });
       });
     }
 
@@ -5913,7 +6094,10 @@ window.CQ = window.CQ || {};
     const res = live.res;
     const text = ok ? opt.ok : opt.fail;
     const min = live.events[live.i - 1] ? live.events[live.i - 1].min : 45;
-    const ins = { min: min, type: ok ? (fx.myGoal || fx.teamGoal ? "goal" : "info") : (fx.oppGoal ? "oppgoal" : "info"), text: text, big: ok && (fx.myGoal || fx.teamGoal || fx.nota >= 1) };
+    // who (campo do campo 2D animado, js/pitch.js): mesma semântica do gol normal —
+    // "me" = gol do próprio jogador na decisão, "assist" = assistência dele, "team" = time
+    const who = fx.myGoal ? "me" : fx.assist ? "assist" : fx.teamGoal ? "team" : undefined;
+    const ins = { min: min, type: ok ? (fx.myGoal || fx.teamGoal ? "goal" : "info") : (fx.oppGoal ? "oppgoal" : "info"), text: text, big: ok && (fx.myGoal || fx.teamGoal || fx.nota >= 1), who: who };
     // atualiza APENAS o resultado da partida (res). O placar visual (live.score)
     // é alterado exclusivamente por step(), ao revelar o evento inserido — assim
     // cada gol conta exatamente uma vez no placar.
@@ -7015,8 +7199,75 @@ window.CQ = window.CQ || {};
       <span class="lh-comp">${esc(fx.label)}</span>
       <span class="live-clock"><span class="liveblink"></span><span id="lv-score" class="tnum">${liveScoreStr(live)}</span></span>
     </div>`;
-    overlay(`${header}<div class="mm-feed" id="lv-feed"></div><div id="lv-foot" style="padding:12px 16px"></div>`, false);
+    // campo 2D animado (js/pitch.js): SVG puro, inserido 1x e mantido vivo no DOM daqui
+    // pra frente — liveStep()/liveDecide()/shootReveal() só mexem em classe/transform
+    // dele depois, nunca recriam (mesmo padrão de #lv-feed/#lv-score/#lv-foot). Modo
+    // largo do overlay dá espaço pro campo sem espremer o feed de texto.
+    const pitchHtml = (CQ.pitch && CQ.pitch.buildPitchSVG) ? CQ.pitch.buildPitchSVG(fx, live.res, g().player) : "";
+    overlay(`<div class="live-sticky">${header}${pitchHtml}</div><div class="mm-feed" id="lv-feed"></div><div id="lv-foot" style="padding:12px 16px"></div>`, true);
     if (fresh) { if (CQ.audio) CQ.audio.play("whistle"); liveStep(); }
+  }
+
+  // ---------------- campo 2D animado: reação a cada evento revelado ----------------
+  // Importante pro determinismo do projeto: a posição cosmética da bola/zona (info,
+  // falta, contra-ataque) usa RNG NÃO semeada (U.ri sem passar live.rng), de propósito
+  // — nunca consome do mesmo gerador que decide resultado real de jogo (live.rng), pra
+  // não arriscar mudar a ordem de sorteios reais (chooseDecision/runShootout) conforme
+  // o timing de clique do usuário. Mesmo espírito de flavor/feed já usado no projeto:
+  // decorativo é decorativo, não precisa ser reproduzível.
+  function applyPitchPose(pose) {
+    if (!pose) return;
+    const reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const ball = $("#pv-ball");
+    if (ball && pose.ball) ball.setAttribute("transform", `translate(${pose.ball[0]},${pose.ball[1]})`);
+    if (pose.goalSide) {
+      const svg = $(".pv-svg");
+      if (svg) {
+        const cls = pose.goalSide === "right" ? "pv-flash-r" : "pv-flash-l";
+        svg.classList.remove("pv-flash-r", "pv-flash-l");
+        void svg.offsetWidth;
+        svg.classList.add(cls);
+      }
+    }
+    if (pose.highlight) {
+      const sel = pose.highlight === "me" ? ".pv-me" :
+        pose.highlight === "mate" ? ".pv-team-mine .pv-player:not(.pv-me)" : ".pv-team-opp .pv-player";
+      const nodes = document.querySelectorAll(sel);
+      if (nodes.length) {
+        const node = nodes.length > 1 ? nodes[U.ri(0, nodes.length - 1)] : nodes[0];
+        const cls = pose.cardType === "y" ? "pv-pulse-y" : pose.cardType === "r" ? "pv-pulse-r" : "pv-pulse-go";
+        node.classList.remove("pv-pulse-y", "pv-pulse-r", "pv-pulse-go");
+        void node.offsetWidth;
+        node.classList.add(cls);
+      }
+    }
+    const wrap = $(".live-pitch");
+    if (wrap) wrap.classList.toggle("pv-hold", !!pose.hold);
+    if (pose.badge) {
+      const b = $("#pv-badge");
+      if (b) {
+        b.textContent = pose.badge;
+        b.classList.remove("pv-badge-show");
+        if (!reduced) { void b.offsetWidth; b.classList.add("pv-badge-show"); }
+      }
+    }
+  }
+
+  // vários eventos podem chegar de um só clique (step() só pausa em gol/intervalo/
+  // decisão — lances neutros/cartão/clima antes disso vêm juntos); espaça a reação
+  // visual pra dar tempo de cada uma se ver, exceto com reduced-motion (aplica só o
+  // estado final, sem atraso decorativo — mesmo padrão de animateCount/dropConfetti).
+  function pitchReact(events) {
+    if (!CQ.pitch || !events || !events.length) return;
+    const live = CQ.state.live;
+    const reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced) { applyPitchPose(CQ.pitch.poseFor(events[events.length - 1])); return; }
+    events.forEach(function (e, i) {
+      setTimeout(function () {
+        if (CQ.state.live !== live) return; // partida encerrada/trocada antes do timeout
+        applyPitchPose(CQ.pitch.poseFor(e));
+      }, i * 550);
+    });
   }
 
   function liveScoreStr(live) {
@@ -7049,6 +7300,10 @@ window.CQ = window.CQ || {};
       if (e.type === "goal") goalSplash(true, e.min + "'");
       else if (e.type === "oppgoal") goalSplash(false, "");
     });
+    pitchReact(revealed);
+    // a decisão em si não entra em "revealed" (step() para antes de empurrá-la) — reage
+    // no campo também, senão ele fica parado na última pose enquanto o painel aparece.
+    if (live.phase === "decision" && live.decision) pitchReact([{ type: "decision", dec: live.decision }]);
     const sc = $("#lv-score");
     if (sc) sc.textContent = liveScoreStr(live).replace(/&amp;/g, "&");
     const foot = $("#lv-foot");
@@ -7146,7 +7401,8 @@ window.CQ = window.CQ || {};
 
   function shootReveal() {
     const live = CQ.state.live;
-    CQ.live.shootStep(live);
+    const l = CQ.live.shootStep(live);
+    if (l && CQ.pitch && CQ.pitch.poseForKick) applyPitchPose(CQ.pitch.poseForKick(l));
     renderShootout();
   }
 
