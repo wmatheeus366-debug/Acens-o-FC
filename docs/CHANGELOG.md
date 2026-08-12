@@ -1188,3 +1188,34 @@ resolvidas na temporada.
   registrado certinho na carreira), e a volta automática pro Flamengo aconteceu sozinha
   no ano certo — inclusive o rótulo "Empréstimo" aparecendo correto na linha do tempo
   com o texto "Saiu do Flamengo por empréstimo, rumo ao RB Bragantino."
+
+## Voltar a ex-clube depois dos 31 (item 4 do roteiro)
+
+Pedido original: "uma opção de voltar para um dos seus ex clubes quando tiver nos 31
+anos a diante ou o agente liga perguntando pra qual clube ele quer voltar". As duas
+framings do pedido viraram uma coisa só: um evento de fim de temporada, iniciado pelo
+agente, com a pergunta literal "pra qual clube você quer voltar".
+
+Mais simples que o sistema de empréstimo desta mesma sessão: mecanicamente, voltar pra
+um ex-clube é só uma transferência normal — reaproveita `acceptOffer` (`js/engine.js`)
+**sem nenhuma função nova pra aceitar**, e não precisa de nenhum campo novo persistido
+no save (diferente do empréstimo, que precisou de `p.loan` pra lembrar o clube de
+origem — aqui não tem "origem" pra lembrar, é só ida).
+
+- **Gatilho novo**, mutuamente exclusivo dos de mercado/empréstimo já existentes:
+  jogador com 31+ anos, com pelo menos 1 ex-clube no histórico (`p.career`), 30% de
+  chance por temporada elegível — não todo ano, pra continuar parecendo uma ligação de
+  verdade, não uma rotina.
+- **`formerClubs(g)`** — lista de clubes distintos por onde o jogador já passou,
+  excluindo o atual, extraída de `p.career` (não existe "clube de origem"/"clube do
+  coração" separado no jogo — confirmado por investigação, `p.career` é a única fonte).
+- **`makeHomecomingOffers`** — diferente do empréstimo (1 proposta só, o clube
+  negocia), aqui mostra **todos** os ex-clubes elegíveis de uma vez, já que a pergunta
+  do agente é literalmente "pra qual" — o jogador escolhe entre eles ou recusa.
+- Tela nova (`showHomecoming`, `js/ui.js`) no mesmo estilo visual do mercado/empréstimo;
+  recusar não tem penalidade ("a proposta pode voltar em outra temporada").
+- Validado: 166/166 testes (3 checagens novas). Confirmado também no navegador: forcei
+  um veterano de 32 anos com Santos no histórico, a ligação do agente apareceu
+  corretamente ("Seu agente liga: um clube onde você já vestiu a camisa quer te trazer
+  de volta. Pra onde você volta?"), aceitei a proposta do Santos e o clube trocou
+  corretamente.

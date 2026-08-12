@@ -45,7 +45,7 @@ Fontes (Google Fonts) e bandeiras (flagcdn) vêm da web com fallback; todo o res
 
 ```
 # no navegador (index.html ou CRAQUE.html aberto), console:
-CQ.tests.run()             # tests/regression.js — ~161 checagens
+CQ.tests.run()             # tests/regression.js — ~166 checagens
 
 # idade real dos elencos (resumível — roda até bater na cota diária, ~100 req/dia):
 node scripts/sync-ages.mjs [teto de chamadas ao vivo, padrão 90]
@@ -282,7 +282,7 @@ preenchido numa derrota); banner de título com ordinal (BICAMPEÃO...PENTACAMPE
    tamanho — precisa de sessão de planejamento própria, escolha de biblioteca tipo
    three.js, o que quebra a filosofia atual de zero dependência externa).
 3. ✅ **Sistema de empréstimo (feito).** Ver seção própria abaixo.
-4. Voltar a ex-clube depois dos 31 (ou ligação do agente).
+4. ✅ **Voltar a ex-clube depois dos 31 (feito).** Ver seção própria abaixo.
 5. Linha do tempo de marcos da carreira.
 6. Sistema de ídolo em camadas (ídolo → ídolo da geração → maior de todos).
 7. Salvar carreira pra sempre ao aposentar ("hall da fama").
@@ -347,3 +347,16 @@ retorno. `p.career[].onLoan` (aditivo) deixa a linha do tempo (`js/ui.js`) difer
 "Empréstimo"/"Fim do empréstimo" de "Transferência" definitiva. Tela nova
 (`showLoanOffer`, `js/ui.js`) no mesmo estilo do mercado normal, com escolha binária
 sem penalidade por recusar.
+
+## Voltar a ex-clube depois dos 31 (item 4, feito)
+
+Mais simples que o empréstimo: mecanicamente é só uma transferência normal, então
+**reaproveita `acceptOffer` sem função nova pra aceitar**, e não precisa de nenhum
+campo novo no save (nenhuma "origem" pra lembrar, é só ida). Gatilho dentro de
+`endSeason` (`js/engine.js`), mutuamente exclusivo dos outros de mercado/empréstimo:
+31+ anos, pelo menos 1 ex-clube no histórico, 30% de chance por temporada elegível.
+`formerClubs(g)` extrai a lista de clubes distintos de `p.career` excluindo o atual
+(não existe "clube de origem" separado no jogo). `makeHomecomingOffers` — diferente do
+empréstimo (1 proposta só) — mostra todos os ex-clubes elegíveis de uma vez, já que a
+pergunta é "pra qual". Tela nova (`showHomecoming`, `js/ui.js`) no mesmo estilo visual
+do mercado/empréstimo.

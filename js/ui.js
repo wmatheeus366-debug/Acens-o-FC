@@ -1422,6 +1422,7 @@ window.CQ = window.CQ || {};
     if (sum.retiring) { G.retired = true; CQ.main.save(); go("retro"); return; }
     if (sum.offers) { showMarket(); return; }
     if (sum.loanOffer) { showLoanOffer(); return; }
+    if (sum.homecomingOffers) { showHomecoming(); return; }
     E().nextSeason(G);
     CQ.main.save();
     go("home");
@@ -1507,6 +1508,47 @@ window.CQ = window.CQ || {};
     CQ.main.save();
     go("home");
     toast("Você decidiu ficar. Nova temporada, nova chance de conquistar espaço.");
+  }
+
+  // ligação do agente: "pra qual clube você quer voltar" — mostra todos os ex-clubes
+  // elegíveis de uma vez (diferente do empréstimo, que é 1 proposta só).
+  function showHomecoming() {
+    const G = g(), sum = G.pendingSummary, offers = sum.homecomingOffers;
+    const cards = offers.map(function (o, i) {
+      const c = D.CLUBS[o.clubId];
+      const roleLbl = { estrela: "como ESTRELA", titular: "como titular" }[o.role] || "como titular";
+      return `<button class="dc-opt" onclick="CQ.ui.pickHomecoming(${i})">
+        <span class="flex">${crest(c, "crest-24")} <b>${esc(o.name)}</b> <span class="badge badge-soft">${esc(o.league)}</span> <span class="badge badge-gold">${roleLbl}</span></span>
+        <small>Salário ${U.fmtBRL(o.salary)}/mês · contrato de ${o.years} ${U.plural(o.years, "ano", "anos")}</small></button>`;
+    }).join("");
+    overlay(`<div class="live-head"><span class="lh-comp">Ligação do agente · ${sum.year}</span>${I.coin}</div>
+      <div style="padding:16px">
+        <h3 class="mb8">"Tenho uma proposta que pode te interessar..."</h3>
+        <p class="small muted mb12">Seu agente liga: um clube onde você já vestiu a camisa quer te trazer de volta. Pra onde você volta?</p>
+        ${cards}
+        <hr class="rule">
+        <button class="dc-opt" onclick="CQ.ui.declineHomecoming()">
+          <span class="flex"><b>Agradecer e seguir no ${esc(E().myClub(G).name)}</b></span>
+          <small>Sem pressa — a proposta pode voltar em outra temporada</small></button>
+      </div>`, true);
+  }
+  function pickHomecoming(i) {
+    const G = g(), o = G.pendingSummary.homecomingOffers[i];
+    E().acceptOffer(G, o); // mecanicamente é só uma transferência normal — sem função nova
+    CQ.nar.post(G, "imprensa", "VOLTA PRA CASA: " + G.player.name + " está de volta ao " + o.name + ".", { hot: true });
+    closeOverlay();
+    E().nextSeason(G);
+    CQ.main.save();
+    go("home");
+    toast("De volta ao " + o.name + "! Que emoção.");
+  }
+  function declineHomecoming() {
+    const G = g();
+    closeOverlay();
+    E().nextSeason(G);
+    CQ.main.save();
+    go("home");
+    toast("Você decidiu esperar. Talvez ano que vem.");
   }
 
   // ---------------- CARREIRA ----------------
@@ -2760,6 +2802,7 @@ window.CQ = window.CQ || {};
     pickInterview: pickInterview, pickPress: pickPress, pickLife: pickLife,
     seasonEndFlow: seasonEndFlow, summaryNext: summaryNext, summaryNextStep: summaryNextStep, pickOffer: pickOffer, pickRenew: pickRenew,
     pickLoan: pickLoan, declineLoan: declineLoan,
+    pickHomecoming: pickHomecoming, declineHomecoming: declineHomecoming,
     managerLine: managerLine, managerConfTier: managerConfTier, MGR_LINES: MGR_LINES,
     ctab: ctab, ttab: ttab, closeTitle: closeTitle, closeDraw: closeDraw, closeCapa: closeCapa, votePoll: votePoll,
     setLogo: setLogo, clearLogo: clearLogo, toast: toast,

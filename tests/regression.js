@@ -840,6 +840,49 @@
     });
   }
 
+  // ---- Volta a ex-clube: dedup correto de p.career (sem repetição, sem o clube atual) ----
+  function testFormerClubsDedup() {
+    withTempGame(function () {
+      const g = newCareer("ATA", "vas");
+      g.player.clubId = "cor";
+      g.player.career = [
+        { year: 2026, clubId: "vas" }, { year: 2027, clubId: "vas" },
+        { year: 2028, clubId: "san" }, { year: 2029, clubId: "cor" }
+      ];
+      const former = E().formerClubs(g);
+      assert("ex-clubes: lista única, sem repetição e sem o clube atual", former.length === 2 && former.indexOf("vas") >= 0 && former.indexOf("san") >= 0 && former.indexOf("cor") < 0, JSON.stringify(former));
+    });
+  }
+  // ---- Volta a ex-clube: gatilho dispara pra veterano 31+ com histórico de clube ----
+  function testHomecomingTriggerFires() {
+    withTempGame(function () {
+      let sum = null, tries = 0;
+      while (tries++ < 40 && !(sum && sum.homecomingOffers)) {
+        const g = newCareer("ATA", "vas");
+        g.player.age = 32;
+        g.player.career = [{ year: 2020, clubId: "san" }, { year: 2021, clubId: "san" }];
+        E().startSeason(g);
+        let n = 0; while (E().currentFixture(g) && n++ < 700) E().applyMatch(g, E().resolveMatch(g, E().currentFixture(g), {}));
+        sum = E().endSeason(g);
+        if (sum.homecomingOffers) {
+          assert("volta a ex-clube: nunca dispara junto com offers/loanOffer", !sum.offers && !sum.loanOffer);
+          assert("volta a ex-clube: só propõe clubes que já foram do jogador", sum.homecomingOffers.every(function (o) { return o.clubId === "san"; }), JSON.stringify(sum.homecomingOffers));
+        }
+      }
+      assert("volta a ex-clube: gatilho dispara pelo menos 1x em " + tries + " tentativas (chance de 30%/temporada)", !!(sum && sum.homecomingOffers), "tries=" + tries);
+    });
+  }
+  // ---- Volta a ex-clube: aceitar reaproveita acceptOffer já existente, sem função nova ----
+  function testAcceptHomecomingUsesAcceptOffer() {
+    withTempGame(function () {
+      const g = newCareer("ATA", "vas");
+      const offers = E().makeHomecomingOffers(g, ["san"]);
+      assert("volta a ex-clube: makeHomecomingOffers gera 1 proposta por ex-clube", offers.length === 1 && offers[0].clubId === "san", JSON.stringify(offers));
+      E().acceptOffer(g, offers[0]);
+      assert("volta a ex-clube: aceitar muda p.clubId pro ex-clube escolhido", g.player.clubId === "san", "clubId=" + g.player.clubId);
+    });
+  }
+
   // ---- Bug real corrigido: banner de campeão não pode comemorar quando quem venceu foi outra seleção/clube ----
   function testChampionBannerCorrectness() {
     withTempGame(function () {
@@ -1110,6 +1153,9 @@
     testAcceptLoanOffer();
     testLoanReturnsAutomatically();
     testCareerTracksLoan();
+    testFormerClubsDedup();
+    testHomecomingTriggerFires();
+    testAcceptHomecomingUsesAcceptOffer();
     testChampionBannerCorrectness();
     testRivalsCoverage();
     testClubRivalryScoreboard();
