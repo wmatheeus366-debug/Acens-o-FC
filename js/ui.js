@@ -1421,10 +1421,11 @@ window.CQ = window.CQ || {};
     CQ.state.summary = null;
     if (sum.retiring) { G.retired = true; CQ.main.save(); go("retro"); return; }
     if (sum.offers) { showMarket(); return; }
+    if (sum.loanOffer) { showLoanOffer(); return; }
     E().nextSeason(G);
     CQ.main.save();
     go("home");
-    toast("Temporada " + G.year + " começa agora. Boa sorte!");
+    toast(G.pendingReturnFromLoan ? "Empréstimo terminou — você está de volta ao " + G.pendingReturnFromLoan + "!" : "Temporada " + G.year + " começa agora. Boa sorte!");
   }
 
   function showMarket() {
@@ -1469,6 +1470,43 @@ window.CQ = window.CQ || {};
     CQ.main.save();
     go("home");
     toast("Contrato renovado. Nova temporada!");
+  }
+
+  // proposta de empréstimo — o clube propõe (não é vitrine), então só 1 destino e a
+  // escolha é binária: aceitar ou ficar brigando por espaço no elenco atual.
+  function showLoanOffer() {
+    const G = g(), sum = G.pendingSummary, o = sum.loanOffer, cl = D.CLUBS[o.clubId];
+    overlay(`<div class="live-head"><span class="lh-comp">Proposta de empréstimo · ${sum.year}</span>${I.coin}</div>
+      <div style="padding:16px">
+        <h3 class="mb8">Pouco espaço no elenco</h3>
+        <p class="small muted mb12">Você jogou pouco nesta temporada. O clube avalia que
+        um empréstimo te dá minutos de verdade em outro lugar — e continua sendo o dono
+        do seu contrato, te espera de volta.</p>
+        <button class="dc-opt" onclick="CQ.ui.pickLoan()">
+          <span class="flex">${crest(cl, "crest-24")} <b>${esc(o.name)}</b> <span class="badge badge-soft">${esc(o.league)}</span> <span class="badge badge-gold">como titular</span></span>
+          <small>Salário ${U.fmtBRL(o.salary)}/mês · empréstimo de ${o.years} ${U.plural(o.years, "temporada", "temporadas")} · volta ao ${esc(E().myClub(G).name)} depois</small></button>
+        <button class="dc-opt" onclick="CQ.ui.declineLoan()">
+          <span class="flex"><b>Ficar e brigar por espaço</b></span>
+          <small>Segue no ${esc(E().myClub(G).name)}, sem garantia de mais minutos</small></button>
+      </div>`, true);
+  }
+  function pickLoan() {
+    const G = g(), sum = G.pendingSummary, o = sum.loanOffer;
+    E().acceptLoanOffer(G, o);
+    CQ.nar.post(G, "imprensa", "EMPRÉSTIMO: " + G.player.name + " é anunciado pelo " + o.name + " até " + G.player.loan.returnYear + ".", { hot: true });
+    closeOverlay();
+    E().nextSeason(G);
+    CQ.main.save();
+    go("home");
+    toast("Empréstimo fechado — bem-vindo ao " + o.name + "!");
+  }
+  function declineLoan() {
+    const G = g();
+    closeOverlay();
+    E().nextSeason(G);
+    CQ.main.save();
+    go("home");
+    toast("Você decidiu ficar. Nova temporada, nova chance de conquistar espaço.");
   }
 
   // ---------------- CARREIRA ----------------
@@ -1560,8 +1598,17 @@ window.CQ = window.CQ || {};
       events.push({ year: first.year, order: 0, cls: "debut", label: "Estreia profissional", detail: "Começou a carreira no " + esc(first.clubName) + "." });
     }
     for (let i = 1; i < p.career.length; i++) {
-      if (p.career[i].clubId !== p.career[i - 1].clubId) {
-        events.push({ year: p.career[i].year, order: 1, cls: "transfer", label: "Transferência", detail: "Saiu do " + esc(p.career[i - 1].clubName) + " e assinou com o " + esc(p.career[i].clubName) + "." });
+      const prev = p.career[i - 1], cur = p.career[i];
+      if (cur.clubId !== prev.clubId) {
+        // 3 casos: saiu emprestado, voltou do empréstimo pro clube dono, ou
+        // transferência definitiva de verdade (nenhum dos dois lados em empréstimo)
+        if (cur.onLoan && !prev.onLoan) {
+          events.push({ year: cur.year, order: 1, cls: "transfer", label: "Empréstimo", detail: "Saiu do " + esc(prev.clubName) + " por empréstimo, rumo ao " + esc(cur.clubName) + "." });
+        } else if (prev.onLoan && !cur.onLoan) {
+          events.push({ year: cur.year, order: 1, cls: "transfer", label: "Fim do empréstimo", detail: "Encerrou o empréstimo e voltou ao " + esc(cur.clubName) + "." });
+        } else {
+          events.push({ year: cur.year, order: 1, cls: "transfer", label: "Transferência", detail: "Saiu do " + esc(prev.clubName) + " e assinou com o " + esc(cur.clubName) + "." });
+        }
       }
     }
     (p.titles || []).forEach(function (t) {
@@ -2712,6 +2759,7 @@ window.CQ = window.CQ || {};
     liveStep: liveStep, liveDecide: liveDecide, shootPick: shootPick, shootReveal: shootReveal, finishLive: finishLive,
     pickInterview: pickInterview, pickPress: pickPress, pickLife: pickLife,
     seasonEndFlow: seasonEndFlow, summaryNext: summaryNext, summaryNextStep: summaryNextStep, pickOffer: pickOffer, pickRenew: pickRenew,
+    pickLoan: pickLoan, declineLoan: declineLoan,
     managerLine: managerLine, managerConfTier: managerConfTier, MGR_LINES: MGR_LINES,
     ctab: ctab, ttab: ttab, closeTitle: closeTitle, closeDraw: closeDraw, closeCapa: closeCapa, votePoll: votePoll,
     setLogo: setLogo, clearLogo: clearLogo, toast: toast,

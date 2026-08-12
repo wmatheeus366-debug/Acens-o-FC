@@ -67,7 +67,7 @@
     withTempGame(function () {
       const g = newCareer("MEI");
       const old = JSON.parse(JSON.stringify(g));
-      ["traits", "compGoals", "idolClubs", "clubGoals", "ballon", "milestones", "assets", "records", "captain", "squadRole"].forEach(function (k) { delete old.player[k]; });
+      ["traits", "compGoals", "idolClubs", "clubGoals", "ballon", "milestones", "assets", "records", "captain", "squadRole", "loan"].forEach(function (k) { delete old.player[k]; });
       delete old.manager; delete old.worldStars; delete old.schemaVersion; delete old.world; delete old.clubRivalry;
       const raw = localStorage.getItem("craque-save-v1");
       localStorage.setItem("craque-save-v1", JSON.stringify(old));
@@ -84,6 +84,7 @@
         loaded && loaded.world && loaded.world.leagues && Object.keys(loaded.world.leagues).length === 7,
         "n=" + (loaded && loaded.world && loaded.world.leagues ? Object.keys(loaded.world.leagues).length : -1));
       assert("save: migra g.clubRivalry", loaded && loaded.clubRivalry && typeof loaded.clubRivalry === "object");
+      assert("save: migra p.loan (empréstimo) pra null", loaded && loaded.player.loan === null, "loan=" + JSON.stringify(loaded && loaded.player.loan));
     });
   }
 
@@ -788,6 +789,57 @@
     });
   }
 
+  // ---- Sistema de empréstimo: dispara quando o jogador fica preso no banco ----
+  function testLoanTriggerFires() {
+    withTempGame(function () {
+      let sum = null, tries = 0;
+      while (tries++ < 15 && !(sum && sum.loanOffer)) {
+        const g = newCareer("ATA", "fla"); // clube forte, overall de estreante — tende a sobrar banco
+        E().startSeason(g);
+        let n = 0; while (E().currentFixture(g) && n++ < 700) E().applyMatch(g, E().resolveMatch(g, E().currentFixture(g), {}));
+        sum = E().endSeason(g);
+        if (sum.loanOffer) {
+          assert("empréstimo: nunca dispara junto com o mercado normal (offers)", !sum.offers);
+          assert("empréstimo: proposta tem clube/salário/duração válidos", !!sum.loanOffer.clubId && sum.loanOffer.salary > 0 && (sum.loanOffer.years === 1 || sum.loanOffer.years === 2), JSON.stringify(sum.loanOffer));
+        }
+      }
+      assert("empréstimo: gatilho dispara pelo menos 1x em " + tries + " tentativas com jogador preso no banco", !!(sum && sum.loanOffer), "tries=" + tries);
+    });
+  }
+  function testAcceptLoanOffer() {
+    withTempGame(function () {
+      const g = newCareer("ATA", "vas");
+      const before = g.year;
+      const offer = { clubId: "cor", name: "Corinthians", league: "BRA", salary: 50000, years: 2, role: "titular" };
+      E().acceptLoanOffer(g, offer);
+      assert("empréstimo: p.loan preenchido corretamente ao aceitar", g.player.loan && g.player.loan.fromClubId === "vas" && g.player.loan.toClubId === "cor" && g.player.loan.returnYear === before + 3, JSON.stringify(g.player.loan));
+      assert("empréstimo: clubId muda pro clube emprestador", g.player.clubId === "cor", "clubId=" + g.player.clubId);
+      assert("empréstimo: contrato de origem nunca fica menor que a data prevista de volta", g.player.contractEnd >= g.player.loan.returnYear);
+    });
+  }
+  function testLoanReturnsAutomatically() {
+    withTempGame(function () {
+      const g = newCareer("ATA", "vas");
+      E().acceptLoanOffer(g, { clubId: "cor", name: "Corinthians", league: "BRA", salary: 50000, years: 1, role: "titular" });
+      g.player.loan.returnYear = g.year + 1; // força a volta já na próxima virada de temporada
+      E().nextSeason(g);
+      assert("empréstimo: volta automática pro clube de origem no ano certo", g.player.clubId === "vas", "clubId=" + g.player.clubId);
+      assert("empréstimo: p.loan zera depois da volta", g.player.loan === null);
+      assert("empréstimo: g.pendingReturnFromLoan sinaliza a volta pra UI", g.pendingReturnFromLoan === "Vasco da Gama", "v=" + g.pendingReturnFromLoan);
+    });
+  }
+  function testCareerTracksLoan() {
+    withTempGame(function () {
+      const g = newCareer("ATA", "vas");
+      E().startSeason(g);
+      g.player.loan = { fromClubId: "vas", fromClubName: "Vasco da Gama", toClubId: "cor", returnYear: g.year + 2 };
+      let n = 0; while (E().currentFixture(g) && n++ < 700) E().applyMatch(g, E().resolveMatch(g, E().currentFixture(g), {}));
+      E().endSeason(g);
+      const rec = g.player.career[g.player.career.length - 1];
+      assert("empréstimo: temporada emprestada fica marcada em p.career (onLoan)", rec && rec.onLoan === true, JSON.stringify(rec && rec.onLoan));
+    });
+  }
+
   // ---- Bug real corrigido: banner de campeão não pode comemorar quando quem venceu foi outra seleção/clube ----
   function testChampionBannerCorrectness() {
     withTempGame(function () {
@@ -1054,6 +1106,10 @@
     testChampsCoversAllContis();
     testMundialRegistersChampionEvenLosing();
     testTituloOrdinalBanner();
+    testLoanTriggerFires();
+    testAcceptLoanOffer();
+    testLoanReturnsAutomatically();
+    testCareerTracksLoan();
     testChampionBannerCorrectness();
     testRivalsCoverage();
     testClubRivalryScoreboard();

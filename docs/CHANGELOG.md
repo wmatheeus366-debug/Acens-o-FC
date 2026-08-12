@@ -1149,3 +1149,42 @@ descobrir nenhum ID novo.
   `CQ.BIRTHDATES` ausente/undefined nunca quebra nada). Conferido também com o jogo de
   verdade rodando o caminho real (não só o teste injetado): Arrascaeta sai com 32 anos
   e fora da Base.
+
+## Sistema de empréstimo (item 3 do roteiro)
+
+Pedido original: "caso o jogador não esteja evoluindo naquele clube, o clube negocia
+ele por empréstimo de 1 ou 2 anos". Investigação (2 agentes Explore) confirmou que o
+mercado de transferências só abria uma vez por temporada (`endSeason`), com 3
+gatilhos (contrato acabou, dispensado, pediu pra sair) — nenhum deles cobria "está
+preso no banco". Não existia nenhum contador pronto de "banco há quanto tempo"; foi
+derivado comparando `p.stats.j` (jogos realmente jogados) com o total de partidas
+resolvidas na temporada.
+
+- **Gatilho novo, mutuamente exclusivo dos 3 já existentes**: jogador com menos de 30
+  anos, que não é a estrela do time (`p.squadRole !== "estrela"`), e que passou boa
+  parte da temporada fora (`benchedRatio >= 0.45`). Limiar calibrado por simulação —
+  testei antes de fixar o número: mesmo um jogador claramente fraco pro nível do clube
+  raramente passa de ~55% de partidas de fora, porque `benchRoll` (o motor que decide
+  titularidade) já dá bastante chance de entrar do banco mesmo pros reservas.
+- **`makeLoanOffer`/`acceptLoanOffer`** (`js/engine.js`) — variantes de `makeOffers`/
+  `acceptOffer` já existentes: só 1 destino proposto (é o clube que negocia, não uma
+  vitrine), sempre prometendo papel de titular (é o ponto do empréstimo — minutos de
+  verdade), só pool brasileiro por ora. Novo campo `p.loan = {fromClubId, fromClubName,
+  toClubId, returnYear}` guarda o clube de origem — nada no jogo guardava isso antes,
+  `acceptOffer` normal sempre sobrescrevia sem deixar rastro.
+- **Volta automática** — `nextSeason` (`js/engine.js`) confere se o ano de retorno
+  chegou e devolve o jogador ao clube de origem sozinho, sem pergunta (mesmo espírito
+  de empréstimo de verdade: acaba, você volta). `g.pendingReturnFromLoan` avisa a UI
+  pra trocar o toast de "nova temporada" por um específico de retorno.
+- **Tela nova** (`showLoanOffer`, `js/ui.js`) no mesmo estilo visual do mercado normal,
+  mas com escolha binária: aceitar o empréstimo ou ficar brigando por espaço (sem
+  penalidade por recusar — respeita a decisão do jogador).
+- **Linha do tempo de carreira** passa a diferenciar "Empréstimo" (saída) e "Fim do
+  empréstimo" (volta) de "Transferência" (definitiva), usando um campo aditivo novo em
+  `p.career[].onLoan`.
+- Validado: 161/161 testes (9 checagens novas). Confirmado também com o jogo rodando
+  de verdade no navegador: forcei um jogador preso no banco no Flamengo, a proposta de
+  empréstimo apareceu pro RB Bragantino, aceitei, joguei 2 temporadas lá (`onLoan:true`
+  registrado certinho na carreira), e a volta automática pro Flamengo aconteceu sozinha
+  no ano certo — inclusive o rótulo "Empréstimo" aparecendo correto na linha do tempo
+  com o texto "Saiu do Flamengo por empréstimo, rumo ao RB Bragantino."

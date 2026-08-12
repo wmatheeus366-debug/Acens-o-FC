@@ -108,7 +108,7 @@ window.CQ = window.CQ || {};
         clubGoals: {}, idolClubs: [], compGoals: {},
         traits: [], decisiveGoals: 0, captain: null, squadRole: "titular", potUps: 0,
         records: { hatTricks: 0, bestSeasonG: 0, bestSeasonAvg: 0, biggestWin: null },
-        seenLiveIntro: false
+        seenLiveIntro: false, loan: null
       },
       leagueOf: {}, champs: {}, feed: [], customLogos: {},
       boardFail: 0, retired: false, transferRequested: false,
@@ -1922,7 +1922,7 @@ window.CQ = window.CQ || {};
       year: g.year, clubId: p.clubId, clubName: myClub(g).name, league: S.comps.LIGA.name, pos: myPos,
       j: p.stats.j, g: p.stats.g, a: p.stats.a, cs: p.stats.cs, avg: Math.round(avg * 100) / 100,
       ov: p.overall, titles: p.titles.filter(function (t) { return t.year === g.year; }).map(function (t) { return t.name; }),
-      awards: awards.won.map(function (a) { return a.name; })
+      awards: awards.won.map(function (a) { return a.name; }), onLoan: !!p.loan
     };
     p.career.push(seasonRec);
     p.hist.push({ y: g.year + 1, ov: p.overall });
@@ -1951,12 +1951,26 @@ window.CQ = window.CQ || {};
     }
     g.transferRequested = false;
 
+    // empréstimo: gatilho novo, mutuamente exclusivo dos 3 acima (nunca 2 decisões de
+    // mercado na mesma temporada) — jogador jovem, sem ser a estrela do time, que
+    // passou a maior parte da temporada no banco (p.stats.j só conta jogos jogados;
+    // S.played é o total de partidas já resolvidas na temporada).
+    let loanOffer = null;
+    if (!retiring && !offers && !p.loan && p.squadRole !== "estrela" && p.age < 30) {
+      // limiar calibrado por simulação: mesmo um jogador claramente fraco pro nível do
+      // clube raramente passa de ~55% de partidas fora (benchRoll ainda dá bastante
+      // chance de entrar do banco) — 0.45 já significa "boa parte da temporada de fora"
+      const benchedRatio = S.played > 0 ? 1 - (p.stats.j / S.played) : 0;
+      if (benchedRatio >= 0.45) loanOffer = makeLoanOffer(g);
+    }
+
     const summary = {
       year: g.year, pos: myPos, champName: champName, table: table.slice(0, 8),
       stats: { j: p.stats.j, g: p.stats.g, a: p.stats.a, cs: p.stats.cs, saves: p.stats.saves, avg: avg },
       awards: awards, metaOk: metaOk, meta: g.board, forcedOut: forcedOut,
       aging: aging, vitima: vit ? { name: vit, gols: vmax } : null,
       titles: seasonRec.titles, offers: offers, mustMove: mustMove, retiring: retiring,
+      loanOffer: loanOffer,
       convNews: convNews, notes: notes, moves: moves,
       ballon: g.lastBallon, income: income, marketValue: p.marketValue, becameIdol: becameIdol,
       newCaptain: newCaptain, newTraits: newTraits, managerName: g.manager ? g.manager.name : null, managerConf: g.manager ? g.manager.conf : null,
@@ -2270,6 +2284,41 @@ window.CQ = window.CQ || {};
     g.transferRequested = false;
   }
 
+  // proposta de empréstimo — 1 clube só (é o clube que negocia, não uma vitrine),
+  // sempre prometendo papel de titular (é o ponto todo de sair por empréstimo: minutos).
+  // Só pool brasileiro por ora — mantém o escopo simples e coerente.
+  function makeLoanOffer(g) {
+    const p = g.player, curCl = myClub(g);
+    const rng = U.rngFor(g.seed, "loan", g.year);
+    const pool = D.clubsOf("BRA").concat(D.clubsOf("BRB")).filter(function (c) {
+      return c.id !== p.clubId && Math.abs(c.str - 4 - p.overall) <= 10 && c.str <= curCl.str + 3;
+    });
+    if (!pool.length) return null;
+    const dest = U.choice(pool, rng);
+    const lg2 = leagueOf(g, dest.id);
+    return {
+      clubId: dest.id, name: dest.name, league: D.LEAGUES[lg2] ? D.LEAGUES[lg2].short : lg2,
+      salary: Math.round(calcSalary(p.overall, dest.str, lg2) * U.rf(0.8, 1.05, rng) / 500) * 500,
+      years: U.ri(1, 2, rng), role: "titular"
+    };
+  }
+  // aceita o empréstimo — preserva o clube de origem (nada mais no jogo guarda isso
+  // hoje) pra poder devolver o jogador sozinho quando o prazo acabar (nextSeason).
+  function acceptLoanOffer(g, offer) {
+    const p = g.player;
+    p.loan = { fromClubId: p.clubId, fromClubName: myClub(g).name, toClubId: offer.clubId, returnYear: g.year + 1 + offer.years };
+    p.clubId = offer.clubId;
+    p.salary = offer.salary; // salário do clube emprestador enquanto durar
+    p.squadRole = offer.role;
+    p.captain = null;
+    g.manager = null;
+    g.boardFail = 0;
+    g.lastPos = null;
+    // contrato de origem só é esticado se terminaria ANTES da volta prevista — evita
+    // abrir o mercado por engano no meio do empréstimo por causa do contrato "vencer"
+    if (p.contractEnd < p.loan.returnYear) p.contractEnd = p.loan.returnYear;
+  }
+
   // pedido de transferência durante a temporada
   function requestTransfer(g) {
     g.transferRequested = true;
@@ -2360,6 +2409,18 @@ window.CQ = window.CQ || {};
     g.lastPos = sum ? sum.pos : null;
     g.pendingSummary = null;
     g.year++;
+    // volta automática do empréstimo — sem escolha nessa hora (empréstimo real também
+    // não pergunta: acaba, você volta). g.pendingReturnFromLoan só existe pra UI trocar
+    // o toast de "nova temporada" por um de "empréstimo terminou" nesse caso específico.
+    g.pendingReturnFromLoan = null;
+    if (g.player.loan && g.year >= g.player.loan.returnYear) {
+      g.pendingReturnFromLoan = g.player.loan.fromClubName;
+      g.player.clubId = g.player.loan.fromClubId;
+      g.player.loan = null;
+      g.player.squadRole = "titular";
+      g.player.captain = null;
+      g.manager = null;
+    }
     startSeason(g);
   }
 
@@ -2385,6 +2446,7 @@ window.CQ = window.CQ || {};
     tableOf: tableOf, ensureRound: ensureRound, leagueZones: leagueZones,
     overallOf: overallOf, buildAttrs: buildAttrs, calcSalary: calcSalary,
     acceptOffer: acceptOffer, acceptRenew: acceptRenew,
+    makeLoanOffer: makeLoanOffer, acceptLoanOffer: acceptLoanOffer,
     requestTransfer: requestTransfer, cancelTransfer: cancelTransfer, peekSchedule: peekSchedule,
     scoreboard: scoreboard, ballonRanking: ballonRanking, ballonScore: ballonScore, marketValue: marketValue,
     careerTotals: careerTotals, buyAsset: buyAsset, assetIncome: assetIncome,

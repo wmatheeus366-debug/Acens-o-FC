@@ -49,6 +49,7 @@ window.CQ = window.CQ || {};
     if (p.captain === undefined) p.captain = null;
     if (!p.squadRole) p.squadRole = "titular";
     if (p.potUps == null) p.potUps = 0;
+    if (p.loan === undefined) p.loan = null; // empréstimo ativo — aditivo
     // save já existia antes desse aviso existir — trata como "já viu" pra não surpreender
     // quem já é veterano do modo ao vivo com um tutorial do nada
     if (p.seenLiveIntro === undefined) p.seenLiveIntro = true;

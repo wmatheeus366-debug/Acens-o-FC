@@ -45,7 +45,7 @@ Fontes (Google Fonts) e bandeiras (flagcdn) vêm da web com fallback; todo o res
 
 ```
 # no navegador (index.html ou CRAQUE.html aberto), console:
-CQ.tests.run()             # tests/regression.js — ~150 checagens
+CQ.tests.run()             # tests/regression.js — ~161 checagens
 
 # idade real dos elencos (resumível — roda até bater na cota diária, ~100 req/dia):
 node scripts/sync-ages.mjs [teto de chamadas ao vivo, padrão 90]
@@ -281,7 +281,7 @@ preenchido numa derrota); banner de título com ordinal (BICAMPEÃO...PENTACAMPE
 2. Campo Ao Vivo com bonecos 3D de verdade (confirmado pelo usuário mesmo sabendo do
    tamanho — precisa de sessão de planejamento própria, escolha de biblioteca tipo
    three.js, o que quebra a filosofia atual de zero dependência externa).
-3. Sistema de empréstimo (1-2 anos).
+3. ✅ **Sistema de empréstimo (feito).** Ver seção própria abaixo.
 4. Voltar a ex-clube depois dos 31 (ou ligação do agente).
 5. Linha do tempo de marcos da carreira.
 6. Sistema de ídolo em camadas (ídolo → ídolo da geração → maior de todos).
@@ -327,3 +327,23 @@ etapa de descobrir IDs.
   sozinho ao bater na cota diária (confirmado pela própria API). Rodar
   `node scripts/sync-ages.mjs` em dias seguintes continua de onde parou, sem perder
   progresso.
+
+## Sistema de empréstimo (item 3, feito)
+
+Gatilho novo dentro de `endSeason` (`js/engine.js`), mutuamente exclusivo dos 3 gatilhos
+de mercado já existentes (contrato acabou/dispensado/pediu pra sair): jogador com menos
+de 30 anos, não é a estrela do time, e passou boa parte da temporada fora
+(`benchedRatio = 1 - p.stats.j/S.played >= 0.45`, limiar calibrado por simulação —
+mesmo um jogador claramente fraco pro clube raramente passa de ~55% por causa de como
+`benchRoll` já dá chance de entrar do banco).
+
+`makeLoanOffer`/`acceptLoanOffer` (`js/engine.js`) são variantes de `makeOffers`/
+`acceptOffer` — 1 destino só (o clube negocia, não é vitrine), sempre com papel de
+titular. Novo `p.loan = {fromClubId, fromClubName, toClubId, returnYear}` guarda o
+clube de origem (nada guardava isso antes — `acceptOffer` normal sobrescreve `p.clubId`
+sem deixar rastro). `nextSeason` confere o ano de retorno e devolve o jogador sozinho,
+sem pergunta — `g.pendingReturnFromLoan` avisa a UI pra trocar o toast padrão por um de
+retorno. `p.career[].onLoan` (aditivo) deixa a linha do tempo (`js/ui.js`) diferenciar
+"Empréstimo"/"Fim do empréstimo" de "Transferência" definitiva. Tela nova
+(`showLoanOffer`, `js/ui.js`) no mesmo estilo do mercado normal, com escolha binária
+sem penalidade por recusar.
