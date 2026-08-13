@@ -1396,3 +1396,25 @@ invisíveis pro feed.
   produção): `testInductAddsToHall`/`testHallCapEnforced` não setavam `CQ.state.game`
   antes de chamar `induct()`, que internamente lê `CQ.ui.careerLegacy(p)` → `g()`.
 - Validado: 191/191 testes (2 novos).
+
+---
+
+## Itens 9-13 do roteiro: painel lateral, avatar editorial, calendário por mês, estados vazios, comparação de idade
+
+- **Item 9**: `overlay(html, wide)` ganha modo `"panel"` (largo + painel lateral fixo
+  com overall/fama/moral/condição/patrimônio), aplicado em `showMarket`/
+  `showLoanOffer`/`showHomecoming` — os 3 modais de decisão grande onde sobrava mais
+  espaço vazio em telas largas. Confirmado o escopo com o usuário (resumo do jogador,
+  não outro tipo de conteúdo).
+- **Item 10**: `portraitSVG` reescrita — retrato cartunesco colorido virou silhueta
+  monotom em tinta sobre papel, mesma identidade editorial do resto do jogo. Mesma
+  assinatura, zero call site alterado (10+ usos).
+- **Item 11**: calendário agrupado por mês (divisão proporcional puramente de
+  apresentação — o jogo não modela data real) + filtro por competição.
+- **Item 12**: passe modesto de copy mais característica em 2 estados vazios (prêmios
+  individuais, aba Base) — não uma varredura exaustiva de toda tela sem conteúdo.
+- **Item 13**: nova aba "Mesma idade" em Carreira — varre `g.world.clubs` (191 elencos
+  persistentes) por jogadores da mesma idade, ranking por overall com percentil.
+  Zero sorteio novo, só reaproveita dado que já existia.
+
+Validado: 200/200 testes (9 novos).

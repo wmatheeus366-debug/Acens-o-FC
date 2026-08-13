@@ -47,7 +47,7 @@ Fontes (Google Fonts) e bandeiras (flagcdn) vêm da web com fallback; todo o res
 
 ```
 # no navegador (index.html ou CRAQUE.html aberto), console:
-CQ.tests.run()             # tests/regression.js — ~191 checagens
+CQ.tests.run()             # tests/regression.js — ~200 checagens
 
 # idade real dos elencos (resumível — roda até bater na cota diária, ~100 req/dia):
 node scripts/sync-ages.mjs [teto de chamadas ao vivo, padrão 90]
@@ -292,11 +292,13 @@ preenchido numa derrota); banner de título com ordinal (BICAMPEÃO...PENTACAMPE
    própria abaixo.
 8. ✅ **Redes sociais reagindo de verdade a resultado/decisão — feito.** Ver seção
    própria abaixo.
-9. Layout: painéis laterais usando o espaço vazio dos modais.
-10. Avatar editorial/silhueta no lugar do retrato cartunesco.
-11. Calendário por mês + filtro por competição.
-12. Estados vazios mais interessantes (varredura geral).
-13. Comparação com jogadores da mesma idade.
+9. ✅ **Layout: painéis laterais nos modais grandes — feito.** Ver seção própria abaixo.
+10. ✅ **Avatar editorial/silhueta — feito.** Ver seção própria abaixo.
+11. ✅ **Calendário por mês + filtro por competição — feito.** Ver seção própria abaixo.
+12. ✅ **Estados vazios mais interessantes — feito (passe modesto).** Copy mais
+    característica em 2 pontos (prêmios individuais, aba Base) — não uma varredura
+    exaustiva de toda tela sem conteúdo do jogo.
+13. ✅ **Comparação com jogadores da mesma idade — feito.** Ver seção própria abaixo.
 14. Potencial + pontos de evolução pra distribuir em atributos (mudança grande de
     mecânica central — confirmado que entra no roteiro, não é imediato).
 
@@ -515,3 +517,43 @@ não setavam `CQ.state.game` antes de chamar `induct()`, que internamente lê
 `CQ.ui.careerLegacy(p)` → `g()` — nunca afetava produção, já que `summaryNext()`
 sempre chama `induct(G)` com `G === CQ.state.game` por construção, mas quebrava em
 página recém-carregada sem `CQ.state.game` prévio).
+
+## Itens 9-13 do roteiro (painel lateral, avatar, calendário, estados vazios, comparação)
+
+Cinco itens de UX menores, cada um com escopo confirmado com o usuário quando havia
+ambiguidade genuína (item 9), implementados em sequência na mesma sessão.
+
+- **Item 9 — painel lateral nos modais grandes**: `overlay(html, wide)` (`js/ui.js`)
+  ganha um 3º modo, `"panel"` — largo (1060px) + `<aside class="ov-side">` fixo com
+  resumo do jogador (overall/fama/moral/condição/patrimônio), aplicado nos 3 modais de
+  decisão grande (`showMarket`/`showLoanOffer`/`showHomecoming`). `sidePanelHTML()`
+  volta `""` sem carreira ativa (nunca quebra um overlay). CSS empilha em coluna única
+  abaixo de 760px (sem espaço sobrando pra painel em mobile).
+- **Item 10 — avatar editorial/silhueta**: `portraitSVG` (`js/util.js`) reescrita do
+  zero — era um retrato cartunesco colorido (pele/cabelo/barba/camisa individuais,
+  ~80 linhas de paths), virou uma silhueta monotom em tinta (`#1b1812`) sobre fundo
+  gradiente de papel, mesma paleta editorial do resto do jogo. Mesma assinatura
+  (`portraitSVG(seedStr, size)`), zero call site precisou mudar (10+ usos em
+  cartão de jogador, capa, feed, técnico, rival). Consts `SKINS`/`HAIRC`/`JERSEY`
+  removidas (só serviam ao estilo antigo).
+- **Item 11 — calendário por mês + filtro**: `calendarHTML` (`js/ui.js`) agrupa os
+  jogos em cabeçalhos de mês (`MONTHS_PT`, fev-dez — o jogo não modela data real, só
+  ordem cronológica; o mês é uma divisão proporcional puramente de apresentação,
+  calculada sobre a lista COMPLETA antes do filtro, pra nunca mudar conforme o que
+  está filtrado) + `<select>` de competição (só aparece com 2+ competições na
+  temporada) via `CQ.state.calFilter`.
+- **Item 12 — estados vazios mais interessantes**: passe modesto, não uma varredura
+  exaustiva — copy mais característica em "Nenhum prêmio individual ainda" (agora com
+  gancho: "boas atuações chamam atenção da crítica") e na aba Base do Clube.
+- **Item 13 — comparação com jogadores da mesma idade**: nova aba "Mesma idade" em
+  Carreira, `peersHTML` (`js/ui.js`) — varre `g.world.clubs` (identidade persistente
+  dos 191 elencos, já com `age`/`ovr` por NPC, zero sorteio novo) por jogadores da
+  MESMA idade do jogador, ordena por overall, mostra top 10 + a posição do jogador
+  (com percentil). Puramente informativo (não é um duelo com efeito de jogo, ao
+  contrário da aba "Duelo" já existente contra o rival de geração).
+
+Validado: 200/200 testes (9 novos). Verificação visual manual no Browser pane via
+`get_page_text`/inspeção de `sidePanelHTML()`/`portraitSVG()` diretas (screenshot
+indisponível nesta sessão) — calendário agrupado por mês com filtro funcionando,
+painel lateral com os dados certos, aba "Mesma idade" mostrando ranking real (ex.:
+211º de 264 jogadores de 24 anos, top 20%).

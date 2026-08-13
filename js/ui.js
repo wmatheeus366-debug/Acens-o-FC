@@ -889,12 +889,36 @@ window.CQ = window.CQ || {};
   }
 
   // ---------------- overlays genéricos ----------------
+  // resumo rápido do jogador (overall/fama/moral/condição/patrimônio) — painel lateral
+  // que aproveita o espaço vazio que sobrava nos modais grandes em telas largas
+  // (item 9 do roteiro). Só existe contexto pra mostrar quando há uma carreira ativa.
+  function sidePanelHTML() {
+    const G = g();
+    if (!G || !G.player) return "";
+    const p = G.player, cl = E().myClub(G);
+    return `<aside class="ov-side">
+      <div class="ov-side-h">${crest(cl, "crest-34")}<div><b>${esc(p.name)}</b><div class="condsmall">${esc(cl.name)}</div></div></div>
+      <div class="ov-side-stats">
+        <div class="ov-stat"><span>Overall</span><b class="tnum">${p.overall}</b></div>
+        <div class="ov-stat"><span>Fama</span><b class="tnum">${Math.round(p.fame)}</b></div>
+        <div class="ov-stat"><span>Moral</span><b class="tnum">${Math.round(p.morale)}</b></div>
+        <div class="ov-stat"><span>Condição</span><b class="tnum">${Math.round(p.condition)}</b></div>
+        <div class="ov-stat"><span>Patrimônio</span><b class="tnum">${U.fmtBRL(p.money)}</b></div>
+      </div>
+    </aside>`;
+  }
+  // `wide`: false/undefined = padrão (680px); true = largo (860px, ex.: modo ao vivo);
+  // "panel" = largo + painel lateral fixo de resumo do jogador, pras decisões grandes
+  // (mercado, empréstimo, volta a ex-clube) onde sobrava bastante espaço vazio em
+  // telas largas. `sidePanelHTML` volta pra "" (sem painel) em telas estreitas via CSS.
   function overlay(html, wide) {
     closeOverlay();
     const div = document.createElement("div");
     div.className = "overlay";
     div.id = "cq-overlay";
-    div.innerHTML = `<div class="overlay-box ${wide ? "wide" : ""}" role="dialog" aria-modal="true">${html}</div>`;
+    const cls = wide === "panel" ? "wide panel" : wide ? "wide" : "";
+    const body = wide === "panel" ? `<div class="ov-main">${html}</div>${sidePanelHTML()}` : html;
+    div.innerHTML = `<div class="overlay-box ${cls}" role="dialog" aria-modal="true">${body}</div>`;
     document.body.appendChild(div);
     // acessibilidade: foca o primeiro controle acionável do diálogo
     const first = div.querySelector("button, a, input, select, .dc-opt, .choice, .shoot-slot");
@@ -1452,7 +1476,7 @@ window.CQ = window.CQ || {};
         <p class="small muted mb12">${sum.mustMove ? "A diretoria encerrou seu ciclo — escolha um novo destino." : of.requested ? "Você pediu para sair — estas são as portas que se abriram." : "Seu contrato chegou ao fim. Escolha seu futuro."}</p>
         ${cards || '<p class="muted">Nenhuma proposta externa desta vez.</p>'}
         <hr class="rule">${renewBtn}
-      </div>`, true);
+      </div>`, "panel");
   }
 
   function pickOffer(i) {
@@ -1498,7 +1522,7 @@ window.CQ = window.CQ || {};
         <button class="dc-opt" onclick="CQ.ui.declineLoan()">
           <span class="flex"><b>Ficar e brigar por espaço</b></span>
           <small>Segue no ${esc(E().myClub(G).name)}, sem garantia de mais minutos</small></button>
-      </div>`, true);
+      </div>`, "panel");
   }
   function pickLoan() {
     const G = g(), sum = G.pendingSummary, o = sum.loanOffer;
@@ -1539,7 +1563,7 @@ window.CQ = window.CQ || {};
         <button class="dc-opt" onclick="CQ.ui.declineHomecoming()">
           <span class="flex"><b>Agradecer e seguir no ${esc(E().myClub(G).name)}</b></span>
           <small>Sem pressa — a proposta pode voltar em outra temporada</small></button>
-      </div>`, true);
+      </div>`, "panel");
   }
   function pickHomecoming(i) {
     const G = g(), o = G.pendingSummary.homecomingOffers[i];
@@ -1565,7 +1589,7 @@ window.CQ = window.CQ || {};
     const G = g(), p = G.player;
     const tab = CQ.state.ctab || "attrs";
     const nat = D.NATIONS[p.nat];
-    const tabs = [["attrs", "Atributos"], ["marcos", "Marcos"], ["evo", "Evolução"], ["linha", "Linha do tempo"], ["hist", "Temporadas"], ["troph", "Conquistas"], ["duel", "Duelo"]];
+    const tabs = [["attrs", "Atributos"], ["marcos", "Marcos"], ["evo", "Evolução"], ["linha", "Linha do tempo"], ["hist", "Temporadas"], ["troph", "Conquistas"], ["duel", "Duelo"], ["peers", "Mesma idade"]];
     const head = `<div class="player-card mb12">
       <div class="player-face">${U.portraitSVG(p.name + G.seed, 96)}</div>
       <div>
@@ -1585,8 +1609,49 @@ window.CQ = window.CQ || {};
     else if (tab === "linha") body = timelineHTML(G);
     else if (tab === "hist") body = histHTML(p);
     else if (tab === "troph") body = trophHTML(p);
+    else if (tab === "peers") body = peersHTML(G);
     else body = duelHTML(G);
     return head + subtabs + body;
+  }
+
+  // ---- comparação com jogadores da mesma idade (item 13 do roteiro) ----
+  // Reaproveita g.world.clubs (identidade persistente dos 191 elencos, já com
+  // age/ovr por NPC — mesmo dado que squadOf/rollAge já mantêm) — sem sortear nada
+  // novo, só varre e ordena o que já existe. Puramente informativo, sem efeito de
+  // jogo (ninguém "compete" contra esses NPCs de verdade, é só contexto).
+  function peersHTML(G) {
+    const p = G.player;
+    if (!G.world || !G.world.clubs) return '<div class="card"><div class="card-b muted">Comparação indisponível nesta carreira (mundo persistente ainda não carregado).</div></div>';
+    const peers = [];
+    Object.keys(G.world.clubs).forEach(function (clubId) {
+      G.world.clubs[clubId].roster.forEach(function (pl) {
+        if (pl.age === p.age) peers.push({ name: pl.name, clubId: clubId, ovr: pl.ovr, pos: pl.pos });
+      });
+    });
+    peers.push({ name: p.name, clubId: p.clubId, ovr: p.overall, pos: p.pos, me: true });
+    peers.sort(function (a, b) { return b.ovr - a.ovr || (a.me ? -1 : b.me ? 1 : 0); });
+    const myRank = peers.findIndex(function (x) { return x.me; }) + 1;
+    const pct = Math.max(1, Math.round((1 - (myRank - 1) / peers.length) * 100));
+    const top = peers.slice(0, 10);
+    const meInTop = top.some(function (x) { return x.me; });
+    function row(x, i) {
+      const cl = D.CLUBS[x.clubId];
+      return `<tr class="${x.me ? "me" : ""}"><td class="tnum">${i + 1}º</td><td><span class="clubcell">${cl ? crest(cl, "crest-20") : ""} ${esc(x.name)}${x.me ? ' <span class="badge badge-gold">você</span>' : ""}</span></td><td class="small">${D.POSITIONS[x.pos] ? esc(D.POSITIONS[x.pos].name) : esc(x.pos)}</td><td class="num tnum"><b>${x.ovr}</b></td></tr>`;
+    }
+    const rows = top.map(row).join("") + (meInTop ? "" : row(peers[myRank - 1], myRank - 1));
+    return `<div class="card">
+      <div class="section-banner"><span class="sb-title">Jogadores de ${p.age} anos</span><span class="sb-meta">${peers.length} no mundo</span></div>
+      <div class="card-b tight" style="padding:12px 14px 4px"><div class="tiles" style="border:none">
+        <div class="tile"><b class="tnum">${myRank}º</b><span>Sua posição</span></div>
+        <div class="tile"><b class="tnum">${peers.length}</b><span>Comparados</span></div>
+        <div class="tile"><b class="tnum">Top ${pct}%</b><span>Percentil por overall</span></div>
+      </div></div>
+      <div class="card-b tight" style="overflow-x:auto"><table class="tbl tbl-zebra">
+        <thead><tr><th>#</th><th>Jogador</th><th>Posição</th><th class="num">OVR</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+      <p class="small muted" style="padding:8px 14px">Comparado com todo jogador de ${p.age} anos nos 191 clubes do mundo persistente — inclui craques reais e promessas geradas.</p>
+    </div>`;
   }
 
   function marcosHTML(G) {
@@ -1799,7 +1864,7 @@ window.CQ = window.CQ || {};
     }).join("") || '<p class="muted small">A sala de troféus ainda espera o primeiro.</p>';
     const awards = p.awards.slice().reverse().map(function (a) {
       return `<div class="flex-b" style="padding:7px 0;border-bottom:1px dashed var(--rule-soft)"><span class="flex">${I.star} <span>${esc(a.name)}${a.club ? `<br><span class="condsmall">no ${esc(a.club)}</span>` : ""}</span></span><span class="tnum muted">${a.year}</span></div>`;
-    }).join("") || '<p class="muted small">Nenhum prêmio individual ainda.</p>';
+    }).join("") || '<p class="muted small">Nenhum prêmio individual ainda — boas atuações chamam atenção da crítica.</p>';
     // vitrine visual de troféus
     let room = "";
     if (p.titles.length) {
@@ -1994,11 +2059,34 @@ window.CQ = window.CQ || {};
   function compTag(comp) {
     return `<span class="cal-tag ${COMP_COLOR[comp] || ""}">${esc(COMP_ABBR[comp] || comp)}</span>`;
   }
+  // meses "editoriais" (fev-dez, temporada brasileira de verdade) — o jogo não modela
+  // data real nenhuma (só ordem cronológica dentro da temporada), então o mês de cada
+  // jogo é uma divisão proporcional da posição dele na lista completa. Puramente de
+  // apresentação: nunca lido por nenhuma lógica de jogo, só agrupa visualmente.
+  const MONTHS_PT = ["Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+  function monthFor(i, total) {
+    return MONTHS_PT[Math.min(MONTHS_PT.length - 1, Math.floor(i / Math.max(1, total) * MONTHS_PT.length))];
+  }
   function calendarHTML(G) {
     const sched = E().peekSchedule(G);
     const nextIdx = sched.findIndex(function (m) { return !m.done; });
     let played = 0, wins = 0;
-    const rows = sched.map(function (m, i) {
+    sched.forEach(function (m) { if (m.done) { played++; if (m.win) wins++; } });
+    // filtro por competição (item 11) — meses são calculados sobre a lista COMPLETA
+    // (verdade cronológica da temporada) antes de filtrar, senão o mês de um jogo mudaria
+    // dependendo do filtro escolhido, o que não faz sentido (ele aconteceu quando aconteceu).
+    const comps = [];
+    sched.forEach(function (m) { if (comps.indexOf(m.comp) < 0) comps.push(m.comp); });
+    const filter = comps.indexOf(CQ.state.calFilter) >= 0 ? CQ.state.calFilter : "all";
+    const filterSel = comps.length > 1 ? `<select onchange="CQ.state.calFilter=this.value;CQ.ui.render()" style="border:1px solid var(--ink);background:#fffdf6;padding:6px 10px;font-size:13px">
+      <option value="all" ${filter === "all" ? "selected" : ""}>Todas as competições</option>
+      ${comps.map(function (c) { return `<option value="${c}" ${filter === c ? "selected" : ""}>${esc(COMP_ABBR[c] || c)}</option>`; }).join("")}
+    </select>` : "";
+    let lastMonth = null, rowsOut = "";
+    sched.forEach(function (m, i) {
+      if (filter !== "all" && m.comp !== filter) return;
+      const month = monthFor(i, sched.length);
+      if (month !== lastMonth) { rowsOut += `<tr class="cal-month-h"><td colspan="5">${month}</td></tr>`; lastMonth = month; }
       const isNext = i === nextIdx;
       const opp = m.oppName ? esc(m.oppName) : "<span class='muted'>a definir</span>";
       const oppCrest = m.oppId ? crest(m.oppId, "crest-20") : (m.comp === "SEL" && m.oppName ? "" : "");
@@ -2007,18 +2095,17 @@ window.CQ = window.CQ || {};
       else if (m.home === false) localTag = '<span class="cal-loc away">Fora</span>';
       else localTag = '<span class="cal-loc muted">—</span>';
       if (m.done) {
-        played++;
         const w = m.win, d = m.draw;
-        if (w) wins++;
         const pill = w ? "V" : d ? "E" : "D";
         const a = m.home ? m.gm : m.go, b = m.home ? m.go : m.gm;
         const mine = m.plays ? notaPill(m.nota) : '<span class="cal-dnp">—</span>';
         statusCell = `<span class="cal-res"><span class="result-pill ${pill}">${pill}</span> <b class="tnum">${a}-${b}</b></span>`;
-        return `<tr class="cal-done"><td>${compTag(m.comp)}</td><td><span class="clubcell">${oppCrest} ${opp}</span></td><td>${localTag}</td><td class="num">${statusCell}</td><td class="num">${mine}</td></tr>`;
+        rowsOut += `<tr class="cal-done"><td>${compTag(m.comp)}</td><td><span class="clubcell">${oppCrest} ${opp}</span></td><td>${localTag}</td><td class="num">${statusCell}</td><td class="num">${mine}</td></tr>`;
+        return;
       }
       statusCell = isNext ? '<span class="cal-next">Próximo</span>' : '<span class="muted small">Agendado</span>';
-      return `<tr class="${isNext ? "cal-now" : ""}"><td>${compTag(m.comp)}${m.decisive ? ' <span class="cal-dec">decisivo</span>' : ""}</td><td><span class="clubcell">${oppCrest} ${opp}</span></td><td>${localTag}</td><td class="num" colspan="2">${statusCell}</td></tr>`;
-    }).join("");
+      rowsOut += `<tr class="${isNext ? "cal-now" : ""}"><td>${compTag(m.comp)}${m.decisive ? ' <span class="cal-dec">decisivo</span>' : ""}</td><td><span class="clubcell">${oppCrest} ${opp}</span></td><td>${localTag}</td><td class="num" colspan="2">${statusCell}</td></tr>`;
+    });
     const upcoming = sched.length - played;
     return `<div class="card">
       <div class="section-banner"><span class="sb-title">Calendário da temporada</span><span class="sb-meta">${G.year}</span></div>
@@ -2028,9 +2115,10 @@ window.CQ = window.CQ || {};
         <div class="tile"><b class="tnum">${upcoming}</b><span>A jogar</span></div>
         <div class="tile"><b class="tnum">${played ? Math.round(wins / played * 100) : 0}%</b><span>Aproveit. (V)</span></div>
       </div>
+      ${filterSel ? `<div class="card-b tight" style="padding:10px 14px">${filterSel}</div>` : ""}
       <div class="card-b tight" style="overflow-x:auto"><table class="tbl">
         <thead><tr><th>Competição</th><th>Adversário</th><th>Local</th><th class="num">Resultado</th><th class="num">Nota</th></tr></thead>
-        <tbody>${rows || '<tr><td colspan="5" class="muted center" style="padding:16px">Temporada ainda não iniciada.</td></tr>'}</tbody>
+        <tbody>${rowsOut || '<tr><td colspan="5" class="muted center" style="padding:16px">Temporada ainda não iniciada.</td></tr>'}</tbody>
       </table></div>
       <p class="small muted" style="padding:8px 14px">Jogos de mata-mata mostram o adversário assim que o chaveamento é sorteado.</p>
     </div>`;
@@ -2553,7 +2641,7 @@ window.CQ = window.CQ || {};
       }).join("");
     return `<div class="card"><div class="card-h"><h3>Base ${esc(cl.name)}</h3><span class="kicker-side">jogadores até 20 anos</span></div>
       <div class="card-b tight" style="overflow-x:auto"><table class="tbl tbl-zebra"><thead><tr><th>Jogador</th><th>Posição</th><th class="num">Idade</th><th class="num">OVR</th></tr></thead>
-      <tbody>${rows || `<tr><td colspan="4" class="small muted" style="padding:10px 14px">Nenhum jogador de base (≤20 anos) no elenco no momento.</td></tr>`}</tbody></table></div>
+      <tbody>${rows || `<tr><td colspan="4" class="small muted" style="padding:10px 14px">Nenhum garoto de olho no elenco agora — a base está de olho na próxima geração.</td></tr>`}</tbody></table></div>
       <p class="small muted" style="padding:8px 14px">Promessas da base envelhecem e evoluem normalmente — fique de olho, algumas podem virar peças importantes com o tempo.</p></div>`;
   }
 
@@ -2834,6 +2922,6 @@ window.CQ = window.CQ || {};
     requestTransfer: requestTransfer, cancelTransfer: cancelTransfer,
     setFocus: setFocus, buyAsset: buyAsset,
     startClubPool: startClubPool, squadOf: squadOf, timelineHTML: timelineHTML, careerLegacy: careerLegacy,
-    hallHTML: hallHTML
+    hallHTML: hallHTML, sidePanelHTML: sidePanelHTML, peersHTML: peersHTML
   };
 })();

@@ -104,51 +104,28 @@ window.CQ = window.CQ || {};
     return first + " " + last;
   }
 
-  // ---------- retrato procedural (estilo ilustração) ----------
-  const SKINS = [
-    { s: "#f4c9a0", d: "#e0ac7d" }, { s: "#e8b38a", d: "#cf9468" }, { s: "#d29b6e", d: "#b57e50" },
-    { s: "#b07a4e", d: "#96633a" }, { s: "#8a5a34", d: "#6f4626" }, { s: "#5e3a1f", d: "#4a2c15" }, { s: "#c99a72", d: "#ac7d55" }
-  ];
-  const HAIRC = ["#20160f", "#0d0d0d", "#3a2415", "#5a3a1e", "#7a5230", "#2a2a2a", "#8a6b3a", "#b0632a"];
+  // ---------- avatar editorial (silhueta, item 10 do roteiro) ----------
+  // Antes era um retrato cartunesco colorido (pele/cabelo/barba/camisa individuais).
+  // Trocado por uma silhueta monotom em tinta sobre papel — o mesmo idioma visual do
+  // resto do jogo (boletim/editorial de jornal esportivo, não avatar de desenho
+  // animado). Mesma assinatura/uso em todo lugar (só a implementação mudou por
+  // dentro) — nenhum call site precisou mexer.
   const BGP = [["#e8e2cf", "#d8d0b6"], ["#dbe6dc", "#c6d8c8"], ["#e7dcd0", "#d6c6b4"], ["#dfe0ea", "#cccee0"], ["#ecddd0", "#dcc6b3"]];
-  const JERSEY = ["#b8330f", "#17563a", "#274a78", "#1b1812", "#8a2408", "#5a2d82", "#0d6b8a"];
+  const INK = "#1b1812";
 
   function portraitSVG(seedStr, size) {
-    const r = rngFor("face2", seedStr);
-    const sk = choice(SKINS, r);
-    const hair = choice(HAIRC, r);
-    const style = ri(0, 6, r);       // estilo de cabelo
-    const beard = ri(0, 4, r);       // barba
+    const r = rngFor("face3", seedStr); // chave nova — não reaproveita rolagens do estilo cartunesco antigo
     const bg = choice(BGP, r);
-    const jersey = choice(JERSEY, r);
-    const eyeY = 47 + ri(-2, 2, r);
+    const hairStyle = ri(0, 4, r); // silhueta do cabelo — ainda monotom, só muda o contorno
+    const tilt = ri(-3, 3, r);     // leve inclinação da cabeça, dá vida sem sair do estilo
     const uid = "p" + hashStr(seedStr);
-    // cabelo: camada de trás + frente
-    let hairBack = "", hairFront = "";
-    if (style === 0) { // curto
-      hairFront = `<path d="M27 42 Q26 18 50 16 Q74 18 73 42 Q70 30 62 29 Q56 33 50 30 Q44 33 38 29 Q30 30 27 42Z" fill="${hair}"/>`;
-    } else if (style === 1) { // topete
-      hairFront = `<path d="M28 40 Q26 14 50 14 Q74 14 72 40 Q70 26 60 25 Q54 20 50 26 Q40 24 28 40Z" fill="${hair}"/><path d="M44 16 Q50 8 58 15 Q52 14 48 20Z" fill="${hair}"/>`;
-    } else if (style === 2) { // black power / afro
-      hairBack = `<circle cx="50" cy="30" r="26" fill="${hair}"/>`;
-      hairFront = `<path d="M25 44 Q24 26 50 25 Q76 26 75 44 Q72 34 50 33 Q28 34 25 44Z" fill="${hair}"/>`;
-    } else if (style === 3) { // longo (até a nuca)
-      hairBack = `<path d="M24 34 Q24 12 50 12 Q76 12 76 34 L76 60 Q72 52 70 42 Q60 34 50 36 Q40 34 30 42 Q28 52 24 60Z" fill="${hair}"/>`;
-      hairFront = `<path d="M27 40 Q26 18 50 17 Q74 18 73 40 Q68 30 50 30 Q32 30 27 40Z" fill="${hair}"/>`;
-    } else if (style === 4) { // coque / moicano
-      hairBack = `<ellipse cx="50" cy="15" rx="9" ry="7" fill="${hair}"/>`;
-      hairFront = `<path d="M30 40 Q30 22 50 22 Q70 22 70 40 Q66 32 50 32 Q34 32 30 40Z" fill="${hair}"/>`;
-    } else if (style === 5) { // raspado com risco
-      hairFront = `<path d="M29 40 Q28 24 50 23 Q72 24 71 40 Q66 33 50 33 Q34 33 29 40Z" fill="${hair}" opacity=".92"/><path d="M40 26 L42 40" stroke="${bg[0]}" stroke-width="1.4"/>`;
-    } else { // careca/recuado
-      hairFront = `<path d="M32 36 Q34 26 50 26 Q66 26 68 36 Q62 31 50 31 Q38 31 32 36Z" fill="${hair}" opacity=".55"/>`;
-    }
-    // barba
-    let beardPath = "";
-    if (beard === 1) beardPath = `<path d="M31 56 Q33 74 50 76 Q67 74 69 56 Q66 68 50 69 Q34 68 31 56Z" fill="${hair}" opacity=".9"/>`;
-    else if (beard === 2) beardPath = `<path d="M30 52 Q31 76 50 78 Q69 76 70 52 L70 62 Q66 72 50 73 Q34 72 30 62Z" fill="${hair}"/><path d="M42 60 h16" stroke="${sk.d}" stroke-width="3" stroke-linecap="round"/>`;
-    else if (beard === 3) beardPath = `<path d="M38 62 Q44 68 50 68 Q56 68 62 62" stroke="${hair}" stroke-width="4" fill="none" stroke-linecap="round" opacity=".85"/>`;
-    else if (beard === 4) beardPath = `<rect x="42" y="61" width="16" height="4" rx="2" fill="${hair}" opacity=".9"/>`;
+
+    let hairPath = "";
+    if (hairStyle === 1) hairPath = `<path d="M27 40 Q26 15 50 14 Q74 15 73 40 Q68 26 50 25 Q32 26 27 40Z" fill="${INK}"/>`; // curto
+    else if (hairStyle === 2) hairPath = `<path d="M25 42 Q24 22 50 21 Q76 22 75 42 Q72 28 50 27 Q28 28 25 42Z" fill="${INK}"/>`; // volumoso
+    else if (hairStyle === 3) hairPath = `<path d="M28 38 Q27 12 50 12 Q73 12 72 38 Q70 22 60 20 Q54 16 50 22 Q40 18 28 38Z" fill="${INK}"/>`; // topete
+    else if (hairStyle === 4) hairPath = `<path d="M24 36 Q24 14 50 13 Q76 14 76 36 L76 55 Q70 45 68 36 Q58 30 50 32 Q42 30 32 36 Q30 45 24 55Z" fill="${INK}"/>`; // longo
+    // hairStyle === 0: careca/raspado — sem contorno extra, só a cabeça lisa
 
     return `<svg viewBox="0 0 100 100" width="${size || 96}" height="${size || 96}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="retrato">
       <defs>
@@ -157,32 +134,12 @@ window.CQ = window.CQ || {};
       </defs>
       <g clip-path="url(#${uid}c)">
         <rect width="100" height="100" fill="url(#${uid}bg)"/>
-        <ellipse cx="50" cy="98" rx="40" ry="26" fill="#00000010"/>
-        ${hairBack}
-        <!-- ombros / camisa -->
-        <path d="M18 100 Q20 78 38 73 L62 73 Q80 78 82 100Z" fill="${jersey}"/>
-        <path d="M42 72 Q50 82 58 72 L58 78 Q50 86 42 78Z" fill="#ffffff" opacity=".9"/>
-        <!-- pescoço -->
-        <path d="M42 66 L42 76 Q50 82 58 76 L58 66Z" fill="${sk.d}"/>
-        <!-- orelhas -->
-        <ellipse cx="26" cy="48" rx="4" ry="6" fill="${sk.s}"/><ellipse cx="74" cy="48" rx="4" ry="6" fill="${sk.s}"/>
-        <!-- cabeça -->
-        <path d="M28 44 Q28 68 50 70 Q72 68 72 44 Q72 22 50 22 Q28 22 28 44Z" fill="${sk.s}"/>
-        <!-- sombra lateral do rosto -->
-        <path d="M50 22 Q72 22 72 44 Q72 68 50 70 Q60 60 60 44 Q60 28 50 22Z" fill="${sk.d}" opacity=".28"/>
-        <!-- sobrancelhas -->
-        <path d="M36 ${eyeY - 6} q5 -3 10 -0.5" stroke="${hair}" stroke-width="2.6" fill="none" stroke-linecap="round"/>
-        <path d="M54 ${eyeY - 6.5} q5 -2.5 10 0.5" stroke="${hair}" stroke-width="2.6" fill="none" stroke-linecap="round"/>
-        <!-- olhos -->
-        <ellipse cx="41" cy="${eyeY}" rx="4" ry="3" fill="#fff"/><ellipse cx="59" cy="${eyeY}" rx="4" ry="3" fill="#fff"/>
-        <circle cx="41.6" cy="${eyeY}" r="2" fill="#241a12"/><circle cx="59.6" cy="${eyeY}" r="2" fill="#241a12"/>
-        <circle cx="42.4" cy="${eyeY - 0.8}" r="0.7" fill="#fff"/><circle cx="60.4" cy="${eyeY - 0.8}" r="0.7" fill="#fff"/>
-        <!-- nariz -->
-        <path d="M50 ${eyeY + 2} q2 7 -2 9 q2 1 4 0" stroke="${sk.d}" stroke-width="1.8" fill="none" stroke-linecap="round"/>
-        <!-- boca -->
-        <path d="M43 64 q7 5 14 0" stroke="#8a4a3a" stroke-width="2.4" fill="none" stroke-linecap="round"/>
-        ${beardPath}
-        ${hairFront}
+        <g transform="rotate(${tilt} 50 55)">
+          <path d="M14 100 Q17 74 40 68 L60 68 Q83 74 86 100Z" fill="${INK}"/>
+          <circle cx="50" cy="42" r="24" fill="${INK}"/>
+          ${hairPath}
+        </g>
+        <rect x="1" y="1" width="98" height="98" fill="none" stroke="${INK}" stroke-width="1.4" opacity=".14"/>
       </g>
     </svg>`;
   }

@@ -1165,6 +1165,76 @@
     });
   }
 
+  // ---- Avatar editorial: silhueta determinística, sem cor/detalhe de rosto (item 10) ----
+  function testPortraitSVGEditorial() {
+    const a = CQ.util.portraitSVG("teste-jogador-1", 72);
+    const a2 = CQ.util.portraitSVG("teste-jogador-1", 72);
+    const b = CQ.util.portraitSVG("outro-jogador-2", 72);
+    assert("avatar: mesma seed sempre gera o mesmo SVG (determinístico)", a === a2, "");
+    assert("avatar: seeds diferentes geram avatares diferentes", a !== b, "");
+    assert("avatar: SVG válido com viewBox 100x100", a.indexOf('viewBox="0 0 100 100"') >= 0, a.slice(0, 80));
+    assert("avatar: silhueta em tinta única (sem paleta de pele/cabelo colorida do estilo antigo)", a.indexOf("#1b1812") >= 0, "");
+  }
+
+  // ---- Comparação com jogadores da mesma idade (item 13 do roteiro) ----
+  function testPeersSameAge() {
+    withTempGame(function () {
+      const g = newCareer("ATA", "fla");
+      CQ.state.game = g;
+      const html = CQ.ui.peersHTML(g);
+      assert("mesma idade: peersHTML renderiza sem exceção e mostra o jogador na lista", html.indexOf(g.player.name) >= 0 && html.indexOf(g.player.age + " anos") >= 0, html.slice(0, 120));
+      // toda a base de comparação vem de g.world.clubs — confirma que pelo menos 1 NPC
+      // da mesma idade existe (191 clubes garantem isso quase sempre) e que o ranking
+      // do jogador está dentro dos limites (1..total)
+      let peers = 0;
+      Object.keys(g.world.clubs).forEach(function (cid) { g.world.clubs[cid].roster.forEach(function (pl) { if (pl.age === g.player.age) peers++; }); });
+      assert("mesma idade: existem NPCs da mesma idade pra comparar (mundo persistente de 191 clubes)", peers > 0, "n=" + peers);
+    });
+  }
+
+  // ---- Calendário por mês + filtro por competição (item 11 do roteiro) ----
+  function testCalendarMonthsAndFilter() {
+    withTempGame(function () {
+      const g = newCareer("ATA", "fla");
+      CQ.state.game = g;
+      E().startSeason(g);
+      let n = 0; while (E().currentFixture(g) && n++ < 12) E().applyMatch(g, E().resolveMatch(g, E().currentFixture(g), {}));
+      CQ.state.screen = "comps"; CQ.state.ttab = "cal"; CQ.state.calFilter = "all";
+      CQ.ui.render();
+      const app = document.getElementById("app");
+      const monthHeaders = app.querySelectorAll(".cal-month-h");
+      assert("calendário: agrupa os jogos em cabeçalhos de mês", monthHeaders.length >= 1, "n=" + monthHeaders.length);
+      const sel = app.querySelector("select");
+      assert("calendário: filtro de competição aparece quando há mais de 1 competição na temporada", !!sel, "");
+      if (sel) {
+        const opts = Array.prototype.map.call(sel.querySelectorAll("option"), function (o) { return o.value; });
+        assert("calendário: filtro sempre tem a opção 'todas'", opts.indexOf("all") >= 0, JSON.stringify(opts));
+        const rowsAll = app.querySelectorAll(".tbl tbody tr:not(.cal-month-h)").length;
+        CQ.state.calFilter = opts.filter(function (o) { return o !== "all"; })[0];
+        CQ.ui.render();
+        const rowsFiltered = document.getElementById("app").querySelectorAll(".tbl tbody tr:not(.cal-month-h)").length;
+        assert("calendário: filtrar por 1 competição mostra menos ou igual jogos que 'todas'", rowsFiltered > 0 && rowsFiltered <= rowsAll, "todas=" + rowsAll + " filtrado=" + rowsFiltered);
+      }
+      CQ.state.screen = "home"; CQ.state.calFilter = "all";
+    });
+  }
+
+  // ---- Painel lateral dos modais grandes (item 9 do roteiro) ----
+  function testOverlaySidePanel() {
+    withTempGame(function () {
+      const g = newCareer("ATA", "fla");
+      CQ.state.game = g;
+      g.player.overall = 82; g.player.fame = 61; g.player.morale = 74; g.player.condition = 88; g.player.money = 1500000;
+      const html = CQ.ui.sidePanelHTML();
+      let ok = true, detail = "";
+      [82, 61, 74, 88].forEach(function (n) { if (html.indexOf(String(n)) < 0) { ok = false; detail += "falta " + n + " "; } });
+      if (html.indexOf(g.player.name) < 0) { ok = false; detail += "falta nome "; }
+      assert("painel lateral: sidePanelHTML mostra overall/fama/moral/condição/nome do jogador ativo", ok, detail);
+      CQ.state.game = null;
+      assert("painel lateral: sem carreira ativa, sidePanelHTML devolve vazio (sem quebrar o modal)", CQ.ui.sidePanelHTML() === "", CQ.ui.sidePanelHTML());
+    });
+  }
+
   // ---- Fala do técnico: linha certa por faixa de confiança + determinística ----
   function testManagerLine() {
     const fakeG = { seed: 12345, year: 2030, season: { idx: 5 } };
@@ -1335,6 +1405,10 @@
     testHallHTMLRenders();
     testLifeEventsSocialCoverage();
     testLifeEventSocialPost();
+    testOverlaySidePanel();
+    testPortraitSVGEditorial();
+    testCalendarMonthsAndFilter();
+    testPeersSameAge();
     const pass = results.filter(function (r) { return r.pass; }).length;
     console.log("%cCRAQUE regressão: " + pass + "/" + results.length + " passaram", "font-weight:bold");
     results.forEach(function (r) { console.log((r.pass ? "✓" : "✗ FALHOU") + " " + r.name + (r.detail ? "  [" + r.detail + "]" : "")); });

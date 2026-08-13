@@ -223,6 +223,7 @@ body::before { opacity: var(--noise-op); }
 .cal-next { font-family: var(--cond); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; background: var(--verm); color: #fff; padding: 2px 8px; }
 .cal-dec { font-family: var(--cond); font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.08em; border: 1px solid var(--verm); color: var(--verm-dark); padding: 0 4px; }
 .cal-dnp { color: var(--ink-3); }
+.cal-month-h td { font-family: var(--cond); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: var(--ink-3); background: var(--paper-2, #fffdf6); padding: 7px 10px !important; border-bottom: 1px solid var(--rule-soft); }
 tr.cal-now td { background: var(--gold-soft); box-shadow: inset 3px 0 0 var(--verm); }
 tr.cal-done td { color: var(--ink-2); }
 tr.cal-done .clubcell { color: var(--ink); }

@@ -388,6 +388,20 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 }
 @keyframes pop { from { transform: translateY(8px); opacity: 0.6; } to { transform: none; opacity: 1; } }
 .overlay-box.wide { width: min(860px, 100%); }
+/* painel lateral de resumo do jogador (item 9) — aproveita o espaço vazio que sobrava
+   nos modais grandes de decisão (mercado/empréstimo/volta a ex-clube) em telas largas.
+   Cada lado rola por conta própria (mesmo teto de 92vh do modal base). */
+.overlay-box.panel { display: flex; width: min(1060px, 100%); align-items: stretch; }
+.overlay-box.panel .ov-main { flex: 1; min-width: 0; max-height: 92vh; overflow-y: auto; }
+.overlay-box.panel .ov-side { width: 240px; flex-shrink: 0; max-height: 92vh; overflow-y: auto; border-left: 1px solid var(--rule-soft); padding: 18px 16px; background: var(--paper); }
+.ov-side-h { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--rule-soft); }
+.ov-side-h b { font-family: var(--serif); font-size: 15px; display: block; }
+.ov-stat { display: flex; justify-content: space-between; align-items: baseline; padding: 7px 0; border-bottom: 1px dashed var(--rule-soft); font-family: var(--cond); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-3); }
+.ov-stat b { font-family: var(--serif); font-size: 15px; color: var(--ink); text-transform: none; letter-spacing: 0; }
+@media (max-width: 760px) {
+  .overlay-box.panel { flex-direction: column; }
+  .overlay-box.panel .ov-side { width: auto; max-height: none; border-left: 0; border-top: 1px solid var(--rule-soft); }
+}
 
 .live-sticky { position: sticky; top: 0; z-index: 3; background: var(--paper); }
 .live-head {
@@ -949,6 +963,7 @@ body::before { opacity: var(--noise-op); }
 .cal-next { font-family: var(--cond); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; background: var(--verm); color: #fff; padding: 2px 8px; }
 .cal-dec { font-family: var(--cond); font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.08em; border: 1px solid var(--verm); color: var(--verm-dark); padding: 0 4px; }
 .cal-dnp { color: var(--ink-3); }
+.cal-month-h td { font-family: var(--cond); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: var(--ink-3); background: var(--paper-2, #fffdf6); padding: 7px 10px !important; border-bottom: 1px solid var(--rule-soft); }
 tr.cal-now td { background: var(--gold-soft); box-shadow: inset 3px 0 0 var(--verm); }
 tr.cal-done td { color: var(--ink-2); }
 tr.cal-done .clubcell { color: var(--ink); }
@@ -1367,51 +1382,28 @@ window.CQ = window.CQ || {};
     return first + " " + last;
   }
 
-  // ---------- retrato procedural (estilo ilustração) ----------
-  const SKINS = [
-    { s: "#f4c9a0", d: "#e0ac7d" }, { s: "#e8b38a", d: "#cf9468" }, { s: "#d29b6e", d: "#b57e50" },
-    { s: "#b07a4e", d: "#96633a" }, { s: "#8a5a34", d: "#6f4626" }, { s: "#5e3a1f", d: "#4a2c15" }, { s: "#c99a72", d: "#ac7d55" }
-  ];
-  const HAIRC = ["#20160f", "#0d0d0d", "#3a2415", "#5a3a1e", "#7a5230", "#2a2a2a", "#8a6b3a", "#b0632a"];
+  // ---------- avatar editorial (silhueta, item 10 do roteiro) ----------
+  // Antes era um retrato cartunesco colorido (pele/cabelo/barba/camisa individuais).
+  // Trocado por uma silhueta monotom em tinta sobre papel — o mesmo idioma visual do
+  // resto do jogo (boletim/editorial de jornal esportivo, não avatar de desenho
+  // animado). Mesma assinatura/uso em todo lugar (só a implementação mudou por
+  // dentro) — nenhum call site precisou mexer.
   const BGP = [["#e8e2cf", "#d8d0b6"], ["#dbe6dc", "#c6d8c8"], ["#e7dcd0", "#d6c6b4"], ["#dfe0ea", "#cccee0"], ["#ecddd0", "#dcc6b3"]];
-  const JERSEY = ["#b8330f", "#17563a", "#274a78", "#1b1812", "#8a2408", "#5a2d82", "#0d6b8a"];
+  const INK = "#1b1812";
 
   function portraitSVG(seedStr, size) {
-    const r = rngFor("face2", seedStr);
-    const sk = choice(SKINS, r);
-    const hair = choice(HAIRC, r);
-    const style = ri(0, 6, r);       // estilo de cabelo
-    const beard = ri(0, 4, r);       // barba
+    const r = rngFor("face3", seedStr); // chave nova — não reaproveita rolagens do estilo cartunesco antigo
     const bg = choice(BGP, r);
-    const jersey = choice(JERSEY, r);
-    const eyeY = 47 + ri(-2, 2, r);
+    const hairStyle = ri(0, 4, r); // silhueta do cabelo — ainda monotom, só muda o contorno
+    const tilt = ri(-3, 3, r);     // leve inclinação da cabeça, dá vida sem sair do estilo
     const uid = "p" + hashStr(seedStr);
-    // cabelo: camada de trás + frente
-    let hairBack = "", hairFront = "";
-    if (style === 0) { // curto
-      hairFront = `<path d="M27 42 Q26 18 50 16 Q74 18 73 42 Q70 30 62 29 Q56 33 50 30 Q44 33 38 29 Q30 30 27 42Z" fill="${hair}"/>`;
-    } else if (style === 1) { // topete
-      hairFront = `<path d="M28 40 Q26 14 50 14 Q74 14 72 40 Q70 26 60 25 Q54 20 50 26 Q40 24 28 40Z" fill="${hair}"/><path d="M44 16 Q50 8 58 15 Q52 14 48 20Z" fill="${hair}"/>`;
-    } else if (style === 2) { // black power / afro
-      hairBack = `<circle cx="50" cy="30" r="26" fill="${hair}"/>`;
-      hairFront = `<path d="M25 44 Q24 26 50 25 Q76 26 75 44 Q72 34 50 33 Q28 34 25 44Z" fill="${hair}"/>`;
-    } else if (style === 3) { // longo (até a nuca)
-      hairBack = `<path d="M24 34 Q24 12 50 12 Q76 12 76 34 L76 60 Q72 52 70 42 Q60 34 50 36 Q40 34 30 42 Q28 52 24 60Z" fill="${hair}"/>`;
-      hairFront = `<path d="M27 40 Q26 18 50 17 Q74 18 73 40 Q68 30 50 30 Q32 30 27 40Z" fill="${hair}"/>`;
-    } else if (style === 4) { // coque / moicano
-      hairBack = `<ellipse cx="50" cy="15" rx="9" ry="7" fill="${hair}"/>`;
-      hairFront = `<path d="M30 40 Q30 22 50 22 Q70 22 70 40 Q66 32 50 32 Q34 32 30 40Z" fill="${hair}"/>`;
-    } else if (style === 5) { // raspado com risco
-      hairFront = `<path d="M29 40 Q28 24 50 23 Q72 24 71 40 Q66 33 50 33 Q34 33 29 40Z" fill="${hair}" opacity=".92"/><path d="M40 26 L42 40" stroke="${bg[0]}" stroke-width="1.4"/>`;
-    } else { // careca/recuado
-      hairFront = `<path d="M32 36 Q34 26 50 26 Q66 26 68 36 Q62 31 50 31 Q38 31 32 36Z" fill="${hair}" opacity=".55"/>`;
-    }
-    // barba
-    let beardPath = "";
-    if (beard === 1) beardPath = `<path d="M31 56 Q33 74 50 76 Q67 74 69 56 Q66 68 50 69 Q34 68 31 56Z" fill="${hair}" opacity=".9"/>`;
-    else if (beard === 2) beardPath = `<path d="M30 52 Q31 76 50 78 Q69 76 70 52 L70 62 Q66 72 50 73 Q34 72 30 62Z" fill="${hair}"/><path d="M42 60 h16" stroke="${sk.d}" stroke-width="3" stroke-linecap="round"/>`;
-    else if (beard === 3) beardPath = `<path d="M38 62 Q44 68 50 68 Q56 68 62 62" stroke="${hair}" stroke-width="4" fill="none" stroke-linecap="round" opacity=".85"/>`;
-    else if (beard === 4) beardPath = `<rect x="42" y="61" width="16" height="4" rx="2" fill="${hair}" opacity=".9"/>`;
+
+    let hairPath = "";
+    if (hairStyle === 1) hairPath = `<path d="M27 40 Q26 15 50 14 Q74 15 73 40 Q68 26 50 25 Q32 26 27 40Z" fill="${INK}"/>`; // curto
+    else if (hairStyle === 2) hairPath = `<path d="M25 42 Q24 22 50 21 Q76 22 75 42 Q72 28 50 27 Q28 28 25 42Z" fill="${INK}"/>`; // volumoso
+    else if (hairStyle === 3) hairPath = `<path d="M28 38 Q27 12 50 12 Q73 12 72 38 Q70 22 60 20 Q54 16 50 22 Q40 18 28 38Z" fill="${INK}"/>`; // topete
+    else if (hairStyle === 4) hairPath = `<path d="M24 36 Q24 14 50 13 Q76 14 76 36 L76 55 Q70 45 68 36 Q58 30 50 32 Q42 30 32 36 Q30 45 24 55Z" fill="${INK}"/>`; // longo
+    // hairStyle === 0: careca/raspado — sem contorno extra, só a cabeça lisa
 
     return `<svg viewBox="0 0 100 100" width="${size || 96}" height="${size || 96}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="retrato">
       <defs>
@@ -1420,32 +1412,12 @@ window.CQ = window.CQ || {};
       </defs>
       <g clip-path="url(#${uid}c)">
         <rect width="100" height="100" fill="url(#${uid}bg)"/>
-        <ellipse cx="50" cy="98" rx="40" ry="26" fill="#00000010"/>
-        ${hairBack}
-        <!-- ombros / camisa -->
-        <path d="M18 100 Q20 78 38 73 L62 73 Q80 78 82 100Z" fill="${jersey}"/>
-        <path d="M42 72 Q50 82 58 72 L58 78 Q50 86 42 78Z" fill="#ffffff" opacity=".9"/>
-        <!-- pescoço -->
-        <path d="M42 66 L42 76 Q50 82 58 76 L58 66Z" fill="${sk.d}"/>
-        <!-- orelhas -->
-        <ellipse cx="26" cy="48" rx="4" ry="6" fill="${sk.s}"/><ellipse cx="74" cy="48" rx="4" ry="6" fill="${sk.s}"/>
-        <!-- cabeça -->
-        <path d="M28 44 Q28 68 50 70 Q72 68 72 44 Q72 22 50 22 Q28 22 28 44Z" fill="${sk.s}"/>
-        <!-- sombra lateral do rosto -->
-        <path d="M50 22 Q72 22 72 44 Q72 68 50 70 Q60 60 60 44 Q60 28 50 22Z" fill="${sk.d}" opacity=".28"/>
-        <!-- sobrancelhas -->
-        <path d="M36 ${eyeY - 6} q5 -3 10 -0.5" stroke="${hair}" stroke-width="2.6" fill="none" stroke-linecap="round"/>
-        <path d="M54 ${eyeY - 6.5} q5 -2.5 10 0.5" stroke="${hair}" stroke-width="2.6" fill="none" stroke-linecap="round"/>
-        <!-- olhos -->
-        <ellipse cx="41" cy="${eyeY}" rx="4" ry="3" fill="#fff"/><ellipse cx="59" cy="${eyeY}" rx="4" ry="3" fill="#fff"/>
-        <circle cx="41.6" cy="${eyeY}" r="2" fill="#241a12"/><circle cx="59.6" cy="${eyeY}" r="2" fill="#241a12"/>
-        <circle cx="42.4" cy="${eyeY - 0.8}" r="0.7" fill="#fff"/><circle cx="60.4" cy="${eyeY - 0.8}" r="0.7" fill="#fff"/>
-        <!-- nariz -->
-        <path d="M50 ${eyeY + 2} q2 7 -2 9 q2 1 4 0" stroke="${sk.d}" stroke-width="1.8" fill="none" stroke-linecap="round"/>
-        <!-- boca -->
-        <path d="M43 64 q7 5 14 0" stroke="#8a4a3a" stroke-width="2.4" fill="none" stroke-linecap="round"/>
-        ${beardPath}
-        ${hairFront}
+        <g transform="rotate(${tilt} 50 55)">
+          <path d="M14 100 Q17 74 40 68 L60 68 Q83 74 86 100Z" fill="${INK}"/>
+          <circle cx="50" cy="42" r="24" fill="${INK}"/>
+          ${hairPath}
+        </g>
+        <rect x="1" y="1" width="98" height="98" fill="none" stroke="${INK}" stroke-width="1.4" opacity=".14"/>
       </g>
     </svg>`;
   }
@@ -9073,12 +9045,36 @@ window.CQ = window.CQ || {};
   }
 
   // ---------------- overlays genéricos ----------------
+  // resumo rápido do jogador (overall/fama/moral/condição/patrimônio) — painel lateral
+  // que aproveita o espaço vazio que sobrava nos modais grandes em telas largas
+  // (item 9 do roteiro). Só existe contexto pra mostrar quando há uma carreira ativa.
+  function sidePanelHTML() {
+    const G = g();
+    if (!G || !G.player) return "";
+    const p = G.player, cl = E().myClub(G);
+    return `<aside class="ov-side">
+      <div class="ov-side-h">${crest(cl, "crest-34")}<div><b>${esc(p.name)}</b><div class="condsmall">${esc(cl.name)}</div></div></div>
+      <div class="ov-side-stats">
+        <div class="ov-stat"><span>Overall</span><b class="tnum">${p.overall}</b></div>
+        <div class="ov-stat"><span>Fama</span><b class="tnum">${Math.round(p.fame)}</b></div>
+        <div class="ov-stat"><span>Moral</span><b class="tnum">${Math.round(p.morale)}</b></div>
+        <div class="ov-stat"><span>Condição</span><b class="tnum">${Math.round(p.condition)}</b></div>
+        <div class="ov-stat"><span>Patrimônio</span><b class="tnum">${U.fmtBRL(p.money)}</b></div>
+      </div>
+    </aside>`;
+  }
+  // `wide`: false/undefined = padrão (680px); true = largo (860px, ex.: modo ao vivo);
+  // "panel" = largo + painel lateral fixo de resumo do jogador, pras decisões grandes
+  // (mercado, empréstimo, volta a ex-clube) onde sobrava bastante espaço vazio em
+  // telas largas. `sidePanelHTML` volta pra "" (sem painel) em telas estreitas via CSS.
   function overlay(html, wide) {
     closeOverlay();
     const div = document.createElement("div");
     div.className = "overlay";
     div.id = "cq-overlay";
-    div.innerHTML = `<div class="overlay-box ${wide ? "wide" : ""}" role="dialog" aria-modal="true">${html}</div>`;
+    const cls = wide === "panel" ? "wide panel" : wide ? "wide" : "";
+    const body = wide === "panel" ? `<div class="ov-main">${html}</div>${sidePanelHTML()}` : html;
+    div.innerHTML = `<div class="overlay-box ${cls}" role="dialog" aria-modal="true">${body}</div>`;
     document.body.appendChild(div);
     // acessibilidade: foca o primeiro controle acionável do diálogo
     const first = div.querySelector("button, a, input, select, .dc-opt, .choice, .shoot-slot");
@@ -9636,7 +9632,7 @@ window.CQ = window.CQ || {};
         <p class="small muted mb12">${sum.mustMove ? "A diretoria encerrou seu ciclo — escolha um novo destino." : of.requested ? "Você pediu para sair — estas são as portas que se abriram." : "Seu contrato chegou ao fim. Escolha seu futuro."}</p>
         ${cards || '<p class="muted">Nenhuma proposta externa desta vez.</p>'}
         <hr class="rule">${renewBtn}
-      </div>`, true);
+      </div>`, "panel");
   }
 
   function pickOffer(i) {
@@ -9682,7 +9678,7 @@ window.CQ = window.CQ || {};
         <button class="dc-opt" onclick="CQ.ui.declineLoan()">
           <span class="flex"><b>Ficar e brigar por espaço</b></span>
           <small>Segue no ${esc(E().myClub(G).name)}, sem garantia de mais minutos</small></button>
-      </div>`, true);
+      </div>`, "panel");
   }
   function pickLoan() {
     const G = g(), sum = G.pendingSummary, o = sum.loanOffer;
@@ -9723,7 +9719,7 @@ window.CQ = window.CQ || {};
         <button class="dc-opt" onclick="CQ.ui.declineHomecoming()">
           <span class="flex"><b>Agradecer e seguir no ${esc(E().myClub(G).name)}</b></span>
           <small>Sem pressa — a proposta pode voltar em outra temporada</small></button>
-      </div>`, true);
+      </div>`, "panel");
   }
   function pickHomecoming(i) {
     const G = g(), o = G.pendingSummary.homecomingOffers[i];
@@ -9749,7 +9745,7 @@ window.CQ = window.CQ || {};
     const G = g(), p = G.player;
     const tab = CQ.state.ctab || "attrs";
     const nat = D.NATIONS[p.nat];
-    const tabs = [["attrs", "Atributos"], ["marcos", "Marcos"], ["evo", "Evolução"], ["linha", "Linha do tempo"], ["hist", "Temporadas"], ["troph", "Conquistas"], ["duel", "Duelo"]];
+    const tabs = [["attrs", "Atributos"], ["marcos", "Marcos"], ["evo", "Evolução"], ["linha", "Linha do tempo"], ["hist", "Temporadas"], ["troph", "Conquistas"], ["duel", "Duelo"], ["peers", "Mesma idade"]];
     const head = `<div class="player-card mb12">
       <div class="player-face">${U.portraitSVG(p.name + G.seed, 96)}</div>
       <div>
@@ -9769,8 +9765,49 @@ window.CQ = window.CQ || {};
     else if (tab === "linha") body = timelineHTML(G);
     else if (tab === "hist") body = histHTML(p);
     else if (tab === "troph") body = trophHTML(p);
+    else if (tab === "peers") body = peersHTML(G);
     else body = duelHTML(G);
     return head + subtabs + body;
+  }
+
+  // ---- comparação com jogadores da mesma idade (item 13 do roteiro) ----
+  // Reaproveita g.world.clubs (identidade persistente dos 191 elencos, já com
+  // age/ovr por NPC — mesmo dado que squadOf/rollAge já mantêm) — sem sortear nada
+  // novo, só varre e ordena o que já existe. Puramente informativo, sem efeito de
+  // jogo (ninguém "compete" contra esses NPCs de verdade, é só contexto).
+  function peersHTML(G) {
+    const p = G.player;
+    if (!G.world || !G.world.clubs) return '<div class="card"><div class="card-b muted">Comparação indisponível nesta carreira (mundo persistente ainda não carregado).</div></div>';
+    const peers = [];
+    Object.keys(G.world.clubs).forEach(function (clubId) {
+      G.world.clubs[clubId].roster.forEach(function (pl) {
+        if (pl.age === p.age) peers.push({ name: pl.name, clubId: clubId, ovr: pl.ovr, pos: pl.pos });
+      });
+    });
+    peers.push({ name: p.name, clubId: p.clubId, ovr: p.overall, pos: p.pos, me: true });
+    peers.sort(function (a, b) { return b.ovr - a.ovr || (a.me ? -1 : b.me ? 1 : 0); });
+    const myRank = peers.findIndex(function (x) { return x.me; }) + 1;
+    const pct = Math.max(1, Math.round((1 - (myRank - 1) / peers.length) * 100));
+    const top = peers.slice(0, 10);
+    const meInTop = top.some(function (x) { return x.me; });
+    function row(x, i) {
+      const cl = D.CLUBS[x.clubId];
+      return `<tr class="${x.me ? "me" : ""}"><td class="tnum">${i + 1}º</td><td><span class="clubcell">${cl ? crest(cl, "crest-20") : ""} ${esc(x.name)}${x.me ? ' <span class="badge badge-gold">você</span>' : ""}</span></td><td class="small">${D.POSITIONS[x.pos] ? esc(D.POSITIONS[x.pos].name) : esc(x.pos)}</td><td class="num tnum"><b>${x.ovr}</b></td></tr>`;
+    }
+    const rows = top.map(row).join("") + (meInTop ? "" : row(peers[myRank - 1], myRank - 1));
+    return `<div class="card">
+      <div class="section-banner"><span class="sb-title">Jogadores de ${p.age} anos</span><span class="sb-meta">${peers.length} no mundo</span></div>
+      <div class="card-b tight" style="padding:12px 14px 4px"><div class="tiles" style="border:none">
+        <div class="tile"><b class="tnum">${myRank}º</b><span>Sua posição</span></div>
+        <div class="tile"><b class="tnum">${peers.length}</b><span>Comparados</span></div>
+        <div class="tile"><b class="tnum">Top ${pct}%</b><span>Percentil por overall</span></div>
+      </div></div>
+      <div class="card-b tight" style="overflow-x:auto"><table class="tbl tbl-zebra">
+        <thead><tr><th>#</th><th>Jogador</th><th>Posição</th><th class="num">OVR</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+      <p class="small muted" style="padding:8px 14px">Comparado com todo jogador de ${p.age} anos nos 191 clubes do mundo persistente — inclui craques reais e promessas geradas.</p>
+    </div>`;
   }
 
   function marcosHTML(G) {
@@ -9983,7 +10020,7 @@ window.CQ = window.CQ || {};
     }).join("") || '<p class="muted small">A sala de troféus ainda espera o primeiro.</p>';
     const awards = p.awards.slice().reverse().map(function (a) {
       return `<div class="flex-b" style="padding:7px 0;border-bottom:1px dashed var(--rule-soft)"><span class="flex">${I.star} <span>${esc(a.name)}${a.club ? `<br><span class="condsmall">no ${esc(a.club)}</span>` : ""}</span></span><span class="tnum muted">${a.year}</span></div>`;
-    }).join("") || '<p class="muted small">Nenhum prêmio individual ainda.</p>';
+    }).join("") || '<p class="muted small">Nenhum prêmio individual ainda — boas atuações chamam atenção da crítica.</p>';
     // vitrine visual de troféus
     let room = "";
     if (p.titles.length) {
@@ -10178,11 +10215,34 @@ window.CQ = window.CQ || {};
   function compTag(comp) {
     return `<span class="cal-tag ${COMP_COLOR[comp] || ""}">${esc(COMP_ABBR[comp] || comp)}</span>`;
   }
+  // meses "editoriais" (fev-dez, temporada brasileira de verdade) — o jogo não modela
+  // data real nenhuma (só ordem cronológica dentro da temporada), então o mês de cada
+  // jogo é uma divisão proporcional da posição dele na lista completa. Puramente de
+  // apresentação: nunca lido por nenhuma lógica de jogo, só agrupa visualmente.
+  const MONTHS_PT = ["Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+  function monthFor(i, total) {
+    return MONTHS_PT[Math.min(MONTHS_PT.length - 1, Math.floor(i / Math.max(1, total) * MONTHS_PT.length))];
+  }
   function calendarHTML(G) {
     const sched = E().peekSchedule(G);
     const nextIdx = sched.findIndex(function (m) { return !m.done; });
     let played = 0, wins = 0;
-    const rows = sched.map(function (m, i) {
+    sched.forEach(function (m) { if (m.done) { played++; if (m.win) wins++; } });
+    // filtro por competição (item 11) — meses são calculados sobre a lista COMPLETA
+    // (verdade cronológica da temporada) antes de filtrar, senão o mês de um jogo mudaria
+    // dependendo do filtro escolhido, o que não faz sentido (ele aconteceu quando aconteceu).
+    const comps = [];
+    sched.forEach(function (m) { if (comps.indexOf(m.comp) < 0) comps.push(m.comp); });
+    const filter = comps.indexOf(CQ.state.calFilter) >= 0 ? CQ.state.calFilter : "all";
+    const filterSel = comps.length > 1 ? `<select onchange="CQ.state.calFilter=this.value;CQ.ui.render()" style="border:1px solid var(--ink);background:#fffdf6;padding:6px 10px;font-size:13px">
+      <option value="all" ${filter === "all" ? "selected" : ""}>Todas as competições</option>
+      ${comps.map(function (c) { return `<option value="${c}" ${filter === c ? "selected" : ""}>${esc(COMP_ABBR[c] || c)}</option>`; }).join("")}
+    </select>` : "";
+    let lastMonth = null, rowsOut = "";
+    sched.forEach(function (m, i) {
+      if (filter !== "all" && m.comp !== filter) return;
+      const month = monthFor(i, sched.length);
+      if (month !== lastMonth) { rowsOut += `<tr class="cal-month-h"><td colspan="5">${month}</td></tr>`; lastMonth = month; }
       const isNext = i === nextIdx;
       const opp = m.oppName ? esc(m.oppName) : "<span class='muted'>a definir</span>";
       const oppCrest = m.oppId ? crest(m.oppId, "crest-20") : (m.comp === "SEL" && m.oppName ? "" : "");
@@ -10191,18 +10251,17 @@ window.CQ = window.CQ || {};
       else if (m.home === false) localTag = '<span class="cal-loc away">Fora</span>';
       else localTag = '<span class="cal-loc muted">—</span>';
       if (m.done) {
-        played++;
         const w = m.win, d = m.draw;
-        if (w) wins++;
         const pill = w ? "V" : d ? "E" : "D";
         const a = m.home ? m.gm : m.go, b = m.home ? m.go : m.gm;
         const mine = m.plays ? notaPill(m.nota) : '<span class="cal-dnp">—</span>';
         statusCell = `<span class="cal-res"><span class="result-pill ${pill}">${pill}</span> <b class="tnum">${a}-${b}</b></span>`;
-        return `<tr class="cal-done"><td>${compTag(m.comp)}</td><td><span class="clubcell">${oppCrest} ${opp}</span></td><td>${localTag}</td><td class="num">${statusCell}</td><td class="num">${mine}</td></tr>`;
+        rowsOut += `<tr class="cal-done"><td>${compTag(m.comp)}</td><td><span class="clubcell">${oppCrest} ${opp}</span></td><td>${localTag}</td><td class="num">${statusCell}</td><td class="num">${mine}</td></tr>`;
+        return;
       }
       statusCell = isNext ? '<span class="cal-next">Próximo</span>' : '<span class="muted small">Agendado</span>';
-      return `<tr class="${isNext ? "cal-now" : ""}"><td>${compTag(m.comp)}${m.decisive ? ' <span class="cal-dec">decisivo</span>' : ""}</td><td><span class="clubcell">${oppCrest} ${opp}</span></td><td>${localTag}</td><td class="num" colspan="2">${statusCell}</td></tr>`;
-    }).join("");
+      rowsOut += `<tr class="${isNext ? "cal-now" : ""}"><td>${compTag(m.comp)}${m.decisive ? ' <span class="cal-dec">decisivo</span>' : ""}</td><td><span class="clubcell">${oppCrest} ${opp}</span></td><td>${localTag}</td><td class="num" colspan="2">${statusCell}</td></tr>`;
+    });
     const upcoming = sched.length - played;
     return `<div class="card">
       <div class="section-banner"><span class="sb-title">Calendário da temporada</span><span class="sb-meta">${G.year}</span></div>
@@ -10212,9 +10271,10 @@ window.CQ = window.CQ || {};
         <div class="tile"><b class="tnum">${upcoming}</b><span>A jogar</span></div>
         <div class="tile"><b class="tnum">${played ? Math.round(wins / played * 100) : 0}%</b><span>Aproveit. (V)</span></div>
       </div>
+      ${filterSel ? `<div class="card-b tight" style="padding:10px 14px">${filterSel}</div>` : ""}
       <div class="card-b tight" style="overflow-x:auto"><table class="tbl">
         <thead><tr><th>Competição</th><th>Adversário</th><th>Local</th><th class="num">Resultado</th><th class="num">Nota</th></tr></thead>
-        <tbody>${rows || '<tr><td colspan="5" class="muted center" style="padding:16px">Temporada ainda não iniciada.</td></tr>'}</tbody>
+        <tbody>${rowsOut || '<tr><td colspan="5" class="muted center" style="padding:16px">Temporada ainda não iniciada.</td></tr>'}</tbody>
       </table></div>
       <p class="small muted" style="padding:8px 14px">Jogos de mata-mata mostram o adversário assim que o chaveamento é sorteado.</p>
     </div>`;
@@ -10737,7 +10797,7 @@ window.CQ = window.CQ || {};
       }).join("");
     return `<div class="card"><div class="card-h"><h3>Base ${esc(cl.name)}</h3><span class="kicker-side">jogadores até 20 anos</span></div>
       <div class="card-b tight" style="overflow-x:auto"><table class="tbl tbl-zebra"><thead><tr><th>Jogador</th><th>Posição</th><th class="num">Idade</th><th class="num">OVR</th></tr></thead>
-      <tbody>${rows || `<tr><td colspan="4" class="small muted" style="padding:10px 14px">Nenhum jogador de base (≤20 anos) no elenco no momento.</td></tr>`}</tbody></table></div>
+      <tbody>${rows || `<tr><td colspan="4" class="small muted" style="padding:10px 14px">Nenhum garoto de olho no elenco agora — a base está de olho na próxima geração.</td></tr>`}</tbody></table></div>
       <p class="small muted" style="padding:8px 14px">Promessas da base envelhecem e evoluem normalmente — fique de olho, algumas podem virar peças importantes com o tempo.</p></div>`;
   }
 
@@ -11018,7 +11078,7 @@ window.CQ = window.CQ || {};
     requestTransfer: requestTransfer, cancelTransfer: cancelTransfer,
     setFocus: setFocus, buyAsset: buyAsset,
     startClubPool: startClubPool, squadOf: squadOf, timelineHTML: timelineHTML, careerLegacy: careerLegacy,
-    hallHTML: hallHTML
+    hallHTML: hallHTML, sidePanelHTML: sidePanelHTML, peersHTML: peersHTML
   };
 })();
 
@@ -11223,7 +11283,7 @@ window.CQ = window.CQ || {};
 
   CQ.state = {
     game: null, screen: "cover",
-    ctab: "attrs", ttab: "liga", clubTab: "info", feedFilter: "all",
+    ctab: "attrs", ttab: "liga", clubTab: "info", feedFilter: "all", calFilter: "all",
     draft: null, live: null, itv: null, lifeEv: null, champFilter: "BRA", summary: null,
     lastSeen: { money: null, fame: null, marcos: {} }
   };

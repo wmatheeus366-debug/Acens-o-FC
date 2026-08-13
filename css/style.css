@@ -375,6 +375,20 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 }
 @keyframes pop { from { transform: translateY(8px); opacity: 0.6; } to { transform: none; opacity: 1; } }
 .overlay-box.wide { width: min(860px, 100%); }
+/* painel lateral de resumo do jogador (item 9) — aproveita o espaço vazio que sobrava
+   nos modais grandes de decisão (mercado/empréstimo/volta a ex-clube) em telas largas.
+   Cada lado rola por conta própria (mesmo teto de 92vh do modal base). */
+.overlay-box.panel { display: flex; width: min(1060px, 100%); align-items: stretch; }
+.overlay-box.panel .ov-main { flex: 1; min-width: 0; max-height: 92vh; overflow-y: auto; }
+.overlay-box.panel .ov-side { width: 240px; flex-shrink: 0; max-height: 92vh; overflow-y: auto; border-left: 1px solid var(--rule-soft); padding: 18px 16px; background: var(--paper); }
+.ov-side-h { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--rule-soft); }
+.ov-side-h b { font-family: var(--serif); font-size: 15px; display: block; }
+.ov-stat { display: flex; justify-content: space-between; align-items: baseline; padding: 7px 0; border-bottom: 1px dashed var(--rule-soft); font-family: var(--cond); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-3); }
+.ov-stat b { font-family: var(--serif); font-size: 15px; color: var(--ink); text-transform: none; letter-spacing: 0; }
+@media (max-width: 760px) {
+  .overlay-box.panel { flex-direction: column; }
+  .overlay-box.panel .ov-side { width: auto; max-height: none; border-left: 0; border-top: 1px solid var(--rule-soft); }
+}
 
 .live-sticky { position: sticky; top: 0; z-index: 3; background: var(--paper); }
 .live-head {
