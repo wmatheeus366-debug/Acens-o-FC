@@ -67,7 +67,7 @@
     withTempGame(function () {
       const g = newCareer("MEI");
       const old = JSON.parse(JSON.stringify(g));
-      ["traits", "compGoals", "idolClubs", "clubGoals", "ballon", "milestones", "assets", "records", "captain", "squadRole", "loan", "firstClassic", "genIdolYear", "momentIdol"].forEach(function (k) { delete old.player[k]; });
+      ["traits", "compGoals", "idolClubs", "clubGoals", "ballon", "milestones", "assets", "records", "captain", "squadRole", "loan", "firstClassic", "genIdolYear", "momentIdol", "evoPoints"].forEach(function (k) { delete old.player[k]; });
       delete old.manager; delete old.worldStars; delete old.schemaVersion; delete old.world; delete old.clubRivalry;
       const raw = localStorage.getItem("craque-save-v1");
       localStorage.setItem("craque-save-v1", JSON.stringify(old));
@@ -78,6 +78,7 @@
       assert("save: migra ídolo em camadas (genIdolYear null, momentIdol false)",
         loaded && loaded.player.genIdolYear === null && loaded.player.momentIdol === false,
         JSON.stringify({ genIdolYear: loaded && loaded.player.genIdolYear, momentIdol: loaded && loaded.player.momentIdol }));
+      assert("save: migra evoPoints (pontos de evolução pendentes)", loaded && loaded.player.evoPoints === 0, "evoPoints=" + (loaded && loaded.player.evoPoints));
       const myClubId = loaded && loaded.player.clubId;
       const expectLen = CQ.DATA.REAL_SQUADS[myClubId] ? CQ.DATA.REAL_SQUADS[myClubId].length : 20;
       assert("save: migra g.world (elenco do clube do jogador)",
@@ -1176,6 +1177,72 @@
     assert("avatar: silhueta em tinta única (sem paleta de pele/cabelo colorida do estilo antigo)", a.indexOf("#1b1812") >= 0, "");
   }
 
+  // ---- Pontos de evolução (item 14 do roteiro) ----
+  function testSpendXPBanksPoints() {
+    withTempGame(function () {
+      const g = newCareer("ATA");
+      E().startSeason(g);
+      const beforeAttrs = JSON.stringify(g.player.attrs);
+      let n = 0, gotPoint = false;
+      while (E().currentFixture(g) && n++ < 40 && !gotPoint) {
+        E().applyMatch(g, E().resolveMatch(g, E().currentFixture(g), {}));
+        if (g.player.evoPoints > 0) gotPoint = true;
+      }
+      assert("evolução: partidas geram pontos pendentes (evoPoints), não mais atributo direto", gotPoint, "evoPoints=" + g.player.evoPoints + " após " + n + " partidas");
+      assert("evolução: p.attrs não muda sozinho — só via investPoint/autoDistribute agora", JSON.stringify(g.player.attrs) === beforeAttrs, "");
+    });
+  }
+  function testInvestPointRespectsCapsAndRefunds() {
+    withTempGame(function () {
+      const g = newCareer("ATA");
+      const p = g.player;
+      p.evoPoints = 5;
+      p.pot = p.overall; // já no teto — nenhum investimento deveria colar
+      const before = JSON.stringify(p.attrs);
+      const res = E().investPoint(g, "fin");
+      assert("evolução: investPoint recusa quando já está no potencial (devolve o ponto)", !res.ok && p.evoPoints === 5 && JSON.stringify(p.attrs) === before, JSON.stringify(res));
+
+      p.pot = Math.min(99, p.overall + 20); // agora tem espaço de verdade
+      p.attrs.fin = 95; // já no teto individual do atributo
+      const res2 = E().investPoint(g, "fin");
+      assert("evolução: investPoint recusa atributo já no teto de 95", !res2.ok, JSON.stringify(res2));
+
+      p.attrs.pas = 60;
+      const beforePts = p.evoPoints;
+      const res3 = E().investPoint(g, "pas");
+      assert("evolução: investPoint aplica corretamente um atributo válido", res3.ok && p.attrs.pas === 61 && p.evoPoints === beforePts - 1, JSON.stringify(res3));
+
+      const res4 = E().investPoint(g, "atributo-que-nao-existe");
+      assert("evolução: investPoint recusa chave de atributo inválida", !res4.ok, JSON.stringify(res4));
+    });
+  }
+  function testAutoDistributeSpendsUpToPotential() {
+    withTempGame(function () {
+      const g = newCareer("MEI");
+      const p = g.player;
+      p.pot = Math.min(99, p.overall + 3); // teto bem apertado — só cabe pouca coisa
+      p.evoPoints = 20; // muito mais do que cabe até o potencial
+      const spent = E().autoDistribute(g);
+      assert("evolução: autoDistribute investe pelo menos 1 ponto quando há espaço até o potencial", spent > 0, "spent=" + spent);
+      assert("evolução: autoDistribute nunca deixa o overall passar do potencial", p.overall <= p.pot, "overall=" + p.overall + " pot=" + p.pot);
+      assert("evolução: pontos gastos descontam de evoPoints", p.evoPoints === 20 - spent, "evoPoints=" + p.evoPoints + " spent=" + spent);
+    });
+  }
+  // ---- Rede de segurança: pontos nunca investidos na mão são aplicados no fim da
+  // temporada (senão quem nunca abre a aba Atributos ficaria com a carreira estagnada) ----
+  function testSeasonEndAutoSpendsLeftoverPoints() {
+    withTempGame(function () {
+      const g = newCareer("ATA", "fla");
+      g.player.pot = Math.min(99, g.player.overall + 10); // espaço de sobra pra crescer
+      E().startSeason(g);
+      let n = 0; while (E().currentFixture(g) && n++ < 700) E().applyMatch(g, E().resolveMatch(g, E().currentFixture(g), {}));
+      const hadPoints = g.player.evoPoints > 0;
+      E().endSeason(g);
+      assert("evolução: temporada inteira sem investir na mão gera pontos pendentes em algum momento", hadPoints, "");
+      assert("evolução: endSeason zera (ou reduz) pontos esquecidos via rede de segurança", g.player.evoPoints === 0 || g.player.overall >= g.player.pot, "evoPoints=" + g.player.evoPoints + " overall=" + g.player.overall + " pot=" + g.player.pot);
+    });
+  }
+
   // ---- Comparação com jogadores da mesma idade (item 13 do roteiro) ----
   function testPeersSameAge() {
     withTempGame(function () {
@@ -1409,6 +1476,10 @@
     testPortraitSVGEditorial();
     testCalendarMonthsAndFilter();
     testPeersSameAge();
+    testSpendXPBanksPoints();
+    testInvestPointRespectsCapsAndRefunds();
+    testAutoDistributeSpendsUpToPotential();
+    testSeasonEndAutoSpendsLeftoverPoints();
     const pass = results.filter(function (r) { return r.pass; }).length;
     console.log("%cCRAQUE regressão: " + pass + "/" + results.length + " passaram", "font-weight:bold");
     results.forEach(function (r) { console.log((r.pass ? "✓" : "✗ FALHOU") + " " + r.name + (r.detail ? "  [" + r.detail + "]" : "")); });

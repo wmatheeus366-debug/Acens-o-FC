@@ -302,9 +302,14 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 
 /* ---------------- Atributos / barras ---------------- */
 
-.attr-row { display: grid; grid-template-columns: 110px 1fr 34px; align-items: center; gap: 10px; padding: 4px 0; }
+.attr-row { display: grid; grid-template-columns: 110px 1fr 34px 32px; align-items: center; gap: 10px; padding: 4px 0; }
 .attr-row .alabel { font-family: var(--cond); font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-2); }
 .attr-row .aval { font-family: var(--serif); font-weight: 700; font-size: 15px; text-align: right; font-variant-numeric: tabular-nums; }
+/* botão de investir 1 ponto de evolução (item 14) — 4ª coluna do grid, sempre reservada
+   (mesmo vazia) pra as linhas não pularem de largura conforme o jogador tem ou não
+   pontos pendentes pra investir naquele atributo específico. */
+.attr-plus { width: 28px; height: 28px; border: 1.5px solid var(--gold); background: transparent; color: var(--gold); font-family: var(--cond); font-weight: 700; font-size: 15px; cursor: pointer; line-height: 1; }
+.attr-plus:hover { background: var(--gold); color: var(--ink); }
 .bar { height: 7px; background: var(--paper-3); position: relative; }
 .bar > i { position: absolute; inset: 0 auto 0 0; background: var(--green); }
 .bar.warm > i { background: var(--verm); }
@@ -716,7 +721,7 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
   .player-face { width: 72px; height: 72px; }
   .player-card .ov-plate { grid-column: 1 / -1; justify-self: start; flex-direction: row; gap: 8px; padding: 4px 12px; }
   .player-card .ov-plate b { font-size: 22px; }
-  .attr-row { grid-template-columns: 92px 1fr 30px; }
+  .attr-row { grid-template-columns: 92px 1fr 30px 28px; }
 }
 
 @media (min-width: 961px) and (max-width: 1180px) {

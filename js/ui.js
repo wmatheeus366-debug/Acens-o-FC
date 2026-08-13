@@ -654,7 +654,7 @@ window.CQ = window.CQ || {};
             <div style="text-align:right"><div class="dossier-ov">${p.overall}</div><div class="dossier-sub">Overall</div></div>
           </div>
           <hr class="rule">
-          <div class="meter-lbl"><span>Potencial ${p.pot}</span><span>Fama <b id="cnt-fame" data-count-to="${Math.round(p.fame)}">${fromFame}</b></span></div>${bar(p.overall, 100, false, p.pot)}
+          <div class="meter-lbl"><span>Potencial ${p.pot}${p.evoPoints ? ` · <a href="#" onclick="CQ.state.ctab='attrs';CQ.ui.go('career');return false" style="color:var(--gold)">${p.evoPoints} ${U.plural(p.evoPoints, "ponto", "pontos")} pra investir</a>` : ""}</span><span>Fama <b id="cnt-fame" data-count-to="${Math.round(p.fame)}">${fromFame}</b></span></div>${bar(p.overall, 100, false, p.pot)}
           <div class="meter-lbl mt8"><span>Condição</span><span class="tnum">${Math.round(p.condition)}%</span></div>${bar(p.condition, 100, p.condition < 40)}
           <div class="meter-lbl mt8"><span>Moral</span><span class="tnum">${Math.round(p.morale)}%</span></div>${bar(p.morale, 100, p.morale < 35)}
           <hr class="rule">
@@ -1783,11 +1783,21 @@ window.CQ = window.CQ || {};
   function ctab(t) { CQ.state.ctab = t; render(); }
 
   function attrsHTML(p) {
+    // pontos de evolução (item 14): o jogador escolhe onde cada ponto vai, em vez de um
+    // sorteio automático — botão "+1" aparece só quando há ponto pendente E ainda não
+    // bateu no potencial E o atributo não está no teto de 95 (mesmas 3 travas de
+    // investPoint, refletidas aqui só pra não mostrar um botão que ia falhar ao clicar).
+    const canInvest = (p.evoPoints || 0) > 0 && p.overall < p.pot;
     const rows = CQ.engine.ATTRS.map(function (a) {
       if (p.pos !== "GOL" && a === "ref") return "";
       if (p.pos === "GOL" && (a === "fin" || a === "dri")) return "";
-      return `<div class="attr-row"><span class="alabel">${D.ATTR_NAMES[a]}</span>${bar(p.attrs[a], 100, p.attrs[a] < 55)}<span class="aval tnum">${p.attrs[a]}</span></div>`;
+      const plusBtn = canInvest && p.attrs[a] < 95 ? `<button class="attr-plus" onclick="CQ.ui.investPoint('${a}')" title="Investir 1 ponto em ${esc(D.ATTR_NAMES[a])}">+1</button>` : "<span></span>";
+      return `<div class="attr-row"><span class="alabel">${D.ATTR_NAMES[a]}</span>${bar(p.attrs[a], 100, p.attrs[a] < 55)}<span class="aval tnum">${p.attrs[a]}</span>${plusBtn}</div>`;
     }).join("");
+    const evoBanner = (p.evoPoints || 0) > 0
+      ? `<div class="notice ${canInvest ? "ok" : ""} mb12">${I.star} <b>${p.evoPoints} ${U.plural(p.evoPoints, "ponto", "pontos")} de evolução</b> pra investir${canInvest ? " — clique no “+1” do atributo que quiser melhorar." : ", mas você já bateu seu potencial atual (só uma grande temporada jovem eleva o teto)."}
+        ${canInvest ? `<div class="mt8"><button class="btn btn-sm" onclick="CQ.ui.autoDistributePoints()">Distribuir automaticamente</button></div>` : ""}</div>`
+      : "";
     const legends = p.legendIds.map(function (id) {
       const L = D.LEGENDS.find(function (x) { return x.id === id; });
       return L ? `<span class="badge badge-gold">${esc(L.name)} · ${esc(L.trait)}</span>` : "";
@@ -1804,7 +1814,7 @@ window.CQ = window.CQ || {};
       <p class="small muted mt8">Desbloqueados por desempenho (gols, assistências, decisões, capitania...). Cada traço melhora seu jogo de verdade.</p></div></div>`;
     return `<div class="cols"><div class="stack">
       <div class="card"><div class="card-h"><h3>Atributos</h3><span class="kicker-side">Potencial ${p.pot}</span></div>
-      <div class="card-b">${rows}</div></div>
+      <div class="card-b">${evoBanner}${rows}</div></div>
       ${traitsCard}
     </div><div class="stack">
       <div class="card"><div class="card-h"><h3>Inspirações — Os Craques</h3></div><div class="card-b">${legends || '<span class="muted small">Nenhuma lenda escolhida.</span>'}</div></div>
@@ -2689,13 +2699,13 @@ window.CQ = window.CQ || {};
             </div>
           </div></div></div>
         <div class="card"><div class="card-h"><h3>Centro de treinamento</h3></div><div class="card-b">
-          <p class="small muted mb8">Escolha o <b>foco de treino</b>: seus pontos de evolução vão priorizar esses atributos. Boas atuações rendem mais pontos (${p.age <= 24 ? "e até os 24 o crescimento é mais rápido" : p.age <= 33 ? "evolução gradual na sua fase" : "aqui o desafio é segurar o nível"}).</p>
+          <p class="small muted mb8">Cada ponto de evolução ganho você investe <b>na mão</b>, na aba Atributos de Carreira. O <b>foco de treino</b> abaixo só entra se você usar o atalho "Distribuir automaticamente" por lá — define pra que lado ele pesa o sorteio. Boas atuações rendem mais pontos (${p.age <= 24 ? "e até os 24 o crescimento é mais rápido" : p.age <= 33 ? "evolução gradual na sua fase" : "aqui o desafio é segurar o nível"}).</p>
           <div class="choice-grid" style="grid-template-columns:repeat(auto-fill,minmax(130px,1fr))">
             ${[["equil", "Equilibrado", "sem prioridade"], ["ataque", "Ataque", "finalização + posição"], ["criacao", "Criação", "passe + drible"], ["atletico", "Atlético", "ritmo + físico"], ["defensivo", "Defesa", "marcação + reflexo"], ["bolaparada", "Bola parada", "faltas e pênaltis"]].map(function (f) {
         return `<button class="choice ${G.trainingFocus === f[0] ? "sel" : ""}" onclick="CQ.ui.setFocus('${f[0]}')"><b>${f[1]}</b><small>${f[2]}</small></button>`;
       }).join("")}
           </div>
-          <div class="meter-lbl mt12"><span>Progresso até o próximo ponto</span><span class="tnum">${Math.round((p.xp % 1) * 100)}%</span></div>${bar((p.xp % 1) * 100, 100)}
+          <div class="meter-lbl mt12"><span>Progresso até o próximo ponto${p.evoPoints ? " (" + p.evoPoints + " " + U.plural(p.evoPoints, "já disponível", "já disponíveis") + ")" : ""}</span><span class="tnum">${Math.round((p.xp % 1) * 100)}%</span></div>${bar((p.xp % 1) * 100, 100)}
         </div></div>
       </div><div class="stack">
         ${(function () {
@@ -2830,6 +2840,19 @@ window.CQ = window.CQ || {};
     g().trainingFocus = f;
     CQ.main.save(); render();
   }
+  // pontos de evolução (item 14) — investir 1 ponto manualmente num atributo escolhido
+  // pelo jogador, ou distribuir tudo de uma vez pro sorteio ponderado de sempre.
+  function investPoint(attrKey) {
+    const res = E().investPoint(g(), attrKey);
+    if (!res.ok) { toast(res.reason === "potencial" ? "Você já está no seu potencial atual." : "Não foi possível investir esse ponto."); return; }
+    CQ.main.save(); render();
+    toast(D.ATTR_NAMES[attrKey] + " +1 (agora " + res.novo + ")");
+  }
+  function autoDistributePoints() {
+    const n = E().autoDistribute(g());
+    CQ.main.save(); render();
+    toast(n > 0 ? n + " " + U.plural(n, "ponto investido", "pontos investidos") + " automaticamente." : "Nenhum ponto pôde ser investido agora.");
+  }
   function buyAsset(key) {
     const ok = E().buyAsset(g(), key);
     if (!ok) { toast("Patrimônio insuficiente."); return; }
@@ -2920,7 +2943,7 @@ window.CQ = window.CQ || {};
     ctab: ctab, ttab: ttab, closeTitle: closeTitle, closeDraw: closeDraw, closeCapa: closeCapa, votePoll: votePoll,
     setLogo: setLogo, clearLogo: clearLogo, toast: toast,
     requestTransfer: requestTransfer, cancelTransfer: cancelTransfer,
-    setFocus: setFocus, buyAsset: buyAsset,
+    setFocus: setFocus, buyAsset: buyAsset, investPoint: investPoint, autoDistributePoints: autoDistributePoints,
     startClubPool: startClubPool, squadOf: squadOf, timelineHTML: timelineHTML, careerLegacy: careerLegacy,
     hallHTML: hallHTML, sidePanelHTML: sidePanelHTML, peersHTML: peersHTML
   };

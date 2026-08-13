@@ -1418,3 +1418,27 @@ invisíveis pro feed.
   Zero sorteio novo, só reaproveita dado que já existia.
 
 Validado: 200/200 testes (9 novos).
+
+---
+
+## Potencial + pontos de evolução (item 14 do roteiro — última pendência)
+
+Mudança de mecânica central, com proposta investigada e aprovada pelo usuário antes de
+codar. Achado que reduziu o escopo: potencial (`p.pot`) já existia e já era mostrado —
+faltava só o jogador escolher onde cada ponto de evolução vai, em vez do sorteio
+automático de sempre.
+
+- `spendXP` para de escolher atributo sozinho — só converte XP em `p.evoPoints`
+  pendente. Novo `investPoint(g, attrKey)` (jogador escolhe manualmente, na aba
+  Atributos) e `autoDistribute(g)` (atalho que reaproveita o sorteio ponderado antigo).
+- Rede de segurança em `endSeason`: pontos nunca investidos na mão até o fim da
+  temporada são aplicados automaticamente — sem isso, ignorar a aba Atributos deixaria
+  a carreira estagnada pra sempre.
+- `trainingFocus` continua relevante — agora só como peso do atalho automático.
+- Balanceamento: `overallOf` (média ponderada pela posição) já desincentiva sozinho
+  builds fora do peso da posição, sem precisar de limite artificial novo.
+- Validado: 215/215 testes (7 novos) + verificação manual completa (clicar +1,
+  distribuir automaticamente, ambos conferidos no navegador).
+
+**Com este item, o roteiro grande de imersão/UX está completo.** Só o item 1 (idade
+real via API-Football) segue em andamento, limitado pela cota diária da API.

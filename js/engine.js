@@ -97,7 +97,7 @@ window.CQ = window.CQ || {};
         nat: opts.natId, age: opts.age, attrs: attrs, overall: ov,
         pot: Math.min(99, ov + U.ri(6, 24, rng)),
         clubId: opts.clubId, salary: salary, contractEnd: 2026 + U.ri(1, 2, rng),
-        condition: 100, morale: 70, fame: opts.natId === "BR" ? 8 : 5, rep: 55, money: 0, xp: 0,
+        condition: 100, morale: 70, fame: opts.natId === "BR" ? 8 : 5, rep: 55, money: 0, xp: 0, evoPoints: 0,
         injury: 0, disc: {},
         legendIds: opts.legendIds || [],
         takerPen: false, takerFK: false,
@@ -1628,17 +1628,48 @@ window.CQ = window.CQ || {};
     equil: {}, ataque: { fin: 2.2, posn: 2.0 }, criacao: { pas: 2.2, dri: 2.0 },
     atletico: { pac: 2.2, fis: 2.2 }, defensivo: { def: 2.2, posn: 1.8, ref: 2.0 }, bolaparada: { bp: 2.8 }
   };
+  // pontos de evolução: em vez de gastar sozinho a cada partida (like antes), só
+  // converte o XP fracionário acumulado em pontos INTEIROS pendentes — quem decide onde
+  // cada ponto vai é o jogador, em investPoint(), sem pressa nenhuma (os pontos ficam
+  // guardados até serem investidos, nunca expiram). Item 14 do roteiro.
   function spendXP(g) {
     const p = g.player;
-    const w = D.POSITIONS[p.pos].weights;
-    const focus = FOCUS_ATTRS[g.trainingFocus || "equil"] || {};
-    // RNG determinístico por partida (mesma seed + ações = mesma evolução)
-    const rng = U.rngFor(g.seed, "xp", g.year, (g.season && g.season.idx) || 0);
     let guard = 0;
     while (p.xp >= 1 && guard++ < 30) {
       p.xp -= 1;
-      if (p.overall >= p.pot) continue;
+      p.evoPoints = (p.evoPoints || 0) + 1;
+    }
+  }
+  // investe 1 ponto pendente num atributo específico, escolhido pelo jogador. Mesmo
+  // teto de sempre (potencial/95) — só muda QUEM escolhe o atributo, a regra de quanto
+  // cresce e onde para continua idêntica ao spendXP antigo (overallOf/pot inalterados,
+  // então o balanceamento já calibrado do jogo não muda, só a agência do jogador).
+  function investPoint(g, attrKey) {
+    const p = g.player;
+    if ((p.evoPoints || 0) < 1) return { ok: false, reason: "sempontos" };
+    if (ATTRS.indexOf(attrKey) < 0) return { ok: false, reason: "atributo" };
+    if (p.attrs[attrKey] >= 95) return { ok: false, reason: "teto" };
+    if (p.overall >= p.pot) return { ok: false, reason: "potencial" };
+    p.evoPoints--;
+    p.attrs[attrKey]++;
+    const nov = overallOf(p.attrs, p.pos);
+    if (nov > p.pot) { p.attrs[attrKey]--; p.evoPoints++; return { ok: false, reason: "potencial" }; } // devolve o ponto — decisão consciente não devia "sumir" numa quina de arredondamento
+    p.overall = nov;
+    return { ok: true, attr: attrKey, novo: p.attrs[attrKey], overall: p.overall };
+  }
+  // atalho pra quem não quer microgerenciar: gasta TODOS os pontos pendentes de uma vez,
+  // reaproveitando o mesmo sorteio ponderado por posição+trainingFocus que já existia
+  // (o foco de treino continua relevante — só não é mais o único jeito de crescer).
+  function autoDistribute(g) {
+    const p = g.player;
+    const w = D.POSITIONS[p.pos].weights;
+    const focus = FOCUS_ATTRS[g.trainingFocus || "equil"] || {};
+    const rng = U.rngFor(g.seed, "xp", g.year, (g.season && g.season.idx) || 0, p.evoPoints);
+    let spent = 0, guard = 0;
+    while ((p.evoPoints || 0) >= 1 && guard++ < 60) {
+      if (p.overall >= p.pot) break;
       const keys = ATTRS.filter(function (a) { return p.attrs[a] < 95; });
+      if (!keys.length) break;
       let total = 0;
       keys.forEach(function (a) { total += ((w[a] || 0.02) + 0.02) * (focus[a] || 1); });
       let roll = rng() * total;
@@ -1647,11 +1678,10 @@ window.CQ = window.CQ || {};
         roll -= ((w[keys[i]] || 0.02) + 0.02) * (focus[keys[i]] || 1);
         if (roll <= 0) { pick = keys[i]; break; }
       }
-      p.attrs[pick]++;
-      const nov = overallOf(p.attrs, p.pos);
-      if (nov > p.pot) p.attrs[pick]--;
-      else p.overall = nov;
+      const res = investPoint(g, pick);
+      if (res.ok) spent++; else break; // "potencial" atingido no meio do lote — para aqui
     }
+    return spent;
   }
 
   // ---------- marcos / recordes ----------
@@ -1853,6 +1883,14 @@ window.CQ = window.CQ || {};
       p.potUps = (p.potUps || 0) + 1;
       aging.potUp = true;
     }
+
+    // rede de segurança: pontos de evolução que sobraram sem serem investidos NA MÃO
+    // durante a temporada são aplicados automaticamente aqui (mesmo sorteio ponderado
+    // de autoDistribute) — sem isso, um jogador que nunca abre a aba Atributos ficaria
+    // com a carreira estagnada pra sempre, o que seria pior que o sistema antigo que
+    // ele substituiu. Quem já investiu na mão durante a temporada simplesmente não tem
+    // sobra nenhuma pra isso mexer.
+    if ((p.evoPoints || 0) > 0) autoDistribute(g);
 
     // rival evolui
     rivalSeasonEnd(g, notes);
@@ -2503,6 +2541,7 @@ window.CQ = window.CQ || {};
     seasonOver: seasonOver, endSeason: endSeason,
     tableOf: tableOf, ensureRound: ensureRound, leagueZones: leagueZones,
     overallOf: overallOf, buildAttrs: buildAttrs, calcSalary: calcSalary,
+    investPoint: investPoint, autoDistribute: autoDistribute,
     acceptOffer: acceptOffer, acceptRenew: acceptRenew,
     makeLoanOffer: makeLoanOffer, acceptLoanOffer: acceptLoanOffer,
     formerClubs: formerClubs, makeHomecomingOffers: makeHomecomingOffers,

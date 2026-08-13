@@ -55,6 +55,7 @@ window.CQ = window.CQ || {};
     if (p.firstClassic === undefined) p.firstClassic = null; // marco pra linha do tempo — aditivo
     if (p.genIdolYear === undefined) p.genIdolYear = null; // ídolo da geração — aditivo
     if (p.momentIdol === undefined) p.momentIdol = false; // ídolo do momento — aditivo
+    if (p.evoPoints == null) p.evoPoints = 0; // pontos de evolução pendentes — aditivo
     // save já existia antes desse aviso existir — trata como "já viu" pra não surpreender
     // quem já é veterano do modo ao vivo com um tutorial do nada
     if (p.seenLiveIntro === undefined) p.seenLiveIntro = true;

@@ -47,7 +47,7 @@ Fontes (Google Fonts) e bandeiras (flagcdn) vêm da web com fallback; todo o res
 
 ```
 # no navegador (index.html ou CRAQUE.html aberto), console:
-CQ.tests.run()             # tests/regression.js — ~200 checagens
+CQ.tests.run()             # tests/regression.js — ~215 checagens
 
 # idade real dos elencos (resumível — roda até bater na cota diária, ~100 req/dia):
 node scripts/sync-ages.mjs [teto de chamadas ao vivo, padrão 90]
@@ -299,8 +299,8 @@ preenchido numa derrota); banner de título com ordinal (BICAMPEÃO...PENTACAMPE
     característica em 2 pontos (prêmios individuais, aba Base) — não uma varredura
     exaustiva de toda tela sem conteúdo do jogo.
 13. ✅ **Comparação com jogadores da mesma idade — feito.** Ver seção própria abaixo.
-14. Potencial + pontos de evolução pra distribuir em atributos (mudança grande de
-    mecânica central — confirmado que entra no roteiro, não é imediato).
+14. ✅ **Potencial + pontos de evolução pra distribuir em atributos — feito.** Ver
+    seção própria abaixo. Última pendência real do roteiro.
 
 ## Idade real dos elencos via API-Football (item 1, em andamento)
 
@@ -557,3 +557,49 @@ Validado: 200/200 testes (9 novos). Verificação visual manual no Browser pane 
 indisponível nesta sessão) — calendário agrupado por mês com filtro funcionando,
 painel lateral com os dados certos, aba "Mesma idade" mostrando ranking real (ex.:
 211º de 264 jogadores de 24 anos, top 20%).
+
+## Potencial + pontos de evolução (item 14 do roteiro, feito — última pendência do roteiro grande)
+
+Mudança de mecânica central, investigada a fundo antes de codar (proposta apresentada e
+aprovada pelo usuário). Achado que reduziu o escopo real: **potencial (`p.pot`) já
+existia e já era mostrado** ao jogador (Home, aba Atributos, gráfico de Evolução) — só
+faltava a metade "pontos de evolução pra distribuir": hoje todo XP virava atributo
+**sozinho e ao acaso** (sorteio ponderado por posição+`trainingFocus`), sem o jogador
+escolher nada.
+
+- `spendXP(g)` (`js/engine.js`) para de escolher atributo — só converte XP fracionário
+  em `p.evoPoints` (inteiro, pendente, nunca expira).
+- `investPoint(g, attrKey)`: o jogador investe 1 ponto manualmente num atributo à
+  escolha, na aba Atributos de Carreira. Mesmas 3 travas de sempre (potencial, teto de
+  95, atributo válido) — devolve o ponto se a escolha não render nada (não "some" numa
+  quina de arredondamento).
+- `autoDistribute(g)`: atalho que reaproveita o sorteio ponderado antigo (posição +
+  `trainingFocus`) pra quem não quer microgerenciar — spenda tudo de uma vez.
+- **Rede de segurança** (achado durante a implementação, não estava na proposta
+  original): pontos nunca investidos na mão até o fim da temporada são aplicados
+  automaticamente em `endSeason` (mesmo `autoDistribute`) — sem isso, um jogador que
+  nunca abre a aba Atributos ficaria com a carreira estagnada pra sempre, pior que o
+  sistema antigo que ele substituiu. Também evitou quebrar as várias simulações longas
+  já existentes em `tests/regression.js` (15-20 temporadas simuladas via
+  `applyMatch`/`resolveMatch` em loop, sem nunca chamar `investPoint` manualmente).
+- `trainingFocus` não foi removido — continua relevante como o peso usado por
+  `autoDistribute` (redefinido de "único jeito de crescer" pra "como o atalho
+  automático decide por você").
+- UI: botão "+1" por atributo na aba Atributos (só aparece quando investível — mesmas 3
+  travas refletidas ali pra nunca mostrar um botão que ia falhar), botão "Distribuir
+  automaticamente", contador de pontos pendentes com link direto da Home.
+- **Balanceamento**: como `overallOf` já é a média ponderada pelos pesos da posição,
+  nenhum limite artificial por temporada foi necessário — investir fora do peso da
+  posição já é auto-desincentivado (rende menos overall por ponto), sem precisar
+  inventar uma trava nova.
+
+Migração aditiva (`p.evoPoints`), sem bump de `SCHEMA_VERSION`. Validado: 215/215
+testes (7 novos, incluindo a rede de segurança rodando uma temporada simulada
+inteira sem nenhum investimento manual). Verificação visual manual completa no Browser
+pane: clicar "+1" em Finalização (62→63, pontos 4→3, overall mantido — esperado num
+atributo secundário isolado) e depois "Distribuir automaticamente" nos 3 restantes
+(overall 67→68, banner de pontos pendentes desaparece).
+
+Com este item, **o roteiro grande de imersão/UX está 100% completo** — só o item 1
+(idade real via API-Football) segue em andamento, limitado pela cota diária da API
+(42/129 clubes até agora), resumível a qualquer momento sem trabalho de design.
