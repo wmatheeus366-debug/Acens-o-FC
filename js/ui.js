@@ -1024,6 +1024,7 @@ window.CQ = window.CQ || {};
         <div class="modal2-kicker">${ico} Fora de campo</div>
         <div class="modal2-title">${esc(ev.title)}</div>
       </div>
+      <div class="modal2-scene">${U.lifeSceneSVG(ev.id)}</div>
       <div class="modal2-body">
         <p class="modal2-desc">${esc(ev.desc)}</p>
         ${opts}

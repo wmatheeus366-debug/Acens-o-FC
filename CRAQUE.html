@@ -1253,6 +1253,10 @@ main.page, .cover { animation: pageIn 0.26s ease both; }
 .modal2-title { font-family: var(--serif); font-weight: 900; font-style: italic; font-size: clamp(22px, 4vw, 30px); line-height: 1.02; }
 .modal2-icon { position: absolute; top: 12px; right: 14px; opacity: .22; }
 .modal2-icon svg { width: 72px; height: 72px; }
+/* cena editorial do evento de vida (item extra: ilustrações nos modais) — mesma
+   silhueta em tinta sobre papel do avatar, só que numa cena pequena em vez de retrato */
+.modal2-scene { border-bottom: 1px solid var(--rule-soft); line-height: 0; }
+.modal2-scene svg { display: block; width: 100%; height: auto; max-height: 130px; }
 .modal2-body { padding: 16px 18px 18px; }
 .modal2-desc { font-family: var(--serif); font-size: 15.5px; line-height: 1.5; color: var(--ink-2); margin-bottom: 14px; }
 .modal2-desc::first-letter { font-family: var(--serif); font-weight: 900; font-size: 2.6em; line-height: .8; float: left; margin: 3px 8px -2px 0; color: var(--verm-dark); }
@@ -1427,6 +1431,89 @@ window.CQ = window.CQ || {};
     </svg>`;
   }
 
+  // ---------- cena editorial (ilustração pequena nos modais de eventos de vida) ----------
+  // Mesma linguagem visual da silhueta de avatar acima: formas monotom em tinta sobre
+  // papel, sem foto/asset externo nenhum (o projeto é 100% procedural/offline desde o
+  // início). Cada evento de vida (js/narrative.js LIFE_EVENTS) mapeia pra uma destas
+  // ~10 cenas reutilizáveis via LIFE_SCENE — não é 1 ilustração única por evento (17
+  // seria fora de escopo), é um pequeno vocabulário de cenas que se repete entre
+  // eventos parecidos (visita a hospital e visita a torcedor internado usam a mesma
+  // cena, por exemplo).
+  function sceneWrap(inner) {
+    return `<svg viewBox="0 0 160 96" xmlns="http://www.w3.org/2000/svg" role="img" aria-hidden="true">
+      <defs><linearGradient id="scbg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${BGP[0][0]}"/><stop offset="1" stop-color="${BGP[0][1]}"/></linearGradient></defs>
+      <rect width="160" height="96" fill="url(#scbg)"/>
+      ${inner}
+    </svg>`;
+  }
+  function sceneFigure(x, y, s) { // busto silhueta simples — mesma forma do avatar, em miniatura
+    s = s || 1;
+    return `<g transform="translate(${x} ${y}) scale(${s})">
+      <path d="M-11 30 Q-9 16 2 12 L14 12 Q25 16 27 30Z" fill="${INK}"/>
+      <circle cx="8" cy="4" r="10" fill="${INK}"/>
+    </g>`;
+  }
+  function sceneHospital() {
+    return sceneWrap(`${sceneFigure(30, 46, 0.9)}
+      <rect x="70" y="55" width="60" height="14" rx="3" fill="${INK}" opacity=".85"/>
+      <rect x="66" y="48" width="10" height="22" rx="2" fill="${INK}" opacity=".85"/>
+      <rect x="118" y="18" width="6" height="22" fill="${INK}"/><rect x="109" y="27" width="24" height="6" fill="${INK}"/>`);
+  }
+  function sceneContract() {
+    return sceneWrap(`<rect x="55" y="45" width="50" height="34" rx="2" fill="${INK}" opacity=".12" stroke="${INK}" stroke-width="2"/>
+      <path d="M62 55h36M62 63h30M62 71h20" stroke="${INK}" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M100 40l14 -14" stroke="${INK}" stroke-width="3" stroke-linecap="round"/><path d="M112 24l4 4-3 3-4-4z" fill="${INK}"/>`);
+  }
+  function sceneMic() {
+    return sceneWrap(`${sceneFigure(40, 44, 0.85)}
+      <rect x="92" y="30" width="8" height="26" rx="4" fill="${INK}"/>
+      <path d="M84 46a12 12 0 0024 0" stroke="${INK}" stroke-width="3" fill="none"/>
+      <rect x="94" y="56" width="4" height="14" fill="${INK}"/><rect x="86" y="70" width="20" height="4" fill="${INK}"/>`);
+  }
+  function sceneCouple() {
+    return sceneWrap(`${sceneFigure(48, 46, 0.85)}${sceneFigure(78, 46, 0.85)}
+      <path d="M63 20c-4-6-14-2-11 5 2 5 11 10 11 10s9-5 11-10c3-7-7-11-11-5z" fill="${INK}" opacity=".85"/>`);
+  }
+  function sceneTeam() {
+    return sceneWrap(`${sceneFigure(35, 48, 0.75)}${sceneFigure(60, 46, 0.85)}${sceneFigure(88, 48, 0.75)}
+      <circle cx="60" cy="20" r="6" fill="${INK}" opacity=".3"/>`);
+  }
+  function sceneSocial() {
+    return sceneWrap(`${sceneFigure(45, 46, 0.9)}
+      <rect x="88" y="24" width="16" height="28" rx="3" fill="${INK}"/><circle cx="96" cy="30" r="3" fill="${BGP[0][0]}"/>
+      <path d="M118 20l-6 10 6 2-14 20 4-14-6-2z" fill="${INK}" opacity=".7"/>`);
+  }
+  function sceneRest() {
+    return sceneWrap(`${sceneFigure(70, 50, 1)}<path d="M40 74q30-10 60 0" stroke="${INK}" stroke-width="2" fill="none" opacity=".4"/>`);
+  }
+  function sceneFormal() {
+    return sceneWrap(`<rect x="40" y="60" width="80" height="6" fill="${INK}"/>${sceneFigure(50, 46, 0.75)}${sceneFigure(100, 46, 0.75)}
+      <circle cx="75" cy="58" r="4" fill="${INK}" opacity=".5"/>`);
+  }
+  function sceneYouth() {
+    return sceneWrap(`${sceneFigure(50, 50, 0.65)}${sceneFigure(75, 46, 0.9)}<circle cx="100" cy="76" r="6" fill="${INK}" opacity=".6"/>`);
+  }
+  function sceneCommunity() {
+    return sceneWrap(`<rect x="40" y="30" width="70" height="40" fill="none" stroke="${INK}" stroke-width="2" opacity=".5"/>
+      <circle cx="75" cy="50" r="5" fill="${INK}" opacity=".6"/>${sceneFigure(30, 56, 0.6)}${sceneFigure(115, 56, 0.6)}`);
+  }
+  const LIFE_SCENE = {
+    hospital: sceneHospital, torcedor: sceneHospital,
+    empresario: sceneContract, tenis: sceneContract, bets: sceneContract,
+    coletiva: sceneMic, arbitro: sceneMic,
+    aniversario: sceneCouple, namorada_liga: sceneCouple,
+    colega: sceneTeam,
+    influencer: sceneSocial, documentario: sceneSocial,
+    incomodo: sceneRest,
+    jantar: sceneFormal, presidente_evento: sceneFormal,
+    base: sceneYouth,
+    vaquinha: sceneCommunity
+  };
+  function lifeSceneSVG(eventId) {
+    const fn = LIFE_SCENE[eventId];
+    return fn ? fn() : sceneWrap(sceneFigure(75, 48, 1));
+  }
+
   // ---------- escudos vetoriais ----------
   // pat: plain | stripes | hoops | sash | diag | half
   function crestSVG(club, cls) {
@@ -1544,7 +1631,7 @@ window.CQ = window.CQ || {};
   CQ.util = {
     hashStr, mulberry32, rngFor, ri, rf, choice, chance, shuffle, poisson, clamp,
     esc, cleanInput, fmtBRL, fmtNota, plural,
-    nameGen, portraitSVG, crestSVG, crestSVGFallback, flagImg, natAvatar, I,
+    nameGen, portraitSVG, lifeSceneSVG, crestSVG, crestSVGFallback, flagImg, natAvatar, I,
     patternFillFor, jerseySVG, tituloOrdinal
   };
 })();
@@ -4319,6 +4406,114 @@ window.CQ = window.CQ || {};
     return g;
   }
 
+  // ---------- atmosfera de estádio (arquibancada/torcida/refletor/placa) ----------
+  // Estilizado, não fotorrealista — nada de modelar pessoa por pessoa (caro à toa pra
+  // 22+ marcadores já em cena); a "torcida" é uma textura repetida de pontinhos
+  // coloridos numa parede reta ao redor do campo, no mesmo espírito de "desenhar com
+  // canvas 2D" que pitchTexture()/jerseySVG já usam no resto do projeto.
+  function crowdTexture() {
+    const c = document.createElement("canvas");
+    c.width = 256; c.height = 96;
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = "#14141c";
+    ctx.fillRect(0, 0, c.width, c.height);
+    const palette = ["#e8e2cf", "#c9302c", "#2a5aa0", "#f2c500", "#1b1812", "#ffffff", "#3a7d44"];
+    for (let row = 0; row < 12; row++) {
+      for (let col = 0; col < 64; col++) {
+        if (Math.random() < 0.88) {
+          ctx.fillStyle = palette[(Math.random() * palette.length) | 0];
+          ctx.fillRect(col * 4 + (row % 2 ? 2 : 0), row * 8, 3, 5);
+        }
+      }
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(10, 2);
+    return tex;
+  }
+
+  // céu do fundo: um gradiente simples (não esfera 360°) — scene.background aceita uma
+  // textura comum, fica fixo em relação à tela (não gira com a câmera), exatamente o
+  // que se quer de um pano de fundo de "céu ao longe".
+  function skyTexture() {
+    const c = document.createElement("canvas");
+    c.width = 4; c.height = 256;
+    const ctx = c.getContext("2d");
+    const grad = ctx.createLinearGradient(0, 0, 0, c.height);
+    grad.addColorStop(0, "#0a1a2e");
+    grad.addColorStop(0.55, "#16324f");
+    grad.addColorStop(1, "#3c5f6e");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, c.width, c.height);
+    return new THREE.CanvasTexture(c);
+  }
+
+  // placa de publicidade nas cores do time do jogador — toque de personalização barato
+  function adBoardTexture(c1, c2) {
+    const c = document.createElement("canvas");
+    c.width = 256; c.height = 32;
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = c1 || "#b8330f"; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.fillStyle = c2 || "#f5efdf";
+    for (let i = 0; i < 8; i++) ctx.fillRect(i * 32, 0, 16, c.height);
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.repeat.set(6, 1);
+    return tex;
+  }
+
+  // arquibancada = 4 paredes retas ao redor do campo (não arquibancada escalonada de
+  // verdade — geometria simples de propósito, dá a silhueta de "estádio" sem precisar
+  // de rotação/inclinação por lado, que seria bem mais código pro mesmo resultado
+  // visual a essa distância de câmera). refletores = poste+luz nos 4 cantos.
+  function buildStadium(scene, myTeam) {
+    const wallH = 15, gap = 5, corner = 10;
+    const standMat = new THREE.MeshLambertMaterial({ map: crowdTexture() });
+    const roofMat = new THREE.MeshLambertMaterial({ color: 0x14141c });
+    function wall(w, d, x, z) {
+      const box = new THREE.Mesh(new THREE.BoxGeometry(w, wallH, d), standMat);
+      box.position.set(x, wallH / 2, z);
+      scene.add(box);
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(w + 1.5, 0.8, d + 1.5), roofMat);
+      roof.position.set(x, wallH + 0.6, z);
+      scene.add(roof);
+    }
+    wall(PW + corner * 2, 2, 0, -(PD / 2 + gap));
+    wall(PW + corner * 2, 2, 0, PD / 2 + gap);
+    wall(2, PD + corner * 2, -(PW / 2 + gap), 0);
+    wall(2, PD + corner * 2, PW / 2 + gap, 0);
+
+    // placa de publicidade — mais perto do campo que a arquibancada, cores do time
+    const adTex = adBoardTexture(myTeam && myTeam.c1, myTeam && myTeam.c2);
+    const adMat = new THREE.MeshBasicMaterial({ map: adTex });
+    function adBoard(w, d, x, z) {
+      const box = new THREE.Mesh(new THREE.BoxGeometry(w, 1.4, d), adMat);
+      box.position.set(x, 0.7, z);
+      scene.add(box);
+    }
+    adBoard(PW + 4, 0.6, 0, -(PD / 2 + 1.8));
+    adBoard(PW + 4, 0.6, 0, PD / 2 + 1.8);
+    adBoard(0.6, PD + 4, -(PW / 2 + 1.8), 0);
+    adBoard(0.6, PD + 4, PW / 2 + 1.8, 0);
+
+    // refletores nos 4 cantos, além da arquibancada
+    const poleMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.6 });
+    const fixMat = new THREE.MeshStandardMaterial({ color: 0xf4efe2, emissive: 0x554422, roughness: 0.4 });
+    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(function (sgn) {
+      const x = sgn[0] * (PW / 2 + gap + corner - 2), z = sgn[1] * (PD / 2 + gap + corner - 2);
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 28, 8), poleMat);
+      pole.position.set(x, 14, z);
+      scene.add(pole);
+      const fix = new THREE.Mesh(new THREE.BoxGeometry(4, 2.4, 1.2), fixMat);
+      fix.position.set(x, 28.5, z);
+      fix.lookAt(0, 10, 0);
+      scene.add(fix);
+      const lamp = new THREE.PointLight(0xfff4d6, 0.9, 140);
+      lamp.position.set(x, 27, z);
+      scene.add(lamp);
+    });
+  }
+
   let state = null; // { renderer, scene, camera, controls, container, ball, players, mineKey, tweens, raf, resizeObs, holding }
 
   function disposeScene(scene) {
@@ -4347,9 +4542,10 @@ window.CQ = window.CQ || {};
     unmount(); // nunca 2 cenas/contextos WebGL ao mesmo tempo
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0b1a12);
+    scene.background = skyTexture();
+    scene.fog = new THREE.Fog(0x16324f, 90, 260); // névoa sutil funde a arquibancada no céu ao longe
     const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 500);
-    camera.position.set(0, 62, 78);
+    camera.position.set(0, 42, 88); // ângulo mais baixo/"transmissão de TV" que a versão anterior (era 0,62,78)
     camera.lookAt(0, 0, 0);
 
     let renderer;
@@ -4371,6 +4567,7 @@ window.CQ = window.CQ || {};
     const pitchMesh = new THREE.Mesh(new THREE.PlaneGeometry(PW, PD), new THREE.MeshLambertMaterial({ map: pitchTexture() }));
     pitchMesh.rotation.x = -Math.PI / 2;
     scene.add(pitchMesh);
+    buildStadium(scene, fx.myTeam);
 
     const controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.target.set(0, 0, 0);
@@ -9224,6 +9421,7 @@ window.CQ = window.CQ || {};
         <div class="modal2-kicker">${ico} Fora de campo</div>
         <div class="modal2-title">${esc(ev.title)}</div>
       </div>
+      <div class="modal2-scene">${U.lifeSceneSVG(ev.id)}</div>
       <div class="modal2-body">
         <p class="modal2-desc">${esc(ev.desc)}</p>
         ${opts}

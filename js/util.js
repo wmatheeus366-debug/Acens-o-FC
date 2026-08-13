@@ -144,6 +144,89 @@ window.CQ = window.CQ || {};
     </svg>`;
   }
 
+  // ---------- cena editorial (ilustração pequena nos modais de eventos de vida) ----------
+  // Mesma linguagem visual da silhueta de avatar acima: formas monotom em tinta sobre
+  // papel, sem foto/asset externo nenhum (o projeto é 100% procedural/offline desde o
+  // início). Cada evento de vida (js/narrative.js LIFE_EVENTS) mapeia pra uma destas
+  // ~10 cenas reutilizáveis via LIFE_SCENE — não é 1 ilustração única por evento (17
+  // seria fora de escopo), é um pequeno vocabulário de cenas que se repete entre
+  // eventos parecidos (visita a hospital e visita a torcedor internado usam a mesma
+  // cena, por exemplo).
+  function sceneWrap(inner) {
+    return `<svg viewBox="0 0 160 96" xmlns="http://www.w3.org/2000/svg" role="img" aria-hidden="true">
+      <defs><linearGradient id="scbg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${BGP[0][0]}"/><stop offset="1" stop-color="${BGP[0][1]}"/></linearGradient></defs>
+      <rect width="160" height="96" fill="url(#scbg)"/>
+      ${inner}
+    </svg>`;
+  }
+  function sceneFigure(x, y, s) { // busto silhueta simples — mesma forma do avatar, em miniatura
+    s = s || 1;
+    return `<g transform="translate(${x} ${y}) scale(${s})">
+      <path d="M-11 30 Q-9 16 2 12 L14 12 Q25 16 27 30Z" fill="${INK}"/>
+      <circle cx="8" cy="4" r="10" fill="${INK}"/>
+    </g>`;
+  }
+  function sceneHospital() {
+    return sceneWrap(`${sceneFigure(30, 46, 0.9)}
+      <rect x="70" y="55" width="60" height="14" rx="3" fill="${INK}" opacity=".85"/>
+      <rect x="66" y="48" width="10" height="22" rx="2" fill="${INK}" opacity=".85"/>
+      <rect x="118" y="18" width="6" height="22" fill="${INK}"/><rect x="109" y="27" width="24" height="6" fill="${INK}"/>`);
+  }
+  function sceneContract() {
+    return sceneWrap(`<rect x="55" y="45" width="50" height="34" rx="2" fill="${INK}" opacity=".12" stroke="${INK}" stroke-width="2"/>
+      <path d="M62 55h36M62 63h30M62 71h20" stroke="${INK}" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M100 40l14 -14" stroke="${INK}" stroke-width="3" stroke-linecap="round"/><path d="M112 24l4 4-3 3-4-4z" fill="${INK}"/>`);
+  }
+  function sceneMic() {
+    return sceneWrap(`${sceneFigure(40, 44, 0.85)}
+      <rect x="92" y="30" width="8" height="26" rx="4" fill="${INK}"/>
+      <path d="M84 46a12 12 0 0024 0" stroke="${INK}" stroke-width="3" fill="none"/>
+      <rect x="94" y="56" width="4" height="14" fill="${INK}"/><rect x="86" y="70" width="20" height="4" fill="${INK}"/>`);
+  }
+  function sceneCouple() {
+    return sceneWrap(`${sceneFigure(48, 46, 0.85)}${sceneFigure(78, 46, 0.85)}
+      <path d="M63 20c-4-6-14-2-11 5 2 5 11 10 11 10s9-5 11-10c3-7-7-11-11-5z" fill="${INK}" opacity=".85"/>`);
+  }
+  function sceneTeam() {
+    return sceneWrap(`${sceneFigure(35, 48, 0.75)}${sceneFigure(60, 46, 0.85)}${sceneFigure(88, 48, 0.75)}
+      <circle cx="60" cy="20" r="6" fill="${INK}" opacity=".3"/>`);
+  }
+  function sceneSocial() {
+    return sceneWrap(`${sceneFigure(45, 46, 0.9)}
+      <rect x="88" y="24" width="16" height="28" rx="3" fill="${INK}"/><circle cx="96" cy="30" r="3" fill="${BGP[0][0]}"/>
+      <path d="M118 20l-6 10 6 2-14 20 4-14-6-2z" fill="${INK}" opacity=".7"/>`);
+  }
+  function sceneRest() {
+    return sceneWrap(`${sceneFigure(70, 50, 1)}<path d="M40 74q30-10 60 0" stroke="${INK}" stroke-width="2" fill="none" opacity=".4"/>`);
+  }
+  function sceneFormal() {
+    return sceneWrap(`<rect x="40" y="60" width="80" height="6" fill="${INK}"/>${sceneFigure(50, 46, 0.75)}${sceneFigure(100, 46, 0.75)}
+      <circle cx="75" cy="58" r="4" fill="${INK}" opacity=".5"/>`);
+  }
+  function sceneYouth() {
+    return sceneWrap(`${sceneFigure(50, 50, 0.65)}${sceneFigure(75, 46, 0.9)}<circle cx="100" cy="76" r="6" fill="${INK}" opacity=".6"/>`);
+  }
+  function sceneCommunity() {
+    return sceneWrap(`<rect x="40" y="30" width="70" height="40" fill="none" stroke="${INK}" stroke-width="2" opacity=".5"/>
+      <circle cx="75" cy="50" r="5" fill="${INK}" opacity=".6"/>${sceneFigure(30, 56, 0.6)}${sceneFigure(115, 56, 0.6)}`);
+  }
+  const LIFE_SCENE = {
+    hospital: sceneHospital, torcedor: sceneHospital,
+    empresario: sceneContract, tenis: sceneContract, bets: sceneContract,
+    coletiva: sceneMic, arbitro: sceneMic,
+    aniversario: sceneCouple, namorada_liga: sceneCouple,
+    colega: sceneTeam,
+    influencer: sceneSocial, documentario: sceneSocial,
+    incomodo: sceneRest,
+    jantar: sceneFormal, presidente_evento: sceneFormal,
+    base: sceneYouth,
+    vaquinha: sceneCommunity
+  };
+  function lifeSceneSVG(eventId) {
+    const fn = LIFE_SCENE[eventId];
+    return fn ? fn() : sceneWrap(sceneFigure(75, 48, 1));
+  }
+
   // ---------- escudos vetoriais ----------
   // pat: plain | stripes | hoops | sash | diag | half
   function crestSVG(club, cls) {
@@ -261,7 +344,7 @@ window.CQ = window.CQ || {};
   CQ.util = {
     hashStr, mulberry32, rngFor, ri, rf, choice, chance, shuffle, poisson, clamp,
     esc, cleanInput, fmtBRL, fmtNota, plural,
-    nameGen, portraitSVG, crestSVG, crestSVGFallback, flagImg, natAvatar, I,
+    nameGen, portraitSVG, lifeSceneSVG, crestSVG, crestSVGFallback, flagImg, natAvatar, I,
     patternFillFor, jerseySVG, tituloOrdinal
   };
 })();

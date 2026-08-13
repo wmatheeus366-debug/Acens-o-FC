@@ -99,6 +99,114 @@ window.CQ = window.CQ || {};
     return g;
   }
 
+  // ---------- atmosfera de estádio (arquibancada/torcida/refletor/placa) ----------
+  // Estilizado, não fotorrealista — nada de modelar pessoa por pessoa (caro à toa pra
+  // 22+ marcadores já em cena); a "torcida" é uma textura repetida de pontinhos
+  // coloridos numa parede reta ao redor do campo, no mesmo espírito de "desenhar com
+  // canvas 2D" que pitchTexture()/jerseySVG já usam no resto do projeto.
+  function crowdTexture() {
+    const c = document.createElement("canvas");
+    c.width = 256; c.height = 96;
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = "#14141c";
+    ctx.fillRect(0, 0, c.width, c.height);
+    const palette = ["#e8e2cf", "#c9302c", "#2a5aa0", "#f2c500", "#1b1812", "#ffffff", "#3a7d44"];
+    for (let row = 0; row < 12; row++) {
+      for (let col = 0; col < 64; col++) {
+        if (Math.random() < 0.88) {
+          ctx.fillStyle = palette[(Math.random() * palette.length) | 0];
+          ctx.fillRect(col * 4 + (row % 2 ? 2 : 0), row * 8, 3, 5);
+        }
+      }
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(10, 2);
+    return tex;
+  }
+
+  // céu do fundo: um gradiente simples (não esfera 360°) — scene.background aceita uma
+  // textura comum, fica fixo em relação à tela (não gira com a câmera), exatamente o
+  // que se quer de um pano de fundo de "céu ao longe".
+  function skyTexture() {
+    const c = document.createElement("canvas");
+    c.width = 4; c.height = 256;
+    const ctx = c.getContext("2d");
+    const grad = ctx.createLinearGradient(0, 0, 0, c.height);
+    grad.addColorStop(0, "#0a1a2e");
+    grad.addColorStop(0.55, "#16324f");
+    grad.addColorStop(1, "#3c5f6e");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, c.width, c.height);
+    return new THREE.CanvasTexture(c);
+  }
+
+  // placa de publicidade nas cores do time do jogador — toque de personalização barato
+  function adBoardTexture(c1, c2) {
+    const c = document.createElement("canvas");
+    c.width = 256; c.height = 32;
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = c1 || "#b8330f"; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.fillStyle = c2 || "#f5efdf";
+    for (let i = 0; i < 8; i++) ctx.fillRect(i * 32, 0, 16, c.height);
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.repeat.set(6, 1);
+    return tex;
+  }
+
+  // arquibancada = 4 paredes retas ao redor do campo (não arquibancada escalonada de
+  // verdade — geometria simples de propósito, dá a silhueta de "estádio" sem precisar
+  // de rotação/inclinação por lado, que seria bem mais código pro mesmo resultado
+  // visual a essa distância de câmera). refletores = poste+luz nos 4 cantos.
+  function buildStadium(scene, myTeam) {
+    const wallH = 15, gap = 5, corner = 10;
+    const standMat = new THREE.MeshLambertMaterial({ map: crowdTexture() });
+    const roofMat = new THREE.MeshLambertMaterial({ color: 0x14141c });
+    function wall(w, d, x, z) {
+      const box = new THREE.Mesh(new THREE.BoxGeometry(w, wallH, d), standMat);
+      box.position.set(x, wallH / 2, z);
+      scene.add(box);
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(w + 1.5, 0.8, d + 1.5), roofMat);
+      roof.position.set(x, wallH + 0.6, z);
+      scene.add(roof);
+    }
+    wall(PW + corner * 2, 2, 0, -(PD / 2 + gap));
+    wall(PW + corner * 2, 2, 0, PD / 2 + gap);
+    wall(2, PD + corner * 2, -(PW / 2 + gap), 0);
+    wall(2, PD + corner * 2, PW / 2 + gap, 0);
+
+    // placa de publicidade — mais perto do campo que a arquibancada, cores do time
+    const adTex = adBoardTexture(myTeam && myTeam.c1, myTeam && myTeam.c2);
+    const adMat = new THREE.MeshBasicMaterial({ map: adTex });
+    function adBoard(w, d, x, z) {
+      const box = new THREE.Mesh(new THREE.BoxGeometry(w, 1.4, d), adMat);
+      box.position.set(x, 0.7, z);
+      scene.add(box);
+    }
+    adBoard(PW + 4, 0.6, 0, -(PD / 2 + 1.8));
+    adBoard(PW + 4, 0.6, 0, PD / 2 + 1.8);
+    adBoard(0.6, PD + 4, -(PW / 2 + 1.8), 0);
+    adBoard(0.6, PD + 4, PW / 2 + 1.8, 0);
+
+    // refletores nos 4 cantos, além da arquibancada
+    const poleMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.6 });
+    const fixMat = new THREE.MeshStandardMaterial({ color: 0xf4efe2, emissive: 0x554422, roughness: 0.4 });
+    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(function (sgn) {
+      const x = sgn[0] * (PW / 2 + gap + corner - 2), z = sgn[1] * (PD / 2 + gap + corner - 2);
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 28, 8), poleMat);
+      pole.position.set(x, 14, z);
+      scene.add(pole);
+      const fix = new THREE.Mesh(new THREE.BoxGeometry(4, 2.4, 1.2), fixMat);
+      fix.position.set(x, 28.5, z);
+      fix.lookAt(0, 10, 0);
+      scene.add(fix);
+      const lamp = new THREE.PointLight(0xfff4d6, 0.9, 140);
+      lamp.position.set(x, 27, z);
+      scene.add(lamp);
+    });
+  }
+
   let state = null; // { renderer, scene, camera, controls, container, ball, players, mineKey, tweens, raf, resizeObs, holding }
 
   function disposeScene(scene) {
@@ -127,9 +235,10 @@ window.CQ = window.CQ || {};
     unmount(); // nunca 2 cenas/contextos WebGL ao mesmo tempo
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0b1a12);
+    scene.background = skyTexture();
+    scene.fog = new THREE.Fog(0x16324f, 90, 260); // névoa sutil funde a arquibancada no céu ao longe
     const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 500);
-    camera.position.set(0, 62, 78);
+    camera.position.set(0, 42, 88); // ângulo mais baixo/"transmissão de TV" que a versão anterior (era 0,62,78)
     camera.lookAt(0, 0, 0);
 
     let renderer;
@@ -151,6 +260,7 @@ window.CQ = window.CQ || {};
     const pitchMesh = new THREE.Mesh(new THREE.PlaneGeometry(PW, PD), new THREE.MeshLambertMaterial({ map: pitchTexture() }));
     pitchMesh.rotation.x = -Math.PI / 2;
     scene.add(pitchMesh);
+    buildStadium(scene, fx.myTeam);
 
     const controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.target.set(0, 0, 0);

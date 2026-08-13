@@ -1177,6 +1177,20 @@
     assert("avatar: silhueta em tinta única (sem paleta de pele/cabelo colorida do estilo antigo)", a.indexOf("#1b1812") >= 0, "");
   }
 
+  // ---- Cenas editoriais nos modais de eventos de vida (ilustração, não foto) ----
+  function testLifeSceneSVGCoversAllEvents() {
+    let ok = true, detail = "";
+    CQ.nar.LIFE_EVENTS.forEach(function (ev) {
+      try {
+        const svg = CQ.util.lifeSceneSVG(ev.id);
+        if (!svg || svg.indexOf("<svg") < 0) { ok = false; detail += ev.id + ":vazio "; }
+      } catch (e) { ok = false; detail += ev.id + ":" + e.message + " "; }
+    });
+    assert("cena de vida: lifeSceneSVG renderiza pra todo evento de LIFE_EVENTS sem exceção", ok, detail);
+    const unknown = CQ.util.lifeSceneSVG("evento-que-nao-existe");
+    assert("cena de vida: id desconhecido cai num fallback genérico, não quebra", unknown.indexOf("<svg") >= 0, "");
+  }
+
   // ---- Pontos de evolução (item 14 do roteiro) ----
   function testSpendXPBanksPoints() {
     withTempGame(function () {
@@ -1474,6 +1488,7 @@
     testLifeEventSocialPost();
     testOverlaySidePanel();
     testPortraitSVGEditorial();
+    testLifeSceneSVGCoversAllEvents();
     testCalendarMonthsAndFilter();
     testPeersSameAge();
     testSpendXPBanksPoints();

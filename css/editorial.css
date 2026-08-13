@@ -508,6 +508,10 @@ main.page, .cover { animation: pageIn 0.26s ease both; }
 .modal2-title { font-family: var(--serif); font-weight: 900; font-style: italic; font-size: clamp(22px, 4vw, 30px); line-height: 1.02; }
 .modal2-icon { position: absolute; top: 12px; right: 14px; opacity: .22; }
 .modal2-icon svg { width: 72px; height: 72px; }
+/* cena editorial do evento de vida (item extra: ilustrações nos modais) — mesma
+   silhueta em tinta sobre papel do avatar, só que numa cena pequena em vez de retrato */
+.modal2-scene { border-bottom: 1px solid var(--rule-soft); line-height: 0; }
+.modal2-scene svg { display: block; width: 100%; height: auto; max-height: 130px; }
 .modal2-body { padding: 16px 18px 18px; }
 .modal2-desc { font-family: var(--serif); font-size: 15.5px; line-height: 1.5; color: var(--ink-2); margin-bottom: 14px; }
 .modal2-desc::first-letter { font-family: var(--serif); font-weight: 900; font-size: 2.6em; line-height: .8; float: left; margin: 3px 8px -2px 0; color: var(--verm-dark); }

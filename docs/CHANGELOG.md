@@ -1442,3 +1442,41 @@ automático de sempre.
 
 **Com este item, o roteiro grande de imersão/UX está completo.** Só o item 1 (idade
 real via API-Football) segue em andamento, limitado pela cota diária da API.
+
+---
+
+## Atmosfera de estádio + ilustrações nos eventos de vida (feedback visual do usuário)
+
+Usuário mandou print do Football Manager (estádio 3D completo: arquibancada, torcida,
+iluminação) perguntando se dava pra chegar nisso, e pediu imagens nos modais de eventos
+de vida (visita ao hospital, visto com a namorada, etc.) representando a cena. Expectativa
+alinhada antes de codar: fotorrealismo tipo FM está fora de alcance de um projeto vanilla
+three.js de poucos KB — o caminho é estilizado, no mesmo idioma editorial do resto do jogo.
+
+**Estádio** (`js/pitch3d.js`, `buildStadium`):
+- 4 paredes retas ao redor do campo (não arquibancada escalonada de verdade — geometria
+  simples de propósito) com textura de "torcida" (pontinhos coloridos repetidos, gerada
+  em `<canvas>`, mesmo truque de `pitchTexture()`), telhado escuro no topo de cada parede.
+- Placa de publicidade nas cores do time do jogador (`fx.myTeam.c1`/`c2`) mais perto do
+  campo que a arquibancada — toque de personalização de graça.
+- 4 refletores nos cantos (poste + luminária + `PointLight` de verdade, iluminação
+  quente) além da arquibancada.
+- Céu com gradiente (textura simples, fixa em relação à tela — não esfera 360°) + névoa
+  sutil (`THREE.Fog`) fundindo a arquibancada no horizonte, no lugar do fundo liso.
+- Câmera padrão mais baixa (`0,42,88`, era `0,62,78`) — ângulo mais "transmissão de TV",
+  mais parecido com a referência.
+- Verificado geometricamente via introspecção da cena (paredes/refletores nas posições
+  certas, sem sobreposição, contagem de mesh exata) — sem screenshot disponível nesta
+  sessão, mas com confirmação estrutural completa.
+
+**Ilustrações nos eventos de vida** (`js/util.js`, `lifeSceneSVG`): sem foto real (direitos
+autorais) nem asset externo (projeto 100% procedural/offline desde o início) — pequeno
+vocabulário de ~10 cenas reutilizáveis (hospital, contrato, microfone, casal, time,
+redes sociais, descanso, formal, base, comunidade), cada uma composta de silhuetas em
+tinta sobre papel (mesma linguagem do avatar editorial, item 10). `LIFE_SCENE` mapeia os
+17 eventos de vida pras cenas mais próximas (ex.: hospital e visita a torcedor internado
+usam a mesma). Nova faixa `.modal2-scene` no modal de evento de vida (`js/ui.js`
+`showLifeEvent`).
+
+Validado: 213/213 testes (2 novos — cobertura de todos os 17 eventos + fallback pra id
+desconhecido).
