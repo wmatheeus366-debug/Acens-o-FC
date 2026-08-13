@@ -11,7 +11,8 @@ Desenvolvimento com arquivos separados; distribuição num arquivo único `CRAQU
 | `js/data.js` | `CQ.DATA` | Clubes, ligas, seleções, lendas, posições, elencos reais, recordes | util |
 | `js/birthdates.js` | `CQ.BIRTHDATES` | Data de nascimento REAL de jogadores de `REAL_SQUADS` (gerado, cresce aos poucos — `scripts/sync-ages.mjs`) | — |
 | `js/world.js` | `CQ.world` | Mundo persistente: identidade estável de NPCs nos 191 clubes, envelhecimento/aposentadoria ano a ano | util, DATA, (BIRTHDATES) |
-| `js/pitch.js` | `CQ.pitch` | Formação (11 posições), desenho do campo 2D (`buildPitchSVG`) e tradução evento→pose visual (`poseFor`/`poseForKick`) — renderizador **e** consumido pela UI (voltou a ser o modo Ao Vivo padrão, ver nota abaixo) | util, DATA |
+| `js/pitch.js` | `CQ.pitch` | Formação (11 posições), desenho do campo 2D (`buildPitchSVG`), escolha de cor de sprite por clube (`pickTeamSprites`/`rankedSpriteColors`) e tradução evento→pose visual (`poseFor`/`poseForKick`) — renderizador **e** consumido pela UI (voltou a ser o modo Ao Vivo padrão, ver nota abaixo) | util, DATA, PLAYER_SPRITES |
+| `js/vendor/player-sprites.js` | `CQ.PLAYER_SPRITES` | 4 cores de sprite de jogador (Kenney Sports Pack, CC0) + 1 bola, embutidos como data-URI base64 — refetch via `scripts/vendor-player-sprites.mjs` | — |
 | `js/vendor/life-scenes.js` | `CQ.LIFE_IMGS` | 10 ilustrações reais (unDraw) dos modais de eventos de vida, embutidas como data-URI base64 — refetch via `scripts/vendor-life-scenes.mjs` | — |
 | `js/vendor/stadium-photo.js` | `CQ.STADIUM_PHOTO` | Foto real de estádio (Wikimedia Commons, CC BY-SA 3.0), embutida como data-URI base64 — pano de fundo do cabeçalho do modo Ao Vivo, refetch via `scripts/vendor-stadium-photo.mjs` | — |
 | `js/engine.js` | `CQ.engine` | Modelo, calendário, simulação, prêmios, mercado, técnico, traços, aposentadoria | util, DATA, world, (nar) |
@@ -254,6 +255,16 @@ quanto da nova `jerseySVG`.
 > diretamente. `FORMATION`/`poseFor`/`poseForKick` nunca mudaram — só o renderizador foi
 > e voltou. Bundle: `2137 KB → 1242 KB` só com a remoção do 3D (ver seção "Imagens reais"
 > abaixo pro que veio depois, subindo de novo pra `~1640 KB`).
+
+> **Atualização 2 (marcador virou sprite):** o `jerseySVG`/`patternFillFor` original
+> tinha um bug real — o tile do `<pattern>` de listra/sash é maior que o próprio
+> marcador do campo, então o padrão colapsava pra cor sólida, e clubes com `c1` verde
+> (ex. Guarani) ficavam ilegíveis em cima do gramado. `buildPitchSVG` passou a usar
+> `CQ.PLAYER_SPRITES` (Kenney, CC0) em vez do círculo colorido — ver
+> "Marcadores do campo 2D viram sprite real" mais abaixo pro detalhe completo.
+> `jerseySVG`/`patternFillFor` continuam intactos e servindo o brasão do clube (onde o
+> tile de 40 unidades sempre coube certo) — viram só o fallback do marcador do campo se
+> `CQ.PLAYER_SPRITES` não carregar.
 
 ## Lista grande de imersão/UX — Fatia 1 (feito) + roteiro futuro
 
@@ -723,3 +734,31 @@ sessão): campo 2D com 22 marcadores + bola reagindo a decisão, modal de evento
 com ilustração real tingida, foto de estádio visível atrás do cabeçalho do Ao Vivo,
 splash de cartão vermelho, rodapé da capa com as duas linhas de atribuição empilhadas
 sem sobrepor.
+
+## Marcadores do campo 2D viram sprite real (bug de padrão + time verde ilegível)
+
+Usuário jogou de verdade logo depois do reverte pra 2D acima e reportou "cara o campo
+voltou ao antigo?? ta terrivel" com print mostrando o Vasco quase invisível e o Guarani
+como bolha preta lisa. Diagnóstico (não só gosto — 2 bugs reais):
+
+1. `patternFillFor` (`js/util.js`) desenha listra/hoop/sash com tile de `40×40`/`10×10`
+   unidades — cabe certo no brasão (badge de 40 unidades), mas é maior que o próprio
+   marcador do campo (círculo de raio 3) — o padrão colapsava pra cor sólida.
+2. `pat:"plain"` só usa `c1` — e clubes com `c1` verde (Guarani, entre outros) ficam
+   sempre ilegíveis num gramado verde, não importa o ajuste de desenho.
+
+Em vez de um 3º ajuste "confia em mim" no SVG, a correção usa sprite real: **Kenney
+"Sports Pack"** (CC0 1.0, uso livre sem atribuição) — `scripts/vendor-player-sprites.mjs`
+recorta 4 cores de "cabeça vista de cima" (azul/vermelho/branco/dourado, a 5ª cor do
+pacote — verde — é **deliberadamente excluída**, é o motivo do bug 2) + 1 bola, embute
+em `js/vendor/player-sprites.js` (`CQ.PLAYER_SPRITES`, ~7 KB). `js/pitch.js` ganhou
+`rankedSpriteColors`/`pickTeamSprites`: distância euclidiana de `club.c1` até as 4 cores
+disponíveis, com desempate garantindo que os 2 times nunca ficam iguais.
+`buildPitchSVG` usa o sprite quando `CQ.PLAYER_SPRITES` existe, com fallback pro círculo
+`jerseySVG` de antes se não (nunca quebra a tela) — `jerseySVG`/`patternFillFor`
+continuam servindo o brasão do clube normalmente em todo o resto do jogo.
+
+Testado com a partida exata do relato (Vasco × Guarani): Vasco vira vermelho, Guarani
+vira azul — nenhum verde, bem distintos. Validado: novo `testPitchSpriteColors` (nenhum
+clube testado escolhe verde; os 2 times nunca empatam de cor) + verificação visual
+manual reproduzindo a mesma partida.

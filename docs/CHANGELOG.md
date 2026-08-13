@@ -1573,3 +1573,55 @@ estocástica, sempre com 0 falhas) + verificação visual manual completa no Bro
 — campo 2D com marcadores reagindo a decisão/gol/cartão, ilustração real no modal de
 evento de vida, foto de estádio atrás do cabeçalho do Ao Vivo, rodapé da capa sem
 sobreposição.
+
+---
+
+## Marcadores do campo 2D viram sprite real (bug de padrão + time verde ilegível)
+
+Usuário jogou uma partida de verdade logo depois do reverte pra 2D e reagiu: "cara o
+campo voltou ao antigo?? ta terrivel", com print mostrando o Vasco quase invisível
+(ovais escuras) e o Guarani como bolhas pretas lisas, sem padrão de camisa nenhum.
+Investigação achou **dois problemas reais, não só gosto**:
+
+1. **Bug de escala**: `patternFillFor` (`js/util.js`) desenha listra/hoop/sash com um
+   tile de `40×40` (ou `10×10`) unidades — no brasão (badge de 40 unidades) isso cabe
+   direito, mas o marcador do campo (`jerseySVG`, círculo de raio 3) é minúsculo
+   perto disso. O resultado: só um fragmento do tile aparecia dentro do círculo,
+   então o padrão "colapsava" pra uma cor sólida (geralmente a cor 1) — nenhum clube
+   com `pat` diferente de `"plain"` mostrava a camisa de verdade no campo.
+2. **Verde no verde**: `pat:"plain"` só usa `c1`, sem mistura — e vários clubes reais
+   (Guarani, entre outros) têm `c1` verde. Um marcador verde sólido em cima de um
+   gramado verde nunca ia ficar legível, não importa a técnica de desenho.
+
+**Correção escolhida — sprite real em vez de mais ajuste de SVG**: dado que o usuário
+já tinha pedido duas vezes por algo "de um repositório" (a atmosfera do estádio e as
+ilustrações dos eventos de vida), e que um terceiro ajuste "confia em mim, calculei
+certo" corria o risco de errar de novo sem feedback visual, a escolha foi trocar o
+círculo colorido por um sprite de "cabecinha vista de cima" de verdade.
+
+**Fonte**: [Kenney "Sports Pack"](https://kenney.nl/assets/sports-pack), licença
+**CC0 1.0** — uso livre, sem exigir atribuição. Novo `scripts/vendor-player-sprites.mjs`
+baixa o pacote, recorta (via `sharp`, já usado por `embed-crests.mjs`) 4 cores de
+"cabeça" (azul/vermelho/branco/dourado) + 1 bola clássica preto-e-branco, embute tudo
+em `js/vendor/player-sprites.js` (`CQ.PLAYER_SPRITES`, ~7 KB total). **A 5ª cor do
+pacote (verde) é deliberadamente excluída** — é o motivo original do bug 2 acima.
+
+**Escolha de cor por clube** (`js/pitch.js`, `pickTeamSprites`/`rankedSpriteColors`):
+distância euclidiana simples de `club.c1` até as 4 cores disponíveis, pegando a mais
+próxima; se os 2 times empatarem na mesma cor, o adversário cai pro 2º colocado dele —
+garante que os 2 times nunca ficam com a cor igual. Aproximado por natureza (só 4
+cores pra ~190 clubes reais), mas sempre legível e sempre distinguível — a prioridade
+era nunca mais repetir o bug relatado, não bater a cor exata do uniforme.
+
+`buildPitchSVG` ganhou fallback automático: se `CQ.PLAYER_SPRITES` não carregar por
+algum motivo, volta pro círculo com `jerseySVG` de antes (nunca quebra a tela) — o
+`jerseySVG`/`patternFillFor` originais continuam intactos e usados pelo brasão do
+clube em todo o resto do jogo (onde o tile de 40 unidades sempre coube certo; o bug
+era específico do marcador minúsculo do campo).
+
+Testado com a partida exata do print do usuário (Vasco × Guarani): Vasco (preto/branco)
+vira vermelho, Guarani (verde) vira azul — nenhum dos dois verde, os dois bem
+distintos. Validado: suíte completa (novo `testPitchSpriteColors` — nenhuma das 4
+cores escolhidas é verde pra nenhum clube testado, e nunca os 2 times empatam na
+mesma cor) + verificação visual manual completa no Browser pane reproduzindo a mesma
+partida do relato original.

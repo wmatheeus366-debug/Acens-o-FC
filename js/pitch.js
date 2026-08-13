@@ -35,8 +35,36 @@ window.CQ = window.CQ || {};
     crowd: "📣", dog: "🐶", rain: "🌧️", laser: "🔺", drone: "🛸"
   };
 
+  // ---------- marcador de jogador: sprite real (js/vendor/player-sprites.js) ----------
+  // Substitui o círculo SVG com <pattern> listrado/diagonal — o padrão nunca aparecia
+  // direito num marcador tão pequeno (o tile do <pattern> era maior que o próprio
+  // marcador) e times com cor verde ficavam ilegíveis em cima do gramado (também verde).
+  // 4 cores fixas do pacote (a 5ª, verde, é deliberadamente excluída daqui — é o motivo
+  // original desse bug); cada clube escolhe a cor mais parecida com sua cor real.
+  const SPRITE_REF = { blue: [65, 159, 221], red: [232, 106, 23], white: [255, 255, 255], special: [255, 204, 0] };
+  function hexToRgb(hex) {
+    const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || "");
+    return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : [136, 136, 136];
+  }
+  function distRgb(a, b) { return Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2) + Math.pow(a[2] - b[2], 2); }
+  // devolve as 4 cores de SPRITE_REF ordenadas da mais próxima pra mais longe da cor do clube
+  function rankedSpriteColors(club) {
+    const rgb = hexToRgb(club && club.c1);
+    return Object.keys(SPRITE_REF).sort(function (a, b) { return distRgb(rgb, SPRITE_REF[a]) - distRgb(rgb, SPRITE_REF[b]); });
+  }
+  // escolhe 1 cor de sprite por time — garante que os 2 times nunca ficam com a mesma
+  // cor (se o 1º colocado do adversário empatar com o do meu time, cai pro 2º colocado
+  // dele), pra sempre dar pra distinguir "meu time" de "adversário" de relance.
+  function pickTeamSprites(mine, opp) {
+    const mineRank = rankedSpriteColors(mine), oppRank = rankedSpriteColors(opp);
+    const mineColor = mineRank[0];
+    const oppColor = oppRank[0] !== mineColor ? oppRank[0] : oppRank[1];
+    return { mine: mineColor, opp: oppColor };
+  }
+
   function buildPitchSVG(fx, res, player) {
     const mine = fx.myTeam, opp = fx.opp;
+    const sprites = pickTeamSprites(mine, opp);
     const myPlayers = FORMATION.map(function (f, i) {
       return { pos: f.pos, x: f.x, y: f.y, uid: "pvm" + i };
     });
@@ -48,17 +76,25 @@ window.CQ = window.CQ || {};
     if (res && res.plays && player) {
       mineIdx = FORMATION.findIndex(function (f) { return f.pos === player.pos; });
     }
+    // fallback (CQ.PLAYER_SPRITES ausente, ex. arquivo vendor não carregado): volta pro
+    // círculo com o padrão do clube que já existia — nunca quebra a tela.
+    function markerBody(side) {
+      const src = CQ.PLAYER_SPRITES && CQ.PLAYER_SPRITES[side === "mine" ? sprites.mine : sprites.opp];
+      if (src) return `<image href="${src}" x="-2.3" y="-3.4" width="4.6" height="6.8"/>`;
+      return U.jerseySVG(side === "mine" ? mine : opp, "pv" + side, 3);
+    }
     function playerG(p, i, side, isMe) {
-      const jersey = U.jerseySVG(side === "mine" ? mine : opp, p.uid, 3);
-      const ring = isMe ? `<circle r="4.1" class="pv-ring"/><text y="1.1" text-anchor="middle" class="pv-num">${U.esc(String((player && player.num) || ""))}</text>` : "";
+      const ring = isMe ? `<circle r="4.3" class="pv-ring"/><text y="1.1" text-anchor="middle" class="pv-num">${U.esc(String((player && player.num) || ""))}</text>` : "";
       // .pv-inner sem transform próprio: CSS Transforms sobrescreve (não soma) o atributo
       // transform="translate(...)" do SVG quando ambos caem no mesmo elemento — o pulso
       // (transform:scale via CSS) precisa animar um filho sem posição própria, senão a
       // animação "teleportaria" o marcador pra origem do campo a cada pulso.
-      return `<g class="pv-player pv-${side}${isMe ? " pv-me" : ""}" data-slot="${side === "mine" ? "m" : "o"}${i}" transform="translate(${p.x},${p.y})"><g class="pv-inner">${jersey}${ring}</g></g>`;
+      return `<g class="pv-player pv-${side}${isMe ? " pv-me" : ""}" data-slot="${side === "mine" ? "m" : "o"}${i}" transform="translate(${p.x},${p.y})"><g class="pv-inner">${markerBody(side)}${ring}</g></g>`;
     }
     const myG = myPlayers.map(function (p, i) { return playerG(p, i, "mine", i === mineIdx); }).join("");
     const opG = opPlayers.map(function (p, i) { return playerG(p, i, "opp", false); }).join("");
+    const ballSrc = CQ.PLAYER_SPRITES && CQ.PLAYER_SPRITES.ball;
+    const ballBody = ballSrc ? `<image href="${ballSrc}" x="-1.9" y="-1.9" width="3.8" height="3.8"/>` : `<circle r="1.7"/>`;
     return `<div class="live-pitch"><svg viewBox="0 0 100 100" preserveAspectRatio="none" class="pv-svg" role="img" aria-label="Campo da partida">
       <rect x="0" y="0" width="100" height="100" class="pv-grass"/>
       <g class="pv-lines">
@@ -70,7 +106,7 @@ window.CQ = window.CQ || {};
       </g>
       <g class="pv-team-mine">${myG}</g>
       <g class="pv-team-opp">${opG}</g>
-      <g id="pv-ball" class="pv-ball" transform="translate(50,50)"><circle r="1.7"/></g>
+      <g id="pv-ball" class="pv-ball" transform="translate(50,50)">${ballBody}</g>
       <text id="pv-badge" class="pv-badge" x="50" y="14" text-anchor="middle"></text>
     </svg></div>`;
   }
@@ -126,5 +162,8 @@ window.CQ = window.CQ || {};
     return { ball: [l.side === "my" ? 88 : 12, 50], result: l.ok ? "goal" : "miss", goalSide: side };
   }
 
-  CQ.pitch = { FORMATION: FORMATION, FLAVOR_ICON: FLAVOR_ICON, buildPitchSVG: buildPitchSVG, poseFor: poseFor, poseForKick: poseForKick };
+  CQ.pitch = {
+    FORMATION: FORMATION, FLAVOR_ICON: FLAVOR_ICON, buildPitchSVG: buildPitchSVG, poseFor: poseFor, poseForKick: poseForKick,
+    SPRITE_REF: SPRITE_REF, rankedSpriteColors: rankedSpriteColors, pickTeamSprites: pickTeamSprites
+  };
 })();

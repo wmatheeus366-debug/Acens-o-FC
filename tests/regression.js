@@ -630,6 +630,29 @@
     assert("campo: poseFor/poseForKick não lançam exceção pra nenhum evento real do jogo", ok, detail);
   }
 
+  // ---- Campo 2D: marcador de jogador é um sprite real (Kenney), nunca a cor verde
+  // (some contra o gramado — motivo do bug relatado pelo usuário) e os 2 times nunca
+  // ficam com a mesma cor de sprite ----
+  function testPitchSpriteColors() {
+    let ok = true, detail = "";
+    const clubes = ["fla", "vas", "gua", "pal", "cor", "flu", "bot", "san"].map(function (id) { return CQ.DATA.CLUBS[id]; }).filter(Boolean);
+    clubes.forEach(function (cl) {
+      const ranked = CQ.pitch.rankedSpriteColors(cl);
+      if (ranked.length !== 4 || ranked.indexOf("green") >= 0) { ok = false; detail += cl.id + ":ranked=" + JSON.stringify(ranked) + " "; }
+    });
+    let mesmaCor = 0;
+    for (let i = 0; i < clubes.length; i++) {
+      for (let j = 0; j < clubes.length; j++) {
+        if (i === j) continue;
+        const s = CQ.pitch.pickTeamSprites(clubes[i], clubes[j]);
+        if (s.mine === s.opp) mesmaCor++;
+        if (s.mine === "green" || s.opp === "green") { ok = false; detail += clubes[i].id + "x" + clubes[j].id + ":verde "; }
+      }
+    }
+    assert("campo: sprite de jogador nunca é a cor verde (bug relatado: time verde some no gramado)", ok, detail);
+    assert("campo: os 2 times nunca ficam com a mesma cor de sprite", mesmaCor === 0, "colisões=" + mesmaCor);
+  }
+
   // ---- Campo 2D animado: jerseySVG usa a cor real do clube em cada padrão de listra ----
   function testJerseySVGAllPatterns() {
     const amostra = { plain: "pal", hoops: "fla", stripes: "bot", sash: "sao" };
@@ -1437,6 +1460,7 @@
     testPressConferenceStructure();
     testPitchFormation();
     testPitchPoseForAllEventTypes();
+    testPitchSpriteColors();
     testJerseySVGAllPatterns();
     testCrestProceduralStillConsistent();
     testWorldAgeDistribution();
