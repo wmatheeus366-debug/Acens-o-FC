@@ -108,7 +108,8 @@ window.CQ = window.CQ || {};
         clubGoals: {}, idolClubs: [], compGoals: {},
         traits: [], decisiveGoals: 0, captain: null, squadRole: "titular", potUps: 0,
         records: { hatTricks: 0, bestSeasonG: 0, bestSeasonAvg: 0, biggestWin: null },
-        seenLiveIntro: false, loan: null, firstClassic: null
+        seenLiveIntro: false, loan: null, firstClassic: null,
+        genIdolYear: null, momentIdol: false
       },
       leagueOf: {}, champs: {}, feed: [], customLogos: {},
       boardFail: 0, retired: false, transferRequested: false,
@@ -1879,6 +1880,20 @@ window.CQ = window.CQ || {};
       becameIdol = myClub(g).name;
       p.fame = U.clamp(p.fame + 5, 0, 100);
     }
+
+    // ídolo da geração: 2ª Bola de Ouro (rank 1 no ranking mundial, que já mede o
+    // jogador contra g.rival + g.worldStars) — permanente, feito raro de propósito
+    // (só o nº 1 do mundo conta, "muito difícil" por design de ballonScore/ranking).
+    let becameGenIdol = false;
+    if (!p.genIdolYear && p.ballon.filter(function (b) { return b.rank === 1; }).length >= 2) {
+      p.genIdolYear = g.year;
+      becameGenIdol = true;
+      p.fame = 100;
+    }
+    // ídolo do momento: transiente, recalculado toda temporada — reflete o presente
+    // (pode ir e vir), ao contrário das camadas permanentes acima. Top-3 na corrida da
+    // Bola de Ouro deste ano, ou fama excepcional mesmo fora do pódio.
+    p.momentIdol = (awards.ballonRank != null && awards.ballonRank <= 3) || p.fame >= 90;
     // capitania e novos traços
     const newCaptain = checkCaptain(g);
     const newTraits = checkTraits(g);
@@ -1986,6 +2001,7 @@ window.CQ = window.CQ || {};
       loanOffer: loanOffer, homecomingOffers: homecomingOffers,
       convNews: convNews, notes: notes, moves: moves,
       ballon: g.lastBallon, income: income, marketValue: p.marketValue, becameIdol: becameIdol,
+      becameGenIdol: becameGenIdol,
       newCaptain: newCaptain, newTraits: newTraits, managerName: g.manager ? g.manager.name : null, managerConf: g.manager ? g.manager.conf : null,
       rival: { name: g.rival.name, g: g.rival.seasonG, a: g.rival.seasonA, club: club(g.rival.clubId).name }
     };
@@ -2295,6 +2311,12 @@ window.CQ = window.CQ || {};
     p.salary = renew.salary;
     p.contractEnd = g.year + renew.years;
     g.transferRequested = false;
+    // decisão que reforça a permanência: já é ídolo deste clube e escolheu ficar em vez
+    // de ouvir outras propostas — pequeno bônus de fama pela lealdade, sinalizado pra UI
+    // poder narrar diferente (mesmo padrão de "notes"/flags que o resto do jogo já usa).
+    const loyal = p.idolClubs && p.idolClubs.indexOf(p.clubId) >= 0;
+    if (loyal) p.fame = U.clamp(p.fame + 4, 0, 100);
+    return { loyal: loyal };
   }
 
   // proposta de empréstimo — 1 clube só (é o clube que negocia, não uma vitrine),

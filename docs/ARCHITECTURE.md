@@ -47,7 +47,7 @@ Fontes (Google Fonts) e bandeiras (flagcdn) vêm da web com fallback; todo o res
 
 ```
 # no navegador (index.html ou CRAQUE.html aberto), console:
-CQ.tests.run()             # tests/regression.js — ~172 checagens
+CQ.tests.run()             # tests/regression.js — ~182 checagens
 
 # idade real dos elencos (resumível — roda até bater na cota diária, ~100 req/dia):
 node scripts/sync-ages.mjs [teto de chamadas ao vivo, padrão 90]
@@ -287,7 +287,7 @@ preenchido numa derrota); banner de título com ordinal (BICAMPEÃO...PENTACAMPE
 3. ✅ **Sistema de empréstimo (feito).** Ver seção própria abaixo.
 4. ✅ **Voltar a ex-clube depois dos 31 (feito).** Ver seção própria abaixo.
 5. ✅ **Linha do tempo de marcos da carreira (feito).** Ver seção própria abaixo.
-6. Sistema de ídolo em camadas (ídolo → ídolo da geração → maior de todos).
+6. ✅ **Sistema de ídolo em camadas (feito).** Ver seção própria abaixo.
 7. Salvar carreira pra sempre ao aposentar ("hall da fama").
 8. Redes sociais reagindo de verdade a resultado/decisão.
 9. Layout: painéis laterais usando o espaço vazio dos modais.
@@ -425,3 +425,41 @@ WebGL no console.
 cilindro+esfera, não modelo rigged; camisa em cor sólida, sem padrão de listras; sem
 sombra/arquibancada/física de bola; sem fallback pro campo 2D se `WebGLRenderer` falhar
 ao inicializar (mostra aviso simples em vez de manter os dois sistemas em paralelo).
+
+## Sistema de ídolo em camadas (item 6 do roteiro, feito)
+
+Pedido original: "ídolo → ídolo da geração → ídolo do momento → maior de todos, com
+decisões que reforçam a permanência no clube". Investigação prévia mostrou que 2 das 4
+camadas **já existiam**, sem ligação entre si: **ídolo do clube** (`p.idolClubs`,
+gols+títulos por clube) e **maior de todos** (`careerLegacy`/tier "LENDA IMORTAL" em
+`js/ui.js`, já era o veredito de aposentadoria mais alto). A fatia adicionou as 2 que
+faltavam e amarrou tudo junto — sem inventar sistema de ranking novo, reaproveitando o
+que `ballonRanking`/`ballonScore` (`g.rival` + `g.worldStars`) já calculavam.
+
+- **Ídolo da geração** (`p.genIdolYear`, novo campo, permanente): dispara na 2ª vez que
+  `p.ballon` acumula `rank === 1` (Bola de Ouro, "o melhor do mundo" — já descrito no
+  código como "muito difícil", medido contra `g.rival`+`g.worldStars`). Computado dentro
+  de `endSeason` (`js/engine.js`), ao lado do bloco de ídolo de clube já existente.
+- **Ídolo do momento** (`p.momentIdol`, booleano transiente, recalculado toda
+  temporada): `true` quando o jogador termina a temporada no top-3 do ranking da Bola de
+  Ouro (`awards.ballonRank <= 3`) ou com fama excepcional (`p.fame >= 90`) — pode ir e
+  vir, ao contrário das 3 outras camadas (permanentes).
+- **Maior de todos**: nenhuma tela nova — `careerLegacy` (`js/ui.js`) já era o veredito
+  final de aposentadoria; `p.genIdolYear` agora entra como condição extra pra tier
+  "LENDA IMORTAL" (junto de `bolas>=3`/`wc+bolas`/`score>=900` que já existiam).
+- **Decisão que reforça a permanência**: `acceptRenew` (`js/engine.js`) ganhou um
+  parâmetro de retorno `{loyal}` — `true` quando o jogador já é ídolo do clube atual e
+  escolhe renovar em vez de ouvir outras propostas na janela. `pickRenew` (`js/ui.js`)
+  usa isso pra uma notícia de imprensa diferente ("recusa as propostas... lealdade que a
+  torcida do ídolo não esquece") + pequeno bônus de fama (+4). Reaproveita o fluxo de
+  mercado já existente (`showMarket`) — nenhuma tela nova, nenhuma decisão nova de UI.
+
+UI: notícia de celebração (`buildSummarySteps`) quando vira ídolo da geração, com
+confete/som de troféu (mesmo tratamento de título); badges na aba "Visão geral" do
+Clube (`clubHTML`); badge na tela de aposentadoria (`retroHTML`).
+
+Migração: `p.genIdolYear`/`p.momentIdol` aditivos em `save.js migrate()`, sem bump de
+`SCHEMA_VERSION` (mesmo padrão de `p.loan`/`p.firstClassic`). Testado: gatilho de ídolo
+da geração (fabricando 2 Bolas de Ouro na carreira — atingir isso organicamente exigiria
+simulação longa demais pra um teste determinístico), ídolo do momento por fama alta,
+bônus de lealdade em `acceptRenew`, e migração de save antigo. 182/182 passando.

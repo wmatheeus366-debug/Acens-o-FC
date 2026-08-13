@@ -1282,6 +1282,7 @@ window.CQ = window.CQ || {};
       return esc((nth >= 2 ? U.tituloOrdinal(nth) + " · " : "") + t.name);
     }).join(", ")}</b></div>` : "";
     const idol = sum.becameIdol ? `<div class="notice ok mb8">${I.star} <b>Você virou ÍDOLO do ${esc(sum.becameIdol)}!</b> Estátua na entrada do estádio e nome eternizado na história do clube.</div>` : "";
+    const genIdol = sum.becameGenIdol ? `<div class="notice ok mb8">${I.star} <b>Você virou ÍDOLO DA GERAÇÃO!</b> Sua 2ª Bola de Ouro consagra você como o nome que define esta era do futebol.</div>` : "";
     const capt = sum.newCaptain ? `<div class="notice ok mb8">${I.trophy} <b>Você é o novo capitão do ${esc(sum.newCaptain)}!</b> A braçadeira reconhece sua liderança.</div>` : "";
     const traitsN = sum.newTraits && sum.newTraits.length ? `<div class="notice ok mb8">${I.star} Novo traço desbloqueado: ${sum.newTraits.map(function (k) { return "<b>" + esc(CQ.engine.TRAITS[k].name) + "</b>"; }).join(", ")}.</div>` : "";
     const moves = [];
@@ -1289,11 +1290,11 @@ window.CQ = window.CQ || {};
     if (sum.moves.myMove === "up") moves.push('<div class="notice ok">ACESSO! Na próxima temporada, o clube sobe de divisão.</div>');
     const convo = sum.convNews === "convocado" ? '<div class="notice ok">Convocado para a Seleção! O ciclo internacional entra no seu calendário.</div>'
       : sum.convNews === "cortado" ? '<div class="notice warn">Você perdeu a vaga na Seleção. Rendimento manda.</div>' : "";
-    if (titleEntries.length || sum.becameIdol || sum.newCaptain || (sum.newTraits && sum.newTraits.length) || moves.length || convo) {
+    if (titleEntries.length || sum.becameIdol || sum.becameGenIdol || sum.newCaptain || (sum.newTraits && sum.newTraits.length) || moves.length || convo) {
       steps.push({
-        confetti: titleEntries.length ? [E().myClub(G).c1 || "#b8330f", E().myClub(G).c2 || "#f5efdf", "#9c7c1e"] : null,
-        sound: titleEntries.length ? "trophy" : null,
-        html: `${head}<div style="padding:16px">${titles}${idol}${capt}${traitsN}${moves.join("")}${convo}${nextBtn}</div>`
+        confetti: (titleEntries.length || sum.becameGenIdol) ? [E().myClub(G).c1 || "#b8330f", E().myClub(G).c2 || "#f5efdf", "#9c7c1e"] : null,
+        sound: (titleEntries.length || sum.becameGenIdol) ? "trophy" : null,
+        html: `${head}<div style="padding:16px">${titles}${idol}${genIdol}${capt}${traitsN}${moves.join("")}${convo}${nextBtn}</div>`
       });
     }
 
@@ -1432,8 +1433,13 @@ window.CQ = window.CQ || {};
   }
   function pickRenew() {
     const G = g(), sum = G.pendingSummary;
-    E().acceptRenew(G, sum.offers.renew);
-    CQ.nar.post(G, "clube", G.player.name + " renova contrato! O camisa " + G.player.num + " segue com a gente.", { hot: true });
+    const res = E().acceptRenew(G, sum.offers.renew);
+    // decisão que reforça a permanência: já é ídolo aqui e escolheu ficar mesmo com
+    // outras portas abertas nesta janela — narrativa própria pra marcar a lealdade.
+    const msg = res && res.loyal
+      ? G.player.name + " recusa as propostas e renova com o " + E().myClub(G).name + " — a lealdade de um ídolo que a torcida não esquece."
+      : G.player.name + " renova contrato! O camisa " + G.player.num + " segue com a gente.";
+    CQ.nar.post(G, "clube", msg, { hot: true });
     closeOverlay();
     E().nextSeason(G);
     CQ.main.save();
@@ -2554,6 +2560,8 @@ window.CQ = window.CQ || {};
               <div class="tile"><b class="tnum">${G.boardFail}</b><span>Metas falhadas</span></div></div>
               <div class="notice ${G.boardFail ? "warn" : "ok"} mt12">${I.whistle} Meta da temporada: <b>${esc(G.board.desc)}</b>${G.boardFail ? " — a paciência da diretoria está curta." : ""}</div>
               ${p.idolClubs && p.idolClubs.indexOf(p.clubId) >= 0 ? `<div class="notice ok mt8">${I.star} <b>Ídolo do ${esc(cl.name)}</b> — estátua e nome eternizado. ${p.clubGoals[p.clubId] || 0} gols com essa camisa.</div>` : `<p class="small muted mt8">Gols por este clube: <b>${p.clubGoals[p.clubId] || 0}</b>. Faça história (100 gols, ou 60 gols + 2 títulos) para virar ídolo eterno.</p>`}
+              ${p.genIdolYear ? `<div class="notice ok mt8">${I.star} <b>Ídolo da geração</b> desde ${p.genIdolYear} — o nome que define esta era do futebol.</div>` : ""}
+              ${p.momentIdol ? `<span class="badge badge-gold mt8">${I.star} Ídolo do momento</span>` : ""}
               ${p.captain === p.clubId ? `<div class="notice ok mt8">${I.trophy} <b>Capitão do ${esc(cl.name)}</b> — a braçadeira é sua.</div>` : ""}
             </div>
           </div></div></div>
@@ -2715,9 +2723,10 @@ window.CQ = window.CQ || {};
     const wc = p.titles.filter(function (t) { return t.key === "WC"; }).length;
     const ucl = p.titles.filter(function (t) { return t.key === "UCL" || t.key === "LIB"; }).length;
     let score = tot.goals * 1.2 + tot.assists * 0.8 + p.titles.length * 8 + p.awards.length * 6 + bolas * 40 + wc * 30 + ucl * 15 + p.natTeam.caps * 0.5;
+    if (p.genIdolYear) score += 60; // ídolo da geração: 2ª Bola de Ouro já pesa por si, mas o título em camada extra empurra o veredito pra cima
     score = Math.round(score);
     let tier;
-    if (bolas >= 3 || (wc >= 1 && bolas >= 1) || score >= 900) tier = { t: "LENDA IMORTAL", d: "Seu nome entra para o panteão dos maiores de todos os tempos. Gerações vão contar suas histórias." };
+    if (p.genIdolYear || bolas >= 3 || (wc >= 1 && bolas >= 1) || score >= 900) tier = { t: "LENDA IMORTAL", d: "Seu nome entra para o panteão dos maiores de todos os tempos. Gerações vão contar suas histórias." };
     else if (bolas >= 1 || score >= 600) tier = { t: "CRAQUE HISTÓRICO", d: "Um dos melhores da sua era. A bola sentiu sua falta no dia da despedida." };
     else if (p.titles.length >= 5 || score >= 380) tier = { t: "GRANDE ÍDOLO", d: "Vitorioso e querido. Sua camisa vira relíquia nas arquibancadas." };
     else if (p.titles.length >= 1 || score >= 200) tier = { t: "JOGADOR RESPEITADO", d: "Uma carreira sólida, com dias de glória que ninguém vai esquecer." };
@@ -2747,6 +2756,7 @@ window.CQ = window.CQ || {};
       <p class="muted" style="max-width:560px;margin:0 auto">${leg.d}</p>
       ${leg.bolas ? `<p class="mt8"><span class="badge badge-gold">${leg.bolas}× Bola de Ouro</span></p>` : ""}
       ${idols.length ? `<p class="small mt8">Eternizado como <b>ídolo</b> de: ${idols.map(function (id) { return esc(D.CLUBS[id] ? D.CLUBS[id].name : id); }).join(", ")} — com estátua e nome na história do clube.</p>` : ""}
+      ${p.genIdolYear ? `<p class="mt8"><span class="badge badge-gold">${I.star} Ídolo da geração desde ${p.genIdolYear}</span></p>` : ""}
     </div></div>
     <div class="cols mt16">
       <div class="stack">

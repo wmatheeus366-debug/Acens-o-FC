@@ -67,7 +67,7 @@
     withTempGame(function () {
       const g = newCareer("MEI");
       const old = JSON.parse(JSON.stringify(g));
-      ["traits", "compGoals", "idolClubs", "clubGoals", "ballon", "milestones", "assets", "records", "captain", "squadRole", "loan", "firstClassic"].forEach(function (k) { delete old.player[k]; });
+      ["traits", "compGoals", "idolClubs", "clubGoals", "ballon", "milestones", "assets", "records", "captain", "squadRole", "loan", "firstClassic", "genIdolYear", "momentIdol"].forEach(function (k) { delete old.player[k]; });
       delete old.manager; delete old.worldStars; delete old.schemaVersion; delete old.world; delete old.clubRivalry;
       const raw = localStorage.getItem("craque-save-v1");
       localStorage.setItem("craque-save-v1", JSON.stringify(old));
@@ -75,6 +75,9 @@
       if (raw != null) localStorage.setItem("craque-save-v1", raw); else localStorage.removeItem("craque-save-v1");
       assert("save: migra campos novos", loaded && Array.isArray(loaded.player.traits) && !!loaded.manager && (loaded.worldStars || []).length === 12, JSON.stringify({ t: !!(loaded && loaded.player.traits), m: !!(loaded && loaded.manager) }));
       assert("save: schemaVersion presente", loaded && loaded.schemaVersion >= 2, "v=" + (loaded && loaded.schemaVersion));
+      assert("save: migra ídolo em camadas (genIdolYear null, momentIdol false)",
+        loaded && loaded.player.genIdolYear === null && loaded.player.momentIdol === false,
+        JSON.stringify({ genIdolYear: loaded && loaded.player.genIdolYear, momentIdol: loaded && loaded.player.momentIdol }));
       const myClubId = loaded && loaded.player.clubId;
       const expectLen = CQ.DATA.REAL_SQUADS[myClubId] ? CQ.DATA.REAL_SQUADS[myClubId].length : 20;
       assert("save: migra g.world (elenco do clube do jogador)",
@@ -804,6 +807,52 @@
     });
   }
 
+  // ---- Ídolo da geração: 2ª Bola de Ouro (rank 1) acumulada desbloqueia, permanente ----
+  function testGenIdolTwoBallons() {
+    withTempGame(function () {
+      const g = newCareer("ATA");
+      E().startSeason(g);
+      // fabrica 2 Bolas de Ouro já na carreira — atingir isso organicamente exigiria uma
+      // simulação longa demais pra um teste determinístico; a regra em si (>=2 rank:1)
+      // é testada aqui como está implementada, não a chance de conquistar cada uma.
+      g.player.ballon = [{ year: g.year - 2, rank: 1, score: 999 }, { year: g.year - 1, rank: 1, score: 999 }];
+      let n = 0; while (E().currentFixture(g) && n++ < 700) E().applyMatch(g, E().resolveMatch(g, E().currentFixture(g), {}));
+      const sum = E().endSeason(g);
+      assert("ídolo da geração: g.player.genIdolYear é preenchido com 2 Bolas de Ouro acumuladas", g.player.genIdolYear === g.year, "genIdolYear=" + g.player.genIdolYear + " year=" + g.year);
+      assert("ídolo da geração: sum.becameGenIdol sinaliza a UI nesta mesma temporada", sum.becameGenIdol === true);
+    });
+  }
+
+  // ---- Ídolo do momento: transiente, liga com fama alta ou top-3 do ranking mundial ----
+  function testMomentIdolTransient() {
+    withTempGame(function () {
+      const g = newCareer("ATA");
+      E().startSeason(g);
+      g.player.fame = 95;
+      let n = 0; while (E().currentFixture(g) && n++ < 700) E().applyMatch(g, E().resolveMatch(g, E().currentFixture(g), {}));
+      E().endSeason(g);
+      assert("ídolo do momento: fama alta (>=90) já liga p.momentIdol", g.player.momentIdol === true, "fame=" + g.player.fame);
+    });
+  }
+
+  // ---- Decisão que reforça a permanência: renovar sendo ídolo do clube dá lealdade ----
+  function testLoyaltyRenewBonus() {
+    withTempGame(function () {
+      const g = newCareer("ATA", "fla");
+      g.player.idolClubs = ["fla"];
+      const before = g.player.fame;
+      const res = E().acceptRenew(g, { salary: 100000, years: 2 });
+      assert("renovação leal: ídolo do clube atual é reconhecido (loyal:true)", res && res.loyal === true);
+      assert("renovação leal: fama sobe com a lealdade", g.player.fame === before + 4, "antes=" + before + " depois=" + g.player.fame);
+
+      const g2 = newCareer("ATA", "fla");
+      g2.player.idolClubs = [];
+      const before2 = g2.player.fame;
+      const res2 = E().acceptRenew(g2, { salary: 100000, years: 2 });
+      assert("renovação normal: sem ídolo do clube atual, loyal:false e sem bônus de fama", res2 && res2.loyal === false && g2.player.fame === before2);
+    });
+  }
+
   // ---- Sistema de empréstimo: dispara quando o jogador fica preso no banco ----
   function testLoanTriggerFires() {
     withTempGame(function () {
@@ -1209,6 +1258,9 @@
     testScoutingRumor();
     testAllPositionsSmoke();
     testPitch3dToWorld();
+    testGenIdolTwoBallons();
+    testMomentIdolTransient();
+    testLoyaltyRenewBonus();
     const pass = results.filter(function (r) { return r.pass; }).length;
     console.log("%cCRAQUE regressão: " + pass + "/" + results.length + " passaram", "font-weight:bold");
     results.forEach(function (r) { console.log((r.pass ? "✓" : "✗ FALHOU") + " " + r.name + (r.detail ? "  [" + r.detail + "]" : "")); });

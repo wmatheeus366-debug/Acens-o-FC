@@ -1304,3 +1304,32 @@ externa/arquivo único" mantida a sessão inteira — e que **substitui** o camp
 - Sem fallback pra campo 2D se `WebGLRenderer` falhar ao inicializar — mostra um aviso
   simples (`.pv3-fallback`) em vez de travar a tela, mas não reimplementa os dois
   sistemas em paralelo (decisão explícita do usuário).
+
+---
+
+## Sistema de ídolo em camadas (item 6 do roteiro)
+
+Pedido original: "ídolo → ídolo da geração → ídolo do momento → maior de todos, com
+decisões que reforçam a permanência no clube". Descoberta que reduziu o escopo real:
+2 das 4 camadas já existiam soltas — **ídolo do clube** (`p.idolClubs`) e **maior de
+todos** (`careerLegacy`, tier "LENDA IMORTAL" já era o veredito mais alto da
+aposentadoria) — só faltava construir as 2 do meio e amarrar tudo.
+
+- **Ídolo da geração** (`p.genIdolYear`, novo, permanente): 2ª Bola de Ouro (`rank===1`
+  em `p.ballon`) na carreira. Reaproveita o ranking que já compara o jogador com
+  `g.rival`/`g.worldStars` (`ballonRanking`) — nenhuma fórmula de comparação nova.
+- **Ídolo do momento** (`p.momentIdol`, novo, transiente — recalculado toda temporada,
+  pode ir e vir): top-3 na Bola de Ouro do ano ou fama ≥90.
+- **Maior de todos**: `careerLegacy` (`js/ui.js`) ganhou `p.genIdolYear` como condição
+  extra pro tier "LENDA IMORTAL" — nenhuma tela nova.
+- **Decisão que reforça a permanência**: `acceptRenew` (`js/engine.js`) agora devolve
+  `{loyal}` quando o jogador já é ídolo do clube atual e escolhe renovar em vez de sair
+  — pequeno bônus de fama (+4) + notícia de imprensa própria em `pickRenew` (`js/ui.js`).
+  Reaproveita o fluxo de mercado já existente, sem tela nova.
+- UI: notícia de celebração com confete/som de troféu (mesmo tratamento de título) na
+  cerimônia de fim de temporada; badges na aba "Visão geral" do Clube; badge na tela de
+  aposentadoria.
+- Migração aditiva (`p.genIdolYear`/`p.momentIdol`), sem bump de `SCHEMA_VERSION`.
+- Validado: 182/182 testes (3 novos + extensão da migração). Verificação visual manual
+  no Browser pane: as 4 camadas renderizando juntas na aba Clube, tier "LENDA IMORTAL"
+  disparando corretamente na tela de aposentadoria com `genIdolYear` forçado.
