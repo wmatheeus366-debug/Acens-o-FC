@@ -387,30 +387,14 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .live-clock .liveblink { display: inline-block; width: 8px; height: 8px; background: var(--verm); border-radius: 50%; margin-right: 7px; animation: blink 1s infinite; vertical-align: 2px; }
 @keyframes blink { 50% { opacity: 0.25; } }
 
-/* ---------------- Campo 2D animado (modo Ao Vivo) ---------------- */
-.live-pitch { padding: 8px 12px 10px; border-bottom: 1px solid var(--rule-soft); }
-.pv-svg { display: block; width: 100%; height: auto; aspect-ratio: 15 / 9; background: var(--paper); }
-.pv-grass { fill: var(--green); }
-.pv-lines { fill: none; stroke: rgba(255, 253, 246, .55); stroke-width: .6; }
-:root[data-theme="dark"] .pv-lines { stroke: rgba(255, 253, 246, .3); }
-.pv-player .pv-inner circle { stroke: #1b1812; }
-.pv-player .pv-ring { fill: none; stroke: var(--gold); stroke-width: .7; opacity: 0; }
-.pv-me .pv-ring { opacity: .9; }
-.pv-num { font-size: 3px; font-weight: 700; fill: #fffdf6; text-anchor: middle; font-family: var(--cond); pointer-events: none; }
-#pv-ball { transition: transform .6s cubic-bezier(.32, .7, .38, 1); }
-#pv-ball circle { fill: #fffdf6; stroke: #1b1812; stroke-width: .3; }
-.pv-badge { font-size: 6.5px; opacity: 0; pointer-events: none; }
-.pv-badge-show { animation: pv-badge-fade 1.6s ease forwards; }
-@keyframes pv-badge-fade { 0% { opacity: 0; transform: translateY(-2px); } 18% { opacity: 1; transform: none; } 78% { opacity: 1; } 100% { opacity: 0; } }
-.pv-pulse-y .pv-inner, .pv-pulse-r .pv-inner, .pv-pulse-go .pv-inner { animation: pv-pulse .9s ease; transform-origin: center; }
-.pv-pulse-y .pv-ring { stroke: var(--gold); animation: pv-ring-flash .9s ease; }
-.pv-pulse-r .pv-ring { stroke: var(--verm); animation: pv-ring-flash .9s ease; }
-@keyframes pv-pulse { 0%, 100% { transform: scale(1); } 32% { transform: scale(1.7); } }
-@keyframes pv-ring-flash { 0%, 100% { opacity: .9; } 32% { opacity: 1; stroke-width: 1.3; } }
-.pv-flash-r, .pv-flash-l { animation: pv-flash .55s ease; }
-@keyframes pv-flash { 0% { filter: none; } 38% { filter: brightness(1.55); } 100% { filter: none; } }
-.pv-hold .pv-svg { animation: pv-hold 1.3s ease-in-out infinite; }
-@keyframes pv-hold { 0%, 100% { opacity: 1; } 50% { opacity: .84; } }
+/* ---------------- Campo 3D (modo Ao Vivo, js/pitch3d.js + three.js) ----------------
+   Canvas WebGL não escala sozinho tipo SVG com viewBox — precisa de largura/altura reais;
+   o aspect-ratio fixo aqui dá a altura, e um ResizeObserver dentro de pitch3d.js mantém o
+   renderer/câmera em sincronia sempre que o container muda de tamanho (ex.: rotação de
+   tela, resize de janela). */
+.live-pitch3d { aspect-ratio: 15 / 9; max-height: 46vh; border-bottom: 1px solid var(--rule-soft); background: #0b1a12; overflow: hidden; }
+.live-pitch3d canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.pv3-fallback { display: flex; align-items: center; justify-content: center; height: 100%; padding: 16px; text-align: center; color: var(--rule); font-family: var(--cond); font-size: 13px; }
 
 .mm-feed { padding: 6px 0; }
 .mm-ev { display: grid; grid-template-columns: 46px 22px 1fr; gap: 8px; padding: 7px 16px; align-items: baseline; animation: evin 0.25s ease; border-bottom: 1px dashed var(--rule-soft); }

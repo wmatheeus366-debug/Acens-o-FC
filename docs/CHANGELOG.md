@@ -1242,3 +1242,65 @@ clássico" ("primeiro jogo" já era coberto pela "Estreia profissional" já exis
   `p.firstClassic`). `timelineHTML` foi exportado em `CQ.ui` pra virar testável
   diretamente — os testes leem a string HTML de verdade gerada pela função, não uma
   simulação separada da lógica.
+
+---
+
+## Campo 3D de verdade no modo Ao Vivo (item 2 do roteiro — Fatia 1)
+
+Pedido original: bonecos 3D de verdade no modo Ao Vivo, navegável em qualquer ângulo
+(não a "câmera tática 2D com perspectiva" do print de referência que o usuário mandou,
+que na real é o modo tático do Football Manager). Confirmado com o usuário mesmo depois
+de avisado do tamanho do trabalho e de que isso quebra a filosofia de "zero dependência
+externa/arquivo único" mantida a sessão inteira — e que **substitui** o campo 2D
+(`buildPitchSVG`), não fica como opção à parte.
+
+- **`three.js r140` vendorizado** (`js/vendor/three.min.js`, `js/vendor/OrbitControls.js`)
+  — última versão que ainda publica um build UMD clássico e um `OrbitControls`
+  não-módulo, os dois rodando como `<script>` comum, sem precisar de bundler nem
+  `type="module"` (`scripts/build.mjs` só concatena texto, do jeito que já fazia).
+  Baixado uma vez via `scripts/vendor-three.mjs` (novo, reexecutável) e comitado —
+  mesmo espírito de `embed-crests.mjs`/`sync-ages.mjs`: busca externa só em tempo de
+  setup, nunca em tempo de execução pro jogador.
+- **Novo `js/pitch3d.js`** — dono de toda a cena (`THREE.Scene`/`PerspectiveCamera`/
+  `WebGLRenderer`/`OrbitControls`), reaproveitando **sem mudar 1 linha**
+  `CQ.pitch.FORMATION`/`poseFor`/`poseForKick` (já eram 100% renderizador-agnósticos —
+  só `buildPitchSVG` era específico de SVG). Três funções expostas: `mount(container,
+  fx, res, player)` monta a cena (gramado texturizado num `<canvas>` 2D, 22 marcadores
+  cilindro+esfera nas cores reais do uniforme, anel dourado no marcador do jogador,
+  bola, luzes, `OrbitControls` com limite de ângulo/zoom); `applyPose(pose)` consome o
+  **mesmo formato de pose** que a versão 2D já usava (tween de posição da bola, pulso de
+  escala no marcador destacado, flash de luz perto do gol, emoji flutuante de badge);
+  `unmount()` para o loop de `requestAnimationFrame` e descarta geometria/material/
+  contexto WebGL — necessário porque, ao contrário de nó SVG, contexto WebGL é recurso
+  escasso do navegador (limite de contextos simultâneos).
+- **`js/ui.js`**: `renderLiveOverlay` passa a inserir um `<div id="lv-pitch3d">` vazio e
+  montar a cena logo depois (precisa existir no DOM antes do `WebGLRenderer` anexar o
+  canvas); `applyPitchPose` vira um delegate de 1 linha pra `CQ.pitch3d.applyPose`;
+  `finishLive()` (único ponto que fecha uma partida ao vivo ativa) ganhou
+  `CQ.pitch3d.unmount()`.
+- **CSS**: `.live-pitch3d` com `aspect-ratio` fixo + `max-height` (canvas WebGL não
+  escala sozinho tipo SVG com `viewBox`; um `ResizeObserver` dentro de `pitch3d.js`
+  mantém renderer/câmera em sincronia quando o container muda de tamanho). Removidas as
+  regras `.pv-*`/`.live-pitch` antigas do campo 2D (mortas — `buildPitchSVG` continua
+  existindo e exportado, só não é mais chamado por nenhum lugar da UI).
+- **Bundle**: `1.24 MB → 1.85 MB` (three.js + OrbitControls somam ~650 KB) — dentro do
+  esperado e confirmado explicitamente com o usuário antes de começar.
+- **Validado**: 172/172 testes passando (incluindo o novo `testPitch3dToWorld`, único
+  helper puro-matemático do módulo — o resto é WebGL de verdade, sem contexto disponível
+  no harness). Verificação visual manual completa no Browser pane: cena renderiza com
+  os 22 marcadores nas cores certas + anel do jogador; arrastar gira a câmera e scroll
+  dá zoom (`OrbitControls` confirmado); tween da bola confirmado por introspecção direta
+  da cena (posição bate com `toWorld` esperado); pulso de destaque no marcador visível
+  na tela; badge de emoji confirmado por posição/opacidade na cena (visibilidade do
+  glifo em si depende da fonte de emoji do sistema, presente em qualquer
+  desktop/mobile real); 8 ciclos seguidos de `unmount()`+`mount()` e um `finishLive()`
+  real sem nenhum erro ou aviso de contexto WebGL no console.
+
+### Simplificações desta fatia (documentadas, não são bugs)
+- Jogadores são cilindro+esfera (silhueta simples), não modelo humano rigged — animação
+  é tween de posição/escala, não corrida/chute de verdade.
+- Camisa em cor sólida (`c1`), sem o padrão de listras/faixas que o SVG 2D tinha.
+- Sem sombra, arquibancada/torcida modelada, ou física de bola com efeito.
+- Sem fallback pra campo 2D se `WebGLRenderer` falhar ao inicializar — mostra um aviso
+  simples (`.pv3-fallback`) em vez de travar a tela, mas não reimplementa os dois
+  sistemas em paralelo (decisão explícita do usuário).

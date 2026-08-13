@@ -11,7 +11,9 @@ Desenvolvimento com arquivos separados; distribuição num arquivo único `CRAQU
 | `js/data.js` | `CQ.DATA` | Clubes, ligas, seleções, lendas, posições, elencos reais, recordes | util |
 | `js/birthdates.js` | `CQ.BIRTHDATES` | Data de nascimento REAL de jogadores de `REAL_SQUADS` (gerado, cresce aos poucos — `scripts/sync-ages.mjs`) | — |
 | `js/world.js` | `CQ.world` | Mundo persistente: identidade estável de NPCs nos 191 clubes, envelhecimento/aposentadoria ano a ano | util, DATA, (BIRTHDATES) |
-| `js/pitch.js` | `CQ.pitch` | Campo 2D animado do modo Ao Vivo: formação, SVG do campo/camisas, tradução evento→pose visual | util, DATA |
+| `js/pitch.js` | `CQ.pitch` | Formação (11 posições) e tradução evento→pose visual (`poseFor`/`poseForKick`), 100% renderizador-agnóstico; `buildPitchSVG` (campo 2D antigo) continua exportado mas não é mais chamado pela UI | util, DATA |
+| `js/vendor/three.min.js`, `js/vendor/OrbitControls.js` | `THREE` (global) | three.js r140 (build UMD clássico) + controles de câmera, vendorizados — única dependência externa do projeto, refetch via `scripts/vendor-three.mjs` | — |
+| `js/pitch3d.js` | `CQ.pitch3d` | Campo 3D de verdade do modo Ao Vivo (WebGL): monta a cena, consome `CQ.pitch.poseFor`/`poseForKick` sem alteração | util, DATA, pitch, THREE |
 | `js/engine.js` | `CQ.engine` | Modelo, calendário, simulação, prêmios, mercado, técnico, traços, aposentadoria | util, DATA, world, (nar) |
 | `js/market.js` | `CQ.market` | Mercado autônomo entre NPCs: clubes comprando/vendendo jogadores entre si a cada temporada | util, DATA, world, engine |
 | `js/narrative.js` | `CQ.nar` | Feed, entrevistas, eventos de vida, enquetes, rival | util, DATA, engine |
@@ -45,7 +47,7 @@ Fontes (Google Fonts) e bandeiras (flagcdn) vêm da web com fallback; todo o res
 
 ```
 # no navegador (index.html ou CRAQUE.html aberto), console:
-CQ.tests.run()             # tests/regression.js — ~174 checagens
+CQ.tests.run()             # tests/regression.js — ~172 checagens
 
 # idade real dos elencos (resumível — roda até bater na cota diária, ~100 req/dia):
 node scripts/sync-ages.mjs [teto de chamadas ao vivo, padrão 90]
@@ -234,7 +236,7 @@ Ver BUG-07 no CHANGELOG para o bug original (suspensão vazando entre competiç�
   por vez" do balanço de temporada, reaproveitando `applyInterview` já existente para
   aplicar o efeito de cada resposta.
 
-## Campo 2D animado no modo Ao Vivo (feito)
+## Campo 2D animado no modo Ao Vivo (feito, depois substituído pelo campo 3D)
 Visualização estilizada, não um replay físico — reage aos mesmos eventos abstratos que
 `js/live.js` já gera, sincronizada 1:1 com o clique-a-clique existente (sem timer, sem
 física nova). Novo `js/pitch.js` (`CQ.pitch`), lógica pura sem tocar DOM: `FORMATION`
@@ -242,11 +244,12 @@ física nova). Novo `js/pitch.js` (`CQ.pitch`), lógica pura sem tocar DOM: `FOR
 bola) e `poseFor`/`poseForKick` (evento → posição/destaque/ícone). Uniformes usam as
 mesmas cores/padrão (`c1`/`c2`/`pat`) que o brasão vetorial já usava — `patternFillFor`
 foi extraído de `crestSVGProcedural` (`js/util.js`) pra virar a base tanto do brasão
-quanto da nova `jerseySVG`. `js/ui.js` (`pitchReact`/`applyPitchPose`) é o único lugar
-que manipula o SVG já inserido no DOM (nunca recria); a posição cosmética da bola usa
-RNG **não semeada**, de propósito — nunca consome do `live.rng` que decide resultado
-real de decisões/pênaltis, preservando o determinismo do jogo independente do timing de
-clique do usuário.
+quanto da nova `jerseySVG`.
+
+> **Atualização:** `buildPitchSVG` foi substituído pelo campo 3D (`js/pitch3d.js`, ver
+> seção "Campo 3D de verdade" abaixo) como renderizador do modo Ao Vivo — continua
+> exportado em `CQ.pitch` (não removido, sem consumidor na UI), mas `FORMATION`/
+> `poseFor`/`poseForKick` seguem sendo a base de ambos, sem nenhuma mudança neles.
 
 ## Lista grande de imersão/UX — Fatia 1 (feito) + roteiro futuro
 
@@ -278,9 +281,9 @@ preenchido numa derrota); banner de título com ordinal (BICAMPEÃO...PENTACAMPE
    abaixo. 8/129 clubes sincronizados até agora (parou sozinho na cota diária de 100
    requisições); continuar rodando `node scripts/sync-ages.mjs` em dias seguintes até
    cobrir os 129.
-2. Campo Ao Vivo com bonecos 3D de verdade (confirmado pelo usuário mesmo sabendo do
-   tamanho — precisa de sessão de planejamento própria, escolha de biblioteca tipo
-   three.js, o que quebra a filosofia atual de zero dependência externa).
+2. ✅ **Campo Ao Vivo com bonecos 3D de verdade (feito, Fatia 1).** Ver seção própria
+   abaixo. Padrão de uniforme/animação mais realista/torcida modelada ficam pra fatias
+   futuras (não desenhadas).
 3. ✅ **Sistema de empréstimo (feito).** Ver seção própria abaixo.
 4. ✅ **Voltar a ex-clube depois dos 31 (feito).** Ver seção própria abaixo.
 5. ✅ **Linha do tempo de marcos da carreira (feito).** Ver seção própria abaixo.
@@ -372,3 +375,53 @@ disputado" precisou de 1 campo aditivo, `p.firstClassic = {year, oppName, clubNa
 setado uma única vez dentro de `applyMatch` ao lado do bloco que já atualiza
 `g.clubRivalry` pro mesmo jogo. `timelineHTML` foi exportado em `CQ.ui` pra ficar
 testável diretamente (os testes leem a string HTML real gerada pela função).
+
+## Campo 3D de verdade no modo Ao Vivo (item 2 do roteiro, Fatia 1, feito)
+
+Substitui `buildPitchSVG` como renderizador do modo Ao Vivo. Pedido explícito do
+usuário mesmo depois de avisado do tamanho do trabalho e de que introduz a primeira
+dependência externa/binário vendorizado do projeto (three.js), quebrando a filosofia
+de "zero dependência/arquivo único" mantida até aqui — confirmado deliberadamente,
+não um descuido de escopo.
+
+**Biblioteca**: three.js r140 (`js/vendor/three.min.js`) + `OrbitControls` r140
+(`js/vendor/OrbitControls.js`), vendorizados via `scripts/vendor-three.mjs` (mesmo
+padrão de `embed-crests.mjs`/`sync-ages.mjs` — busca externa só em tempo de setup).
+r140 é deliberado: é a última versão que ainda publica um build UMD clássico e um
+`OrbitControls` não-módulo, os dois compatíveis com `scripts/build.mjs` (que só
+concatena texto de `<script>`, sem bundler/`import`/`export`) sem nenhuma mudança no
+próprio build. Bundle final: `1.24 MB → 1.85 MB`.
+
+**Divisão de responsabilidade** (a mesma que já existia entre `js/pitch.js` e a UI, só
+trocando quem desenha): `CQ.pitch.FORMATION`/`poseFor`/`poseForKick` continuam sendo a
+**única fonte da verdade** de "o que aconteceu e pra onde as coisas devem ir" — não
+mudaram 1 linha. `js/pitch3d.js` (`CQ.pitch3d`) é só o renderizador novo: `mount(container,
+fx, res, player)` monta `THREE.Scene`/`PerspectiveCamera`/`WebGLRenderer`/
+`OrbitControls` (22 marcadores cilindro+esfera nas cores reais do uniforme, anel
+dourado no marcador do jogador, gramado texturizado num `<canvas>` 2D comum);
+`applyPose(pose)` consome o mesmo formato de pose que a versão 2D já usava, só que
+anima via tween (posição/escala) em vez de `classList`/`transform` de SVG; `unmount()`
+para o loop de `requestAnimationFrame` e descarta geometria/material/contexto WebGL —
+necessário porque, ao contrário de nó SVG (garbage-collected sozinho), contexto WebGL é
+recurso escasso e limitado do navegador.
+
+`js/ui.js`: `renderLiveOverlay` insere um `<div id="lv-pitch3d">` vazio e monta a cena
+logo depois do `overlay(...)` (precisa existir no DOM antes do `WebGLRenderer` anexar o
+canvas); `applyPitchPose` virou 1 linha delegando pra `CQ.pitch3d.applyPose`;
+`finishLive()` (único ponto de todo o código que fecha uma partida ao vivo ativa) ganhou
+`CQ.pitch3d.unmount()`. CSS novo: `.live-pitch3d` com `aspect-ratio` fixo (canvas WebGL
+não escala sozinho tipo SVG com `viewBox`) + `ResizeObserver` interno ao módulo.
+
+**Verificação**: harness Node não tem contexto WebGL — só `toWorld` (conversão %→espaço
+3D) é puramente matemático e testável ali (`testPitch3dToWorld`). Resto validado
+manualmente no Browser pane: cena renderiza com os 22 marcadores certos; `OrbitControls`
+confirmado (arrastar gira, scroll dá zoom); tween da bola confirmado por introspecção
+direta da cena three.js (posição bate exatamente com `toWorld`); pulso de destaque e
+badge de emoji confirmados (posição/opacidade corretas na cena); 8 ciclos de
+`unmount()`+`mount()` seguidos e um `finishLive()` real sem erro nem aviso de contexto
+WebGL no console.
+
+**Simplificações documentadas** (não são bugs, escopo desta fatia): jogadores são
+cilindro+esfera, não modelo rigged; camisa em cor sólida, sem padrão de listras; sem
+sombra/arquibancada/física de bola; sem fallback pro campo 2D se `WebGLRenderer` falhar
+ao inicializar (mostra aviso simples em vez de manter os dois sistemas em paralelo).

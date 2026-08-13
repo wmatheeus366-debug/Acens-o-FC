@@ -991,58 +991,25 @@ window.CQ = window.CQ || {};
       <span class="lh-comp">${esc(fx.label)}</span>
       <span class="live-clock"><span class="liveblink"></span><span id="lv-score" class="tnum">${liveScoreStr(live)}</span></span>
     </div>`;
-    // campo 2D animado (js/pitch.js): SVG puro, inserido 1x e mantido vivo no DOM daqui
-    // pra frente — liveStep()/liveDecide()/shootReveal() só mexem em classe/transform
-    // dele depois, nunca recriam (mesmo padrão de #lv-feed/#lv-score/#lv-foot). Modo
-    // largo do overlay dá espaço pro campo sem espremer o feed de texto.
-    const pitchHtml = (CQ.pitch && CQ.pitch.buildPitchSVG) ? CQ.pitch.buildPitchSVG(fx, live.res, g().player) : "";
-    overlay(`<div class="live-sticky">${header}${pitchHtml}</div><div class="mm-feed" id="lv-feed"></div><div id="lv-foot" style="padding:12px 16px"></div>`, true);
+    // campo 3D (js/pitch3d.js, three.js): div vazio inserido 1x, montado logo depois
+    // (precisa existir no DOM antes do WebGLRenderer anexar o canvas nele) — daqui pra
+    // frente liveStep()/liveDecide()/shootReveal() só chamam applyPitchPose(), nunca
+    // remontam a cena. Modo largo do overlay dá espaço pro campo sem espremer o feed.
+    overlay(`<div class="live-sticky">${header}<div id="lv-pitch3d" class="live-pitch3d"></div></div><div class="mm-feed" id="lv-feed"></div><div id="lv-foot" style="padding:12px 16px"></div>`, true);
+    if (CQ.pitch3d) CQ.pitch3d.mount($("#lv-pitch3d"), fx, live.res, g().player);
     if (fresh) { if (CQ.audio) CQ.audio.play("whistle"); liveStep(); }
   }
 
-  // ---------------- campo 2D animado: reação a cada evento revelado ----------------
+  // ---------------- campo 3D: reação a cada evento revelado ----------------
   // Importante pro determinismo do projeto: a posição cosmética da bola/zona (info,
   // falta, contra-ataque) usa RNG NÃO semeada (U.ri sem passar live.rng), de propósito
   // — nunca consome do mesmo gerador que decide resultado real de jogo (live.rng), pra
   // não arriscar mudar a ordem de sorteios reais (chooseDecision/runShootout) conforme
   // o timing de clique do usuário. Mesmo espírito de flavor/feed já usado no projeto:
-  // decorativo é decorativo, não precisa ser reproduzível.
+  // decorativo é decorativo, não precisa ser reproduzível. A lógica de "como reagir"
+  // agora mora inteira em js/pitch3d.js — aqui só delega.
   function applyPitchPose(pose) {
-    if (!pose) return;
-    const reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const ball = $("#pv-ball");
-    if (ball && pose.ball) ball.setAttribute("transform", `translate(${pose.ball[0]},${pose.ball[1]})`);
-    if (pose.goalSide) {
-      const svg = $(".pv-svg");
-      if (svg) {
-        const cls = pose.goalSide === "right" ? "pv-flash-r" : "pv-flash-l";
-        svg.classList.remove("pv-flash-r", "pv-flash-l");
-        void svg.offsetWidth;
-        svg.classList.add(cls);
-      }
-    }
-    if (pose.highlight) {
-      const sel = pose.highlight === "me" ? ".pv-me" :
-        pose.highlight === "mate" ? ".pv-team-mine .pv-player:not(.pv-me)" : ".pv-team-opp .pv-player";
-      const nodes = document.querySelectorAll(sel);
-      if (nodes.length) {
-        const node = nodes.length > 1 ? nodes[U.ri(0, nodes.length - 1)] : nodes[0];
-        const cls = pose.cardType === "y" ? "pv-pulse-y" : pose.cardType === "r" ? "pv-pulse-r" : "pv-pulse-go";
-        node.classList.remove("pv-pulse-y", "pv-pulse-r", "pv-pulse-go");
-        void node.offsetWidth;
-        node.classList.add(cls);
-      }
-    }
-    const wrap = $(".live-pitch");
-    if (wrap) wrap.classList.toggle("pv-hold", !!pose.hold);
-    if (pose.badge) {
-      const b = $("#pv-badge");
-      if (b) {
-        b.textContent = pose.badge;
-        b.classList.remove("pv-badge-show");
-        if (!reduced) { void b.offsetWidth; b.classList.add("pv-badge-show"); }
-      }
-    }
+    if (CQ.pitch3d) CQ.pitch3d.applyPose(pose);
   }
 
   // vários eventos podem chegar de um só clique (step() só pausa em gol/intervalo/
@@ -1202,6 +1169,7 @@ window.CQ = window.CQ || {};
   function finishLive() {
     const live = CQ.state.live;
     CQ.state.live = null;
+    if (CQ.pitch3d) CQ.pitch3d.unmount(); // nunca deixar contexto WebGL vivo fora da partida
     closeOverlay();
     E().applyMatch(g(), live.res);
     CQ.main.save();
