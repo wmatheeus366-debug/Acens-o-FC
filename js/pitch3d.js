@@ -99,30 +99,38 @@ window.CQ = window.CQ || {};
     return g;
   }
 
-  // ---------- atmosfera de estádio (arquibancada/torcida/refletor/placa) ----------
-  // Estilizado, não fotorrealista — nada de modelar pessoa por pessoa (caro à toa pra
-  // 22+ marcadores já em cena); a "torcida" é uma textura repetida de pontinhos
-  // coloridos numa parede reta ao redor do campo, no mesmo espírito de "desenhar com
-  // canvas 2D" que pitchTexture()/jerseySVG já usam no resto do projeto.
-  function crowdTexture() {
-    const c = document.createElement("canvas");
-    c.width = 256; c.height = 96;
-    const ctx = c.getContext("2d");
-    ctx.fillStyle = "#14141c";
-    ctx.fillRect(0, 0, c.width, c.height);
-    const palette = ["#e8e2cf", "#c9302c", "#2a5aa0", "#f2c500", "#1b1812", "#ffffff", "#3a7d44"];
-    for (let row = 0; row < 12; row++) {
-      for (let col = 0; col < 64; col++) {
-        if (Math.random() < 0.88) {
-          ctx.fillStyle = palette[(Math.random() * palette.length) | 0];
-          ctx.fillRect(col * 4 + (row % 2 ? 2 : 0), row * 8, 3, 5);
-        }
-      }
-    }
-    const tex = new THREE.CanvasTexture(c);
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(10, 2);
-    return tex;
+  // ---------- atmosfera de estádio (modelo real + refletor/placa procedurais) ----------
+  // Depois do feedback do usuário ("muito feio, muito amador") na 1ª versão (4 paredes
+  // retas com textura de torcida em canvas), trocado por um modelo 3D de verdade:
+  // "Football stadium" por Poly by Google, CC-BY 3.0, baixado uma vez via
+  // scripts/vendor-stadium.mjs e embutido em base64 (js/vendor/stadium-model.js) — sem
+  // chamada de rede em tempo de execução, mesmo espírito de three.js/escudos vendorizados.
+  // Sem textura própria (materiais em cor sólida, 16 meshes, ~1.5k triângulos — leve),
+  // então continua batendo com a estética "formas simples" do resto do campo 3D.
+  let stadiumModelCache = null; // ArrayBuffer decodificado 1x, reaproveitado entre partidas
+  function b64ToArrayBuffer(b64) {
+    const bin = atob(b64);
+    const buf = new ArrayBuffer(bin.length);
+    const view = new Uint8Array(buf);
+    for (let i = 0; i < bin.length; i++) view[i] = bin.charCodeAt(i);
+    return buf;
+  }
+  let mountGen = 0; // incrementado a cada mount() — descarta callback de carga atrasado
+  // deslocamento medido 1x (ver scripts/vendor-stadium.mjs / verificação desta fatia):
+  // o modelo não nasce centralizado na origem nem com o chão em y=0.
+  const STADIUM_OFFSET = { x: -2.7, y: -24.9, z: -1.1 };
+  function loadStadiumModel(scene) {
+    if (typeof THREE.GLTFLoader === "undefined" || !CQ.STADIUM_GLB_B64) return; // degrada bem: campo ainda funciona sem o estádio
+    const myGen = mountGen;
+    try {
+      if (!stadiumModelCache) stadiumModelCache = b64ToArrayBuffer(CQ.STADIUM_GLB_B64);
+      new THREE.GLTFLoader().parse(stadiumModelCache, "", function (gltf) {
+        if (myGen !== mountGen) return; // usuário já fechou/trocou de partida antes do modelo terminar de carregar
+        const model = gltf.scene;
+        model.position.set(STADIUM_OFFSET.x, STADIUM_OFFSET.y, STADIUM_OFFSET.z);
+        scene.add(model);
+      }, function () { /* falhou ao decodificar — sem stadium, sem quebrar o resto do campo */ });
+    } catch (e) { /* GLTFLoader ausente/incompatível — mesma degradação graciosa */ }
   }
 
   // céu do fundo: um gradiente simples (não esfera 360°) — scene.background aceita uma
@@ -155,28 +163,14 @@ window.CQ = window.CQ || {};
     return tex;
   }
 
-  // arquibancada = 4 paredes retas ao redor do campo (não arquibancada escalonada de
-  // verdade — geometria simples de propósito, dá a silhueta de "estádio" sem precisar
-  // de rotação/inclinação por lado, que seria bem mais código pro mesmo resultado
-  // visual a essa distância de câmera). refletores = poste+luz nos 4 cantos.
+  // refletores procedurais (o modelo baixado não trouxe nenhum) + placa de publicidade,
+  // complementando o modelo real do estádio carregado por loadStadiumModel().
   function buildStadium(scene, myTeam) {
-    const wallH = 15, gap = 5, corner = 10;
-    const standMat = new THREE.MeshLambertMaterial({ map: crowdTexture() });
-    const roofMat = new THREE.MeshLambertMaterial({ color: 0x14141c });
-    function wall(w, d, x, z) {
-      const box = new THREE.Mesh(new THREE.BoxGeometry(w, wallH, d), standMat);
-      box.position.set(x, wallH / 2, z);
-      scene.add(box);
-      const roof = new THREE.Mesh(new THREE.BoxGeometry(w + 1.5, 0.8, d + 1.5), roofMat);
-      roof.position.set(x, wallH + 0.6, z);
-      scene.add(roof);
-    }
-    wall(PW + corner * 2, 2, 0, -(PD / 2 + gap));
-    wall(PW + corner * 2, 2, 0, PD / 2 + gap);
-    wall(2, PD + corner * 2, -(PW / 2 + gap), 0);
-    wall(2, PD + corner * 2, PW / 2 + gap, 0);
+    mountGen++;
+    loadStadiumModel(scene);
+    const gap = 5;
 
-    // placa de publicidade — mais perto do campo que a arquibancada, cores do time
+    // placa de publicidade — bem perto do campo, cores do time
     const adTex = adBoardTexture(myTeam && myTeam.c1, myTeam && myTeam.c2);
     const adMat = new THREE.MeshBasicMaterial({ map: adTex });
     function adBoard(w, d, x, z) {
@@ -189,20 +183,20 @@ window.CQ = window.CQ || {};
     adBoard(0.6, PD + 4, -(PW / 2 + 1.8), 0);
     adBoard(0.6, PD + 4, PW / 2 + 1.8, 0);
 
-    // refletores nos 4 cantos, além da arquibancada
+    // refletores nos 4 cantos, além do footprint do modelo real (~110×87 do centro)
     const poleMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.6 });
     const fixMat = new THREE.MeshStandardMaterial({ color: 0xf4efe2, emissive: 0x554422, roughness: 0.4 });
     [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(function (sgn) {
-      const x = sgn[0] * (PW / 2 + gap + corner - 2), z = sgn[1] * (PD / 2 + gap + corner - 2);
-      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 28, 8), poleMat);
-      pole.position.set(x, 14, z);
+      const x = sgn[0] * 122, z = sgn[1] * 96;
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 42, 8), poleMat);
+      pole.position.set(x, 21, z);
       scene.add(pole);
       const fix = new THREE.Mesh(new THREE.BoxGeometry(4, 2.4, 1.2), fixMat);
-      fix.position.set(x, 28.5, z);
+      fix.position.set(x, 42.5, z);
       fix.lookAt(0, 10, 0);
       scene.add(fix);
-      const lamp = new THREE.PointLight(0xfff4d6, 0.9, 140);
-      lamp.position.set(x, 27, z);
+      const lamp = new THREE.PointLight(0xfff4d6, 0.9, 160);
+      lamp.position.set(x, 41, z);
       scene.add(lamp);
     });
   }
@@ -220,6 +214,7 @@ window.CQ = window.CQ || {};
   }
 
   function unmount() {
+    mountGen++; // invalida qualquer GLTFLoader.parse() do modelo do estádio ainda em voo
     if (!state) return;
     cancelAnimationFrame(state.raf);
     if (state.resizeObs) state.resizeObs.disconnect();

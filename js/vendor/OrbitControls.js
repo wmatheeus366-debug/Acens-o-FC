@@ -1,5 +1,5 @@
-/* CRAQUE — OrbitControls do three.js r140 (examples/js/controls, MIT), vendorizado junto
-   com three.min.js — controla a camera do campo 3D (arrastar gira, scroll da zoom). */
+/* CRAQUE — OrbitControls do three.js r0.140.0 (examples/js/controls, MIT), vendorizado junto
+   com three.min.js — controla a câmera do campo 3D (arrastar gira, scroll dá zoom). */
 ( function () {
 
 	// Unlike TrackballControls, it maintains the "up" direction object.up (+Y by default).

@@ -1480,3 +1480,51 @@ usam a mesma). Nova faixa `.modal2-scene` no modal de evento de vida (`js/ui.js`
 
 Validado: 213/213 testes (2 novos — cobertura de todos os 17 eventos + fallback pra id
 desconhecido).
+
+---
+
+## Estádio 3D real (substitui a arquibancada procedural — feedback do usuário)
+
+Usuário testou o estádio procedural (4 paredes retas + textura de torcida em canvas,
+item acima) e considerou "muito feio... amador", mandando um novo print do Football
+Manager e pedindo explicitamente pra achar um modelo de verdade num repositório, em vez
+de continuar construindo geometria na mão.
+
+**Modelo**: "Football stadium" por Poly by Google, licença **CC-BY 3.0**
+(https://creativecommons.org/licenses/by/3.0/), baixado via
+[poly.pizza](https://poly.pizza/m/6TZCkGh76m5) — espelho público, sem login, do extinto
+Google Poly. Pesquisa de licenciamento descartou Sketchfab (a maioria dos modelos free
+lá usa a licença "Standard" própria da Sketchfab, não redistribuível, e o download exige
+conta logada — fora do que este assistente pode fazer em nome do usuário) antes de
+chegar no poly.pizza como fonte com direito de redistribuição claro e download direto.
+
+**Vendorização** (mesmo espírito de `embed-crests.mjs`/`sync-ages.mjs`: busca externa só
+em tempo de setup, nunca em tempo de execução pro jogador):
+- `scripts/vendor-stadium.mjs` (novo) baixa o `.glb`, confere a assinatura binária
+  (`glTF`) e grava `js/vendor/stadium-model.js` como base64
+  (`CQ.STADIUM_GLB_B64`) — ~140 KB de texto pra ~103 KB de binário original.
+- `scripts/vendor-three.mjs` ganhou um 3º arquivo: `js/vendor/GLTFLoader.js` (three.js
+  r140, `examples/js/loaders`, build clássico não-módulo, mesmo motivo de versão do
+  `three.min.js`/`OrbitControls.js` já vendorizados).
+- `js/pitch3d.js`: `buildStadium` decodifica o base64 pra `ArrayBuffer` (`atob` +
+  `Uint8Array`, sem nenhuma rede) e chama `new THREE.GLTFLoader().parse(...)` — nunca
+  `.load(url)`, porque não existe URL nenhuma em tempo de execução. Carregamento é
+  assíncrono; um contador `mountGen` (incrementado em `unmount()` e no início de cada
+  `buildStadium()`) descarta o callback se o jogador já tiver fechado a partida ao vivo
+  antes do modelo terminar de decodificar — mesmo cuidado de ciclo de vida do contexto
+  WebGL já usado no resto de `pitch3d.js`.
+- Posicionamento calibrado por bounding box (`THREE.Box3().setFromObject`) via
+  introspecção da cena ao vivo — sem screenshot disponível nesta sessão, mesma técnica
+  de verificação estrutural já usada no item anterior.
+- Placas de publicidade e refletores procedurais (do item anterior) foram mantidos,
+  reposicionados em torno do modelo real; as 4 paredes retas + textura de torcida em
+  canvas foram removidas.
+
+**Atribuição obrigatória pela licença CC-BY**: linha nova no rodapé da capa
+(`coverHTML`, `js/ui.js`) — "Modelo 3D do estádio: 'Football stadium' por Poly by
+Google, CC-BY 3.0" com link pra licença. Documentado aqui e em `ARCHITECTURE.md` também.
+
+Bundle cresceu de ~2.0 MB pra **2137 KB** (modelo 3D embutido + loader). Validado:
+217/217 testes + verificação manual (atribuição renderiza na capa, carregamento sem
+erro no console, 8 ciclos de abrir/fechar partida ao vivo sem vazamento de contexto
+WebGL).

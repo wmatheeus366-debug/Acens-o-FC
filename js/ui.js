@@ -209,6 +209,7 @@ window.CQ = window.CQ || {};
       </div>
       <div class="btnrow mt8"><button class="btn btn-ghost" onclick="CQ.ui.go('hall')">${I.trophy} Hall da Fama</button></div>
       <div class="cover-foot">Roda 100% no seu navegador · progresso salvo localmente</div>
+      <div class="cover-foot small">Modelo 3D do estádio: "Football stadium" por Poly by Google, <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener" style="color:inherit">CC-BY 3.0</a></div>
     </div>`;
   }
 

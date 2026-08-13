@@ -12,8 +12,9 @@ Desenvolvimento com arquivos separados; distribuição num arquivo único `CRAQU
 | `js/birthdates.js` | `CQ.BIRTHDATES` | Data de nascimento REAL de jogadores de `REAL_SQUADS` (gerado, cresce aos poucos — `scripts/sync-ages.mjs`) | — |
 | `js/world.js` | `CQ.world` | Mundo persistente: identidade estável de NPCs nos 191 clubes, envelhecimento/aposentadoria ano a ano | util, DATA, (BIRTHDATES) |
 | `js/pitch.js` | `CQ.pitch` | Formação (11 posições) e tradução evento→pose visual (`poseFor`/`poseForKick`), 100% renderizador-agnóstico; `buildPitchSVG` (campo 2D antigo) continua exportado mas não é mais chamado pela UI | util, DATA |
-| `js/vendor/three.min.js`, `js/vendor/OrbitControls.js` | `THREE` (global) | three.js r140 (build UMD clássico) + controles de câmera, vendorizados — única dependência externa do projeto, refetch via `scripts/vendor-three.mjs` | — |
-| `js/pitch3d.js` | `CQ.pitch3d` | Campo 3D de verdade do modo Ao Vivo (WebGL): monta a cena, consome `CQ.pitch.poseFor`/`poseForKick` sem alteração | util, DATA, pitch, THREE |
+| `js/vendor/three.min.js`, `js/vendor/OrbitControls.js`, `js/vendor/GLTFLoader.js` | `THREE` (global) | three.js r140 (build UMD clássico) + controles de câmera + loader de modelos glTF, vendorizados — única dependência externa do projeto, refetch via `scripts/vendor-three.mjs` | — |
+| `js/vendor/stadium-model.js` | `CQ.STADIUM_GLB_B64` | Modelo 3D real do estádio ("Football stadium" por Poly by Google, CC-BY 3.0), embutido como base64 — refetch via `scripts/vendor-stadium.mjs` | — |
+| `js/pitch3d.js` | `CQ.pitch3d` | Campo 3D de verdade do modo Ao Vivo (WebGL): monta a cena, decodifica `CQ.STADIUM_GLB_B64` via `GLTFLoader.parse()`, consome `CQ.pitch.poseFor`/`poseForKick` sem alteração | util, DATA, pitch, THREE, STADIUM_GLB_B64 |
 | `js/engine.js` | `CQ.engine` | Modelo, calendário, simulação, prêmios, mercado, técnico, traços, aposentadoria | util, DATA, world, (nar) |
 | `js/market.js` | `CQ.market` | Mercado autônomo entre NPCs: clubes comprando/vendendo jogadores entre si a cada temporada | util, DATA, world, engine |
 | `js/narrative.js` | `CQ.nar` | Feed, entrevistas, eventos de vida, enquetes, rival | util, DATA, engine |
@@ -427,8 +428,46 @@ WebGL no console.
 
 **Simplificações documentadas** (não são bugs, escopo desta fatia): jogadores são
 cilindro+esfera, não modelo rigged; camisa em cor sólida, sem padrão de listras; sem
-sombra/arquibancada/física de bola; sem fallback pro campo 2D se `WebGLRenderer` falhar
-ao inicializar (mostra aviso simples em vez de manter os dois sistemas em paralelo).
+sombra/física de bola; sem fallback pro campo 2D se `WebGLRenderer` falhar ao inicializar
+(mostra aviso simples em vez de manter os dois sistemas em paralelo). A arquibancada
+inicialmente era 100% procedural (4 paredes + textura de torcida em canvas) — ver seção
+seguinte pra como isso foi substituído por um modelo real.
+
+### Estádio: de procedural pra modelo 3D real (feedback do usuário — "muito amador")
+
+A primeira versão da arquibancada era geometria simples de propósito (4 `BoxGeometry`
+com textura de pontinhos coloridos simulando torcida). O usuário testou, comparou com um
+print do Football Manager e pediu explicitamente um modelo de verdade "de algum
+repositório" em vez de mais geometria feita à mão.
+
+**Fonte**: [poly.pizza](https://poly.pizza/m/6TZCkGh76m5) (espelho público, sem login,
+do extinto Google Poly) — modelo "Football stadium" por Poly by Google, **licença CC-BY
+3.0**. Pesquisa descartou Sketchfab: a maior parte dos modelos free lá usa a licença
+"Standard" da própria Sketchfab (não redistribuível) e exige conta logada pra baixar —
+nenhum agente deste projeto pode logar/criar conta em nome do usuário.
+
+**Vendorização** (mesmo princípio de `js/crests.js`/`js/birthdates.js` — busca externa
+só em tempo de setup, nunca em runtime):
+- `scripts/vendor-stadium.mjs` baixa o `.glb`, valida a assinatura binária (`"glTF"` nos
+  4 primeiros bytes) e grava `js/vendor/stadium-model.js` (`CQ.STADIUM_GLB_B64`, base64).
+- `scripts/vendor-three.mjs` ganhou `js/vendor/GLTFLoader.js` (three.js r140, mesmo
+  build clássico não-módulo de `three.min.js`/`OrbitControls.js`).
+
+**Carregamento** (`js/pitch3d.js`, `loadStadiumModel`): decodifica o base64 pra
+`ArrayBuffer` (`atob` + `Uint8Array`, cacheado após a 1ª partida) e chama
+`new THREE.GLTFLoader().parse(buf, "", onLoad, onError)` — nunca `.load(url)`, já que
+não existe URL nenhuma em runtime, garantindo zero chamada de rede pro jogador. O parse
+é assíncrono; o mesmo contador `mountGen` que já protegia o ciclo de vida do
+`WebGLRenderer` (incrementado em `unmount()` e no início de cada `buildStadium()`)
+descarta o callback se a partida ao vivo já tiver sido fechada antes do modelo terminar
+de decodificar. Posição calibrada por `THREE.Box3().setFromObject()` via introspecção da
+cena (sem screenshot disponível nesta sessão). Placas de publicidade e refletores
+procedurais foram mantidos e reposicionados ao redor do modelo real.
+
+**Atribuição obrigatória** (CC-BY exige crédito visível, não só em docs): linha nova no
+rodapé da capa (`coverHTML`, `js/ui.js`) linkando pra `creativecommons.org/licenses/by/3.0`.
+
+Bundle: `2137 KB` (modelo 3D embutido + `GLTFLoader.js`). Validado: 217/217 testes.
 
 ## Sistema de ídolo em camadas (item 6 do roteiro, feito)
 
