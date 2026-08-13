@@ -1374,3 +1374,25 @@ textura de rosto/uniforme detalhada, sem rig/animação de membro) — só a geo
 ficou mais parecida com uma pessoa. Validado visualmente no Browser pane (câmera
 aproximada manualmente via console pra inspecionar um jogador de perto) e nos 182/182
 testes (nenhum deles depende da geometria interna do boneco, só de `toWorld`).
+
+---
+
+## Redes sociais reagindo de verdade a decisões (item 8 do roteiro)
+
+"Resultado de partida" já estava bem coberto por `onMatch` desde sessões anteriores
+(hat-tricks, gols decisivos, defesaças, clássicos, duelo com o rival, marcos). O gap
+real estava em **decisões**: `applyLifeEvent` só reagia a 3 dos 17 eventos de vida
+(`hospital`/`influencer`/`coletiva`), hard-coded — as outras 14 escolhas eram
+invisíveis pro feed.
+
+- Novo campo `social` (opcional) direto na opção do evento (mesmo padrão de `label`/
+  `fx`/`note`): `{k: perfil, text: "...", hot?}`, com `{name}`/`{club}` interpolados
+  (`fillNames`, novo helper). `applyLifeEvent` virou 1 linha genérica no lugar dos 3
+  `if (ev.id === ...)`.
+- **30 das 48 opções** de eventos de vida agora geram post real no feed (antes eram só
+  3 casos). Deliberadamente não é 100% — a opção mais neutra de cada evento fica de fora,
+  mesmo espírito de "só o que vira notícia de verdade" que `onMatch` já seguia.
+- Corrigido de brinde um bug de isolamento nos testes do Hall da Fama (não afetava
+  produção): `testInductAddsToHall`/`testHallCapEnforced` não setavam `CQ.state.game`
+  antes de chamar `induct()`, que internamente lê `CQ.ui.careerLegacy(p)` → `g()`.
+- Validado: 191/191 testes (2 novos).

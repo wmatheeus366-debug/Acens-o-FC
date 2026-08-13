@@ -7600,59 +7600,64 @@ window.CQ = window.CQ || {};
   }
 
   // ---------- eventos de vida ----------
+  // `social` (opcional, por opção): reação de verdade no feed pra decisão tomada — não só
+  // pros 2-3 eventos que já tinham isso hard-coded antes. `k` é o perfil (mesmo dicionário
+  // PROFILES já usado pelo resto do feed), `text` aceita {name}/{club} (ver fillNames).
+  // Nem toda opção precisa de post (a mais neutra/mediana costuma ficar de fora, mesmo
+  // espírito de "só o que realmente vira notícia" que onMatch já segue pros resultados).
   const LIFE_EVENTS = [
     {
       id: "hospital", title: "Visita ao hospital infantil",
       desc: "A assessoria do clube organizou uma visita ao hospital infantil da cidade. As crianças pediram você.",
       opts: [
-        { label: "Ir e passar a tarde com as crianças", fx: { rep: +6, fame: +2, cond: -4 }, note: "As fotos correram as redes. O gesto tocou a cidade." },
+        { label: "Ir e passar a tarde com as crianças", fx: { rep: +6, fame: +2, cond: -4 }, note: "As fotos correram as redes. O gesto tocou a cidade.", social: { k: "torcida", text: "Fotos do {name} no hospital infantil hoje. Ídolo dentro e fora de campo. 👏" } },
         { label: "Ir rapidinho, tirar fotos e sair", fx: { rep: +1, fame: +1 }, note: "Cumpriu tabela. Passou despercebido." },
-        { label: "Recusar para focar no treino", fx: { rep: -4, cond: +5 }, note: "O corpo agradece, mas a imprensa registrou a ausência." }
+        { label: "Recusar para focar no treino", fx: { rep: -4, cond: +5 }, note: "O corpo agradece, mas a imprensa registrou a ausência.", social: { k: "zoeira", text: "{name} recusou visita ao hospital pra treinar. Prioridades, né?" } }
       ]
     },
     {
       id: "empresario", title: "Reunião com o empresário",
       desc: "Seu empresário apareceu com um contrato de publicidade de uma marca de energético.",
       opts: [
-        { label: "Assinar o contrato", fx: { money: 350000, fame: +3, rep: -2 }, note: "Outdoor na avenida principal. O bolso agradece." },
+        { label: "Assinar o contrato", fx: { money: 350000, fame: +3, rep: -2 }, note: "Outdoor na avenida principal. O bolso agradece.", social: { k: "imprensa", text: "{name} fecha contrato milionário com marca de energético — outdoor já estampa a avenida principal." } },
         { label: "Pedir mais tempo para pensar", fx: {}, note: "O empresário torceu o nariz, mas aceitou." },
-        { label: "Recusar: imagem vem antes de dinheiro", fx: { rep: +4 }, note: "A decisão virou pauta positiva nos jornais." }
+        { label: "Recusar: imagem vem antes de dinheiro", fx: { rep: +4 }, note: "A decisão virou pauta positiva nos jornais.", social: { k: "mesa", text: "{name} recusa proposta publicitária por questão de imagem. Postura elogiada pela crítica." } }
       ]
     },
     {
       id: "coletiva", title: "Coletiva de imprensa",
       desc: "O clube pediu que você participe da coletiva da semana. Os jornalistas estão afiados.",
       opts: [
-        { label: "Responder tudo com diplomacia", fx: { rep: +3 }, note: "Saiu ileso e elogiado pela postura." },
-        { label: "Alfinetar o próximo adversário", fx: { fame: +4, rep: -3, morale: +2 }, note: "Manchete no dia seguinte. O clima do jogo esquentou." },
-        { label: "Dar respostas curtas e ir embora", fx: { rep: -2, cond: +3 }, note: "A imprensa achou arrogante, mas você descansou." }
+        { label: "Responder tudo com diplomacia", fx: { rep: +3 }, note: "Saiu ileso e elogiado pela postura.", social: { k: "mesa", text: "Postura serena de {name} na coletiva de hoje — nenhuma pergunta armadilha pegou." } },
+        { label: "Alfinetar o próximo adversário", fx: { fame: +4, rep: -3, morale: +2 }, note: "Manchete no dia seguinte. O clima do jogo esquentou.", social: { k: "mesa", text: "{name} provoca o próximo adversário em coletiva: \"que venham\". O jogo esquentou.", hot: true } },
+        { label: "Dar respostas curtas e ir embora", fx: { rep: -2, cond: +3 }, note: "A imprensa achou arrogante, mas você descansou.", social: { k: "zoeira", text: "Entrevista-relâmpago do {name} hoje. Simpatia não é bem o forte da vez." } }
       ]
     },
     {
       id: "aniversario", title: "Aniversário da namorada",
       desc: "O aniversário dela caiu na véspera de jogo. Ela quer uma festa; o preparador quer você na cama às 22h.",
       opts: [
-        { label: "Festa completa até tarde", fx: { morale: +8, cond: -10, rep: -2 }, note: "A festa foi linda. O treino do dia seguinte, nem tanto." },
+        { label: "Festa completa até tarde", fx: { morale: +8, cond: -10, rep: -2 }, note: "A festa foi linda. O treino do dia seguinte, nem tanto.", social: { k: "zoeira", text: "Fotos da festa badalada da véspera rodando as redes. Treino de hoje promete." } },
         { label: "Jantar íntimo e voltar cedo", fx: { morale: +4, cond: -2 }, note: "Equilíbrio de atleta profissional." },
-        { label: "Adiar a comemoração", fx: { morale: -5, cond: +4, rep: +1 }, note: "Foco total no jogo... e um gelo em casa." }
+        { label: "Adiar a comemoração", fx: { morale: -5, cond: +4, rep: +1 }, note: "Foco total no jogo... e um gelo em casa.", social: { k: "torcida", text: "{name} abriu mão da festa da namorada pra focar 100% no jogo. Isso é profissional." } }
       ]
     },
     {
       id: "colega", title: "Colega de elenco em crise",
       desc: "Um companheiro vem sendo massacrado pela torcida após falhas seguidas. O vestiário está dividido.",
       opts: [
-        { label: "Defendê-lo publicamente", fx: { rep: +5, morale: +3 }, note: "O elenco fechou com você. Liderança reconhecida." },
+        { label: "Defendê-lo publicamente", fx: { rep: +5, morale: +3 }, note: "O elenco fechou com você. Liderança reconhecida.", social: { k: "mesa", text: "{name} saiu em defesa pública do companheiro criticado. Elenco fechado." } },
         { label: "Apoiar só no privado", fx: { morale: +2 }, note: "Ele agradeceu. Ninguém ficou sabendo." },
-        { label: "Ficar de fora da polêmica", fx: { rep: -2 }, note: "Neutralidade também é escolha — e o grupo percebeu." }
+        { label: "Ficar de fora da polêmica", fx: { rep: -2 }, note: "Neutralidade também é escolha — e o grupo percebeu.", social: { k: "zoeira", text: "Colega sendo detonado pela torcida e nem um post de apoio do {name}. Reparado." } }
       ]
     },
     {
       id: "influencer", title: "Convite de influencer",
       desc: "Um influencer gigante chamou você para um vídeo de desafios no CT. O clube liberou, mas em dia de folga.",
       opts: [
-        { label: "Gravar o vídeo", fx: { fame: +6, cond: -5 }, note: "Milhões de views. Seu nome explodiu nas redes." },
+        { label: "Gravar o vídeo", fx: { fame: +6, cond: -5 }, note: "Milhões de views. Seu nome explodiu nas redes.", social: { k: "imprensa", text: "{name} quebra a internet em vídeo com influencer: milhões de views em 24h." } },
         { label: "Só se for depois da temporada", fx: { fame: +1 }, note: "Ficou a promessa. O influencer entendeu." },
-        { label: "Recusar: folga é folga", fx: { cond: +6, fame: -1 }, note: "Descanso completo. As redes que esperem." }
+        { label: "Recusar: folga é folga", fx: { cond: +6, fame: -1 }, note: "Descanso completo. As redes que esperem.", social: { k: "zoeira", text: "Convite de influencer gigante recusado pelo {name}. Exigente, hein." } }
       ]
     },
     {
@@ -7667,16 +7672,16 @@ window.CQ = window.CQ || {};
       id: "jantar", title: "Jantar com a diretoria",
       desc: "O presidente do clube convidou você para um jantar em família. Sinal de prestígio — ou de cobrança.",
       opts: [
-        { label: "Ir e conversar sobre o futuro", fx: { rep: +3, morale: +3 }, note: "Saiu do jantar com moral e promessas." },
+        { label: "Ir e conversar sobre o futuro", fx: { rep: +3, morale: +3 }, note: "Saiu do jantar com moral e promessas.", social: { k: "clube", text: "Jantar produtivo entre {name} e a diretoria. Clima de confiança pro resto da temporada." } },
         { label: "Ir, mas só ouvir", fx: { rep: +1 }, note: "Educado e discreto. Anotaram." },
-        { label: "Inventar compromisso", fx: { rep: -4, cond: +3 }, note: "A cadeira vazia foi notada na mesa do presidente." }
+        { label: "Inventar compromisso", fx: { rep: -4, cond: +3 }, note: "A cadeira vazia foi notada na mesa do presidente.", social: { k: "mesa", text: "{name} não apareceu no jantar com a diretoria do {club}. Cadeira vazia rendeu assunto." } }
       ]
     },
     {
       id: "base", title: "Visita à base",
       desc: "O coordenador da base pediu que você passe uma tarde com os meninos do sub-15. Muitos têm você como ídolo.",
       opts: [
-        { label: "Passar a tarde e dar uma palestra", fx: { rep: +5, morale: +4, cond: -3 }, note: "Os meninos não esqueceram. Você também não." },
+        { label: "Passar a tarde e dar uma palestra", fx: { rep: +5, morale: +4, cond: -3 }, note: "Os meninos não esqueceram. Você também não.", social: { k: "torcida", text: "{name} passou a tarde com a base do {club}. Os moleques não vão esquecer isso." } },
         { label: "Mandar um vídeo gravado", fx: { rep: +1 }, note: "Melhor que nada, disse o coordenador." }
       ]
     },
@@ -7684,16 +7689,16 @@ window.CQ = window.CQ || {};
       id: "documentario", title: "Proposta de documentário",
       desc: "Uma plataforma de streaming quer produzir um documentário sobre a sua vida e carreira.",
       opts: [
-        { label: "Topar e abrir a intimidade", fx: { fame: +8, rep: -1, money: 400000 }, note: "Câmeras te seguem por meses. O público amou." },
+        { label: "Topar e abrir a intimidade", fx: { fame: +8, rep: -1, money: 400000 }, note: "Câmeras te seguem por meses. O público amou.", social: { k: "imprensa", text: "Documentário sobre a vida de {name} é anunciado por streaming. Câmeras vão acompanhar tudo." } },
         { label: "Só se focar no futebol", fx: { fame: +3 }, note: "Um recorte respeitoso — e bem recebido." },
-        { label: "Recusar: prefiro privacidade", fx: { rep: +3 }, note: "Sua vida continua sua. A imprensa respeitou." }
+        { label: "Recusar: prefiro privacidade", fx: { rep: +3 }, note: "Sua vida continua sua. A imprensa respeitou.", social: { k: "mesa", text: "{name} recusa documentário e preserva a privacidade. Decisão respeitada pela imprensa." } }
       ]
     },
     {
       id: "tenis", title: "Chuteira nova de patrocínio",
       desc: "Uma fabricante lançou uma chuteira e quer você como rosto da campanha, com um modelo exclusivo.",
       opts: [
-        { label: "Assinar contrato milionário", fx: { money: 700000, fame: +5 }, note: "Sua chuteira esgota nas lojas em uma semana." },
+        { label: "Assinar contrato milionário", fx: { money: 700000, fame: +5 }, note: "Sua chuteira esgota nas lojas em uma semana.", social: { k: "imprensa", text: "Chuteira assinada por {name} esgota nas lojas em uma semana. Contrato milionário rendendo." } },
         { label: "Pedir modelo personalizado", fx: { money: 300000, morale: +2 }, note: "Cores do seu jeito. Estilo é tudo." },
         { label: "Manter a marca antiga", fx: { rep: +2 }, note: "Fidelidade também tem valor." }
       ]
@@ -7702,7 +7707,7 @@ window.CQ = window.CQ || {};
       id: "torcedor", title: "Torcedor doente no hospital",
       desc: "Um torcedor internado, fã incondicional seu, fez o pedido de te conhecer antes de uma cirurgia importante.",
       opts: [
-        { label: "Ir pessoalmente ao hospital", fx: { rep: +8, morale: +3, cond: -2 }, note: "Um momento que nenhum troféu paga. Ele foi pra cirurgia sorrindo." },
+        { label: "Ir pessoalmente ao hospital", fx: { rep: +8, morale: +3, cond: -2 }, note: "Um momento que nenhum troféu paga. Ele foi pra cirurgia sorrindo.", social: { k: "torcida", text: "{name} visitou torcedor internado antes de uma cirurgia importante. A torcida do {club} inteira se emocionou." } },
         { label: "Enviar camisa autografada e vídeo", fx: { rep: +3 }, note: "O gesto emocionou a família." }
       ]
     },
@@ -7710,18 +7715,18 @@ window.CQ = window.CQ || {};
       id: "arbitro", title: "Polêmica com a arbitragem",
       desc: "Um pênalti não marcado custou pontos ao time. Os repórteres cercam você querendo declaração.",
       opts: [
-        { label: "Detonar a arbitragem publicamente", fx: { fame: +4, rep: -4, morale: +2 }, note: "Manchete garantida — e possível multa da federação." },
+        { label: "Detonar a arbitragem publicamente", fx: { fame: +4, rep: -4, morale: +2 }, note: "Manchete garantida — e possível multa da federação.", social: { k: "imprensa", text: "{name} detona a arbitragem em entrevista após pênalti não marcado. Bomba pra semana.", hot: true } },
         { label: "Reclamar com diplomacia", fx: { rep: +1 }, note: "Firme, mas sem passar do ponto." },
-        { label: "Dizer que erros fazem parte", fx: { rep: +4, morale: -1 }, note: "Maturidade elogiada nos estúdios." }
+        { label: "Dizer que erros fazem parte", fx: { rep: +4, morale: -1 }, note: "Maturidade elogiada nos estúdios.", social: { k: "mesa", text: "Maturidade de {name} ao comentar o erro da arbitragem sem drama. Elogiado nos estúdios." } }
       ]
     },
     {
       id: "vaquinha", title: "Causa social na comunidade",
       desc: "Sua comunidade de origem pede ajuda para reformar o campinho onde você começou a jogar.",
       opts: [
-        { label: "Bancar a reforma inteira", fx: { money: -500000, rep: +10, morale: +4 }, note: "O campo agora leva o seu nome. Gerações vão jogar ali." },
-        { label: "Doar uma parte e mobilizar", fx: { money: -150000, rep: +5 }, note: "Você deu o pontapé; a comunidade completou." },
-        { label: "Prometer ajudar mais pra frente", fx: { rep: -2 }, note: "A promessa ficou no ar." }
+        { label: "Bancar a reforma inteira", fx: { money: -500000, rep: +10, morale: +4 }, note: "O campo agora leva o seu nome. Gerações vão jogar ali.", social: { k: "torcida", text: "{name} banca sozinho a reforma completa do campinho onde começou a jogar. Comunidade em festa.", hot: true } },
+        { label: "Doar uma parte e mobilizar", fx: { money: -150000, rep: +5 }, note: "Você deu o pontapé; a comunidade completou.", social: { k: "torcida", text: "{name} doa parte da reforma do campinho da comunidade e ainda mobiliza o resto. Gesto reconhecido." } },
+        { label: "Prometer ajudar mais pra frente", fx: { rep: -2 }, note: "A promessa ficou no ar.", social: { k: "zoeira", text: "{name} prometeu ajudar a reforma do campinho da comunidade... segue só na promessa." } }
       ]
     },
     {
@@ -7737,18 +7742,18 @@ window.CQ = window.CQ || {};
       id: "bets", title: "Convite de casa de apostas",
       desc: "Uma casa de apostas esportivas ofereceu um contrato alto pra estampar seu nome em campanha publicitária.",
       opts: [
-        { label: "Assinar o contrato milionário", fx: { money: 900000, fame: +5, rep: -6 }, note: "Cachê gordo, mas parte da torcida não gostou de ver o ídolo estampando aposta." },
-        { label: "Negociar uma campanha de jogo responsável", fx: { money: 400000, rep: +3, fame: +2 }, note: "Meio-termo bem recebido: dinheiro no bolso sem abrir mão da imagem." },
-        { label: "Recusar o convite", fx: { rep: +4 }, note: "Ficou de fora da polêmica — e de uma bolada." }
+        { label: "Assinar o contrato milionário", fx: { money: 900000, fame: +5, rep: -6 }, note: "Cachê gordo, mas parte da torcida não gostou de ver o ídolo estampando aposta.", social: { k: "zoeira", text: "{name} fecha contrato milionário com casa de apostas. Parte da torcida não curtiu ver o ídolo estampando aposta." } },
+        { label: "Negociar uma campanha de jogo responsável", fx: { money: 400000, rep: +3, fame: +2 }, note: "Meio-termo bem recebido: dinheiro no bolso sem abrir mão da imagem.", social: { k: "mesa", text: "{name} negocia campanha de jogo responsável com casa de apostas. Meio-termo bem recebido pela crítica." } },
+        { label: "Recusar o convite", fx: { rep: +4 }, note: "Ficou de fora da polêmica — e de uma bolada.", social: { k: "mesa", text: "{name} recusa contrato milionário com casa de apostas por questão de imagem." } }
       ]
     },
     {
       id: "presidente_evento", title: "Convite do presidente do clube",
       desc: "O presidente do clube fez questão de te chamar pessoalmente pra prestigiar um evento institucional na próxima semana.",
       opts: [
-        { label: "Comparecer e discursar", fx: { rep: +5, morale: +3, cond: -3 }, note: "Discurso emocionado, aplausos de pé. O presidente saiu satisfeito." },
+        { label: "Comparecer e discursar", fx: { rep: +5, morale: +3, cond: -3 }, note: "Discurso emocionado, aplausos de pé. O presidente saiu satisfeito.", social: { k: "clube", text: "Discurso emocionado de {name} no evento institucional do {club}. Aplausos de pé, presidente satisfeito." } },
         { label: "Ir e ficar discreto", fx: { rep: +2 }, note: "Presença cumprida, sem holofote." },
-        { label: "Recusar por causa da rotina de treinos", fx: { rep: -3, cond: +4 }, note: "O presidente entendeu, mas anotou a ausência." }
+        { label: "Recusar por causa da rotina de treinos", fx: { rep: -3, cond: +4 }, note: "O presidente entendeu, mas anotou a ausência.", social: { k: "mesa", text: "{name} não compareceu ao evento institucional do {club}, citando a rotina de treinos." } }
       ]
     }
   ];
@@ -7763,6 +7768,11 @@ window.CQ = window.CQ || {};
     return ev;
   }
 
+  // {name}/{club} nos textos de opt.social — mesmo espírito do fill() de injectPoll,
+  // só que sem {rival} (eventos de vida não giram em torno do rival de geração).
+  function fillNames(g, s) {
+    return s.replace(/\{name\}/g, first(g.player.name)).replace(/\{club\}/g, CQ.engine.myClub(g).name);
+  }
   function applyLifeEvent(g, ev, opt) {
     const p = g.player, fx = opt.fx || {};
     if (fx.rep) p.rep = U.clamp(p.rep + fx.rep, 0, 100);
@@ -7770,9 +7780,9 @@ window.CQ = window.CQ || {};
     if (fx.morale) p.morale = U.clamp(p.morale + fx.morale, 5, 100);
     if (fx.cond) p.condition = U.clamp(p.condition + fx.cond, 0, 100);
     if (fx.money) p.money += fx.money;
-    if (ev.id === "hospital" && fx.rep >= 6) post(g, "torcida", "Fotos do " + first(p.name) + " no hospital infantil hoje. Ídolo dentro e fora de campo. 👏");
-    if (ev.id === "influencer" && fx.fame >= 6) post(g, "imprensa", p.name + " quebra a internet em vídeo com influencer: 12 milhões de views em 24h.");
-    if (ev.id === "coletiva" && fx.rep < 0 && fx.fame > 0) post(g, "mesa", p.name + " provoca próximo adversário em coletiva: \"que venham\". O jogo esquentou.");
+    // a decisão tomada agora sempre pode virar post — cada opção que merece repercussão
+    // já carrega o próprio texto (ver LIFE_EVENTS acima), em vez de checar fx solto aqui.
+    if (opt.social) post(g, opt.social.k, fillNames(g, opt.social.text), opt.social.hot ? { hot: true } : {});
   }
 
   // ---------- fim de temporada ----------
@@ -7810,7 +7820,7 @@ window.CQ = window.CQ || {};
   }
 
   CQ.nar = {
-    PROFILES: PROFILES,
+    PROFILES: PROFILES, LIFE_EVENTS: LIFE_EVENTS,
     post: post, onMatch: onMatch, preMatch: preMatch, onSeasonEnd: onSeasonEnd,
     maybeInterview: maybeInterview, applyInterview: applyInterview,
     maybePressConference: maybePressConference,

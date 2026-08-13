@@ -47,7 +47,7 @@ Fontes (Google Fonts) e bandeiras (flagcdn) vêm da web com fallback; todo o res
 
 ```
 # no navegador (index.html ou CRAQUE.html aberto), console:
-CQ.tests.run()             # tests/regression.js — ~188 checagens
+CQ.tests.run()             # tests/regression.js — ~191 checagens
 
 # idade real dos elencos (resumível — roda até bater na cota diária, ~100 req/dia):
 node scripts/sync-ages.mjs [teto de chamadas ao vivo, padrão 90]
@@ -290,7 +290,8 @@ preenchido numa derrota); banner de título com ordinal (BICAMPEÃO...PENTACAMPE
 6. ✅ **Sistema de ídolo em camadas (feito).** Ver seção própria abaixo.
 7. ✅ **Salvar carreira pra sempre ao aposentar ("hall da fama") — feito.** Ver seção
    própria abaixo.
-8. Redes sociais reagindo de verdade a resultado/decisão.
+8. ✅ **Redes sociais reagindo de verdade a resultado/decisão — feito.** Ver seção
+   própria abaixo.
 9. Layout: painéis laterais usando o espaço vazio dos modais.
 10. Avatar editorial/silhueta no lugar do retrato cartunesco.
 11. Calendário por mês + filtro por competição.
@@ -489,3 +490,28 @@ esquema de `g`.
 
 Validado: 188/188 testes (indução adiciona cartão com os números certos, teto de 60
 respeitado mantendo as mais recentes, tela renderiza com e sem hall vazio).
+
+## Redes sociais reagindo de verdade a decisões (item 8 do roteiro, feito)
+
+Investigação prévia mostrou que "resultado de partida" já estava bem coberto —
+`onMatch` (`js/narrative.js`) já reage a hat-tricks, gols decisivos, defesaças,
+atuações ruins, clássicos, duelo com o rival de geração, marcos de carreira etc. desde
+sessões anteriores. O gap real estava em **decisões**: `applyLifeEvent` só tinha
+reação social hard-coded pra 3 dos 17 eventos de vida (`hospital`/`influencer`/
+`coletiva`) — as outras 14 escolhas eram completamente invisíveis pro feed.
+
+Refatorado pra um campo genérico `social` (opcional) direto na opção do evento, no
+mesmo padrão de `label`/`fx`/`note` que já existia — `{k: perfil, text: "...", hot?}`,
+com `{name}`/`{club}` interpolados (`fillNames`, novo helper). `applyLifeEvent` virou
+1 linha (`if (opt.social) post(...)`) no lugar dos 3 `if (ev.id === ...)` fixos.
+Resultado: **30 das 48 opções** de eventos de vida agora geram um post real — deliberado
+não ser 100% (a opção mais "morna"/neutra de cada evento costuma ficar de fora, mesmo
+espírito de "só o que vira notícia de verdade" que `onMatch` já seguia pros resultados).
+
+Validado: 191/191 testes (2 novos — cobertura ≥50% das opções, e um evento específico
+confirmando post/não-post conforme a opção escolhida). Também corrigiu um bug de
+isolamento nos testes do Hall da Fama (`testInductAddsToHall`/`testHallCapEnforced`
+não setavam `CQ.state.game` antes de chamar `induct()`, que internamente lê
+`CQ.ui.careerLegacy(p)` → `g()` — nunca afetava produção, já que `summaryNext()`
+sempre chama `induct(G)` com `G === CQ.state.game` por construção, mas quebrava em
+página recém-carregada sem `CQ.state.game` prévio).

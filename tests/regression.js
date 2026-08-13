@@ -981,6 +981,7 @@
   function testInductAddsToHall() {
     withTempGame(function () {
       const g = newCareer("ATA", "fla");
+      CQ.state.game = g; // induct() -> CQ.ui.careerLegacy(p) lê CQ.state.game internamente
       g.player.career = [{ year: 2026, clubId: "fla", clubName: "Flamengo", league: "Série A", pos: "ATA", j: 30, g: 20, a: 10, cs: 0, avg: 7.5, ov: 85, titles: [], awards: [], onLoan: false }];
       g.player.titles = [{ year: 2026, key: "LIGA", name: "Brasileirão", club: "Flamengo" }];
       g.year = 2030;
@@ -1001,6 +1002,7 @@
       const raw = localStorage.getItem("craque-hall-v1");
       localStorage.removeItem("craque-hall-v1");
       const g = newCareer("ATA", "fla");
+      CQ.state.game = g; // induct() -> CQ.ui.careerLegacy(p) lê CQ.state.game internamente
       g.player.career = [{ year: 2026, clubId: "fla", clubName: "Flamengo", league: "Série A", pos: "ATA", j: 10, g: 5, a: 2, cs: 0, avg: 7, ov: 80, titles: [], awards: [], onLoan: false }];
       for (let i = 0; i < 65; i++) { g.year = 2026 + i; g.player.name = "Jogador " + i; CQ.main.induct(g); }
       const hall = CQ.main.hallList();
@@ -1140,6 +1142,26 @@
       }
       assert("base: há promessas com overall Europa-relevante em 20 temporadas", euroWorthy > 0, "n=" + euroWorthy);
       assert("base: cada promessa Europa-relevante gera o rumor de olheiro europeu", rumorsFound === euroWorthy, rumorsFound + "/" + euroWorthy);
+    });
+  }
+
+  // ---- Redes sociais reagem de verdade a decisões de eventos de vida (item 8 do roteiro) ----
+  function testLifeEventsSocialCoverage() {
+    const events = CQ.nar.LIFE_EVENTS;
+    let totalOpts = 0, withSocial = 0;
+    events.forEach(function (ev) { ev.opts.forEach(function (o) { totalOpts++; if (o.social) withSocial++; }); });
+    assert("eventos de vida: maioria das opções agora gera reação social no feed (cobertura ampla, não só 2-3 eventos como antes)", withSocial >= totalOpts * 0.5, "com social=" + withSocial + "/" + totalOpts);
+  }
+  function testLifeEventSocialPost() {
+    withTempGame(function () {
+      const g = newCareer("ATA", "fla");
+      const ev = CQ.nar.LIFE_EVENTS.find(function (e) { return e.id === "hospital"; });
+      const before = g.feed.length;
+      CQ.nar.applyLifeEvent(g, ev, ev.opts[0]); // "Ir e passar a tarde" — tem social
+      assert("evento de vida: opção com social posta no feed com o perfil e texto certos", g.feed.length === before + 1 && g.feed[0].k === "torcida" && g.feed[0].text.indexOf("hospital") >= 0, JSON.stringify(g.feed[0]));
+      const before2 = g.feed.length;
+      CQ.nar.applyLifeEvent(g, ev, ev.opts[1]); // "Ir rapidinho" — sem social
+      assert("evento de vida: opção sem social não posta nada (nem toda decisão vira notícia)", g.feed.length === before2, "before=" + before2 + " depois=" + g.feed.length);
     });
   }
 
@@ -1311,6 +1333,8 @@
     testInductAddsToHall();
     testHallCapEnforced();
     testHallHTMLRenders();
+    testLifeEventsSocialCoverage();
+    testLifeEventSocialPost();
     const pass = results.filter(function (r) { return r.pass; }).length;
     console.log("%cCRAQUE regressão: " + pass + "/" + results.length + " passaram", "font-weight:bold");
     results.forEach(function (r) { console.log((r.pass ? "✓" : "✗ FALHOU") + " " + r.name + (r.detail ? "  [" + r.detail + "]" : "")); });
