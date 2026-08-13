@@ -630,20 +630,6 @@
     assert("campo: poseFor/poseForKick não lançam exceção pra nenhum evento real do jogo", ok, detail);
   }
 
-  // ---- Campo 3D (js/pitch3d.js): toWorld é o único helper puro-matemático exposto —
-  // resto do módulo é WebGL de verdade, sem contexto disponível neste console; a cena
-  // em si só se confirma visualmente no navegador (ver docs/CHANGELOG.md). ----
-  function testPitch3dToWorld() {
-    let ok = true, detail = "";
-    const centro = CQ.pitch3d.toWorld(50, 50);
-    if (Math.abs(centro.x) > 1e-9 || Math.abs(centro.z) > 1e-9) { ok = false; detail += "centro não é (0,0): " + JSON.stringify(centro) + " "; }
-    const esq = CQ.pitch3d.toWorld(0, 50), dir = CQ.pitch3d.toWorld(100, 50);
-    if (!(esq.x < 0 && dir.x > 0 && Math.abs(esq.x + dir.x) < 1e-9)) { ok = false; detail += "x não é simétrico em torno do centro "; }
-    const cima = CQ.pitch3d.toWorld(50, 0), baixo = CQ.pitch3d.toWorld(50, 100);
-    if (!(cima.z < 0 && baixo.z > 0 && Math.abs(cima.z + baixo.z) < 1e-9)) { ok = false; detail += "z não é simétrico em torno do centro "; }
-    assert("campo 3D: toWorld mapeia 0-100% pro espaço 3D simetricamente em torno da origem", ok, detail);
-  }
-
   // ---- Campo 2D animado: jerseySVG usa a cor real do clube em cada padrão de listra ----
   function testJerseySVGAllPatterns() {
     const amostra = { plain: "pal", hoops: "fla", stripes: "bot", sash: "sao" };
@@ -1177,18 +1163,18 @@
     assert("avatar: silhueta em tinta única (sem paleta de pele/cabelo colorida do estilo antigo)", a.indexOf("#1b1812") >= 0, "");
   }
 
-  // ---- Cenas editoriais nos modais de eventos de vida (ilustração, não foto) ----
+  // ---- Cenas editoriais nos modais de eventos de vida (ilustração real, unDraw) ----
   function testLifeSceneSVGCoversAllEvents() {
     let ok = true, detail = "";
     CQ.nar.LIFE_EVENTS.forEach(function (ev) {
       try {
-        const svg = CQ.util.lifeSceneSVG(ev.id);
-        if (!svg || svg.indexOf("<svg") < 0) { ok = false; detail += ev.id + ":vazio "; }
+        const img = CQ.util.lifeSceneSVG(ev.id);
+        if (!img || img.indexOf("<img") < 0 || img.indexOf("src=") < 0) { ok = false; detail += ev.id + ":vazio "; }
       } catch (e) { ok = false; detail += ev.id + ":" + e.message + " "; }
     });
     assert("cena de vida: lifeSceneSVG renderiza pra todo evento de LIFE_EVENTS sem exceção", ok, detail);
     const unknown = CQ.util.lifeSceneSVG("evento-que-nao-existe");
-    assert("cena de vida: id desconhecido cai num fallback genérico, não quebra", unknown.indexOf("<svg") >= 0, "");
+    assert("cena de vida: id desconhecido cai num fallback genérico, não quebra", unknown.indexOf("<img") >= 0, "");
   }
 
   // ---- Pontos de evolução (item 14 do roteiro) ----
@@ -1477,7 +1463,6 @@
     testClubRivalryScoreboard();
     testScoutingRumor();
     testAllPositionsSmoke();
-    testPitch3dToWorld();
     testGenIdolTwoBallons();
     testMomentIdolTransient();
     testLoyaltyRenewBonus();

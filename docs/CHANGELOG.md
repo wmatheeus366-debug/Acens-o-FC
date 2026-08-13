@@ -1528,3 +1528,48 @@ Bundle cresceu de ~2.0 MB pra **2137 KB** (modelo 3D embutido + loader). Validad
 217/217 testes + verificação manual (atribuição renderiza na capa, carregamento sem
 erro no console, 8 ciclos de abrir/fechar partida ao vivo sem vazamento de contexto
 WebGL).
+
+---
+
+## Campo 3D revertido pra 2D + imagens reais (feedback direto do usuário)
+
+Usuário testou o campo 3D + estádio real em produção e mandou 2 prints com o veredito:
+"olha o estadio ta muito feio... isso ta muito amador" e, sobre as ilustrações dos
+eventos de vida, "as imagens preciso que vc pegue em algum repositorio pq olha a merda
+de imagem que ta ai". Pediu explicitamente: 2D no lugar do 3D, e imagens de verdade (de
+"algum site ou repositório") no lugar do que era desenhado à mão.
+
+**Campo 3D → 2D, de vez**: `js/pitch3d.js` e os 4 arquivos vendorizados de three.js
+(`three.min.js`/`OrbitControls.js`/`GLTFLoader.js`/`stadium-model.js`) foram **apagados**
+do repositório — não só desconectados. `js/ui.js` voltou a chamar `CQ.pitch.buildPitchSVG`
+diretamente (o campo 2D já existia, testado, só tinha sido desconectado numa sessão
+anterior — zero código novo nessa parte). CSS `.pv-*` restaurado. **Bundle caiu de
+2137 KB pra 1242 KB** só com essa remoção.
+
+**Ilustrações de eventos de vida** (hospital, contrato, entrevista, casal, time, redes
+sociais, descanso, evento formal, base, torcida): as silhuetas de tinta desenhadas à mão
+viraram ilustrações reais da [unDraw](https://undraw.co) (licença livre, sem exigir
+atribuição), uma por categoria, embutidas como base64 em `js/vendor/life-scenes.js`
+(novo `scripts/vendor-life-scenes.mjs`, ~267 KB). Um filtro CSS sépia/saturação tinge as
+cores originais (roxo/rosa) pro tom kraft do resto do jogo.
+
+**Atmosfera de estádio**: uma foto real (Wikimedia Commons, CC BY-SA 3.0, estádio
+genérico de Brno — sem marca reconhecível) como pano de fundo discreto atrás do
+cabeçalho do modo Ao Vivo, embutida via `js/vendor/stadium-photo.js` (novo
+`scripts/vendor-stadium-photo.mjs`, ~131 KB). Atribuição no rodapé da capa (junto com a
+da unDraw, que não exige mas foi documentada mesmo assim por transparência).
+
+**Cartão também vira splash em tela cheia** (mesmo padrão do gol) — "o jogo precisa tá
+rolando", pedido do usuário — em vez de só uma linha discreta no feed.
+
+**Bug lateral corrigido**: o rodapé da capa tinha 2 linhas de atribuição `position:
+absolute` no mesmo `bottom`, se sobrepondo (nunca percebido antes porque o screenshot do
+Browser pane esteve fora do ar a sessão inteira anterior — agora voltou a funcionar e a
+verificação visual pegou isso de cara).
+
+Bundle final: **1640 KB** (bem abaixo do pico de 2137 KB com o 3D, mesmo com as imagens
+novas). Validado: suíte completa 100% (contagem de testes varia por simulação
+estocástica, sempre com 0 falhas) + verificação visual manual completa no Browser pane
+— campo 2D com marcadores reagindo a decisão/gol/cartão, ilustração real no modal de
+evento de vida, foto de estádio atrás do cabeçalho do Ao Vivo, rodapé da capa sem
+sobreposição.

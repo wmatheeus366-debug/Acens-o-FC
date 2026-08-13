@@ -11,10 +11,9 @@ Desenvolvimento com arquivos separados; distribuição num arquivo único `CRAQU
 | `js/data.js` | `CQ.DATA` | Clubes, ligas, seleções, lendas, posições, elencos reais, recordes | util |
 | `js/birthdates.js` | `CQ.BIRTHDATES` | Data de nascimento REAL de jogadores de `REAL_SQUADS` (gerado, cresce aos poucos — `scripts/sync-ages.mjs`) | — |
 | `js/world.js` | `CQ.world` | Mundo persistente: identidade estável de NPCs nos 191 clubes, envelhecimento/aposentadoria ano a ano | util, DATA, (BIRTHDATES) |
-| `js/pitch.js` | `CQ.pitch` | Formação (11 posições) e tradução evento→pose visual (`poseFor`/`poseForKick`), 100% renderizador-agnóstico; `buildPitchSVG` (campo 2D antigo) continua exportado mas não é mais chamado pela UI | util, DATA |
-| `js/vendor/three.min.js`, `js/vendor/OrbitControls.js`, `js/vendor/GLTFLoader.js` | `THREE` (global) | three.js r140 (build UMD clássico) + controles de câmera + loader de modelos glTF, vendorizados — única dependência externa do projeto, refetch via `scripts/vendor-three.mjs` | — |
-| `js/vendor/stadium-model.js` | `CQ.STADIUM_GLB_B64` | Modelo 3D real do estádio ("Football stadium" por Poly by Google, CC-BY 3.0), embutido como base64 — refetch via `scripts/vendor-stadium.mjs` | — |
-| `js/pitch3d.js` | `CQ.pitch3d` | Campo 3D de verdade do modo Ao Vivo (WebGL): monta a cena, decodifica `CQ.STADIUM_GLB_B64` via `GLTFLoader.parse()`, consome `CQ.pitch.poseFor`/`poseForKick` sem alteração | util, DATA, pitch, THREE, STADIUM_GLB_B64 |
+| `js/pitch.js` | `CQ.pitch` | Formação (11 posições), desenho do campo 2D (`buildPitchSVG`) e tradução evento→pose visual (`poseFor`/`poseForKick`) — renderizador **e** consumido pela UI (voltou a ser o modo Ao Vivo padrão, ver nota abaixo) | util, DATA |
+| `js/vendor/life-scenes.js` | `CQ.LIFE_IMGS` | 10 ilustrações reais (unDraw) dos modais de eventos de vida, embutidas como data-URI base64 — refetch via `scripts/vendor-life-scenes.mjs` | — |
+| `js/vendor/stadium-photo.js` | `CQ.STADIUM_PHOTO` | Foto real de estádio (Wikimedia Commons, CC BY-SA 3.0), embutida como data-URI base64 — pano de fundo do cabeçalho do modo Ao Vivo, refetch via `scripts/vendor-stadium-photo.mjs` | — |
 | `js/engine.js` | `CQ.engine` | Modelo, calendário, simulação, prêmios, mercado, técnico, traços, aposentadoria | util, DATA, world, (nar) |
 | `js/market.js` | `CQ.market` | Mercado autônomo entre NPCs: clubes comprando/vendendo jogadores entre si a cada temporada | util, DATA, world, engine |
 | `js/narrative.js` | `CQ.nar` | Feed, entrevistas, eventos de vida, enquetes, rival | util, DATA, engine |
@@ -237,7 +236,7 @@ Ver BUG-07 no CHANGELOG para o bug original (suspensão vazando entre competiç�
   por vez" do balanço de temporada, reaproveitando `applyInterview` já existente para
   aplicar o efeito de cada resposta.
 
-## Campo 2D animado no modo Ao Vivo (feito, depois substituído pelo campo 3D)
+## Campo 2D animado no modo Ao Vivo (feito, voltou a ser o padrão — ver nota)
 Visualização estilizada, não um replay físico — reage aos mesmos eventos abstratos que
 `js/live.js` já gera, sincronizada 1:1 com o clique-a-clique existente (sem timer, sem
 física nova). Novo `js/pitch.js` (`CQ.pitch`), lógica pura sem tocar DOM: `FORMATION`
@@ -247,10 +246,14 @@ mesmas cores/padrão (`c1`/`c2`/`pat`) que o brasão vetorial já usava — `pat
 foi extraído de `crestSVGProcedural` (`js/util.js`) pra virar a base tanto do brasão
 quanto da nova `jerseySVG`.
 
-> **Atualização:** `buildPitchSVG` foi substituído pelo campo 3D (`js/pitch3d.js`, ver
-> seção "Campo 3D de verdade" abaixo) como renderizador do modo Ao Vivo — continua
-> exportado em `CQ.pitch` (não removido, sem consumidor na UI), mas `FORMATION`/
-> `poseFor`/`poseForKick` seguem sendo a base de ambos, sem nenhuma mudança neles.
+> **Atualização (revertida):** `buildPitchSVG` foi substituído pelo campo 3D
+> (`js/pitch3d.js`, three.js) por uma sessão. Usuário testou e achou "bem engessado e
+> ruim" (câmera parada, estádio vazio) e pediu pra voltar pro 2D — `js/pitch3d.js` e os
+> 4 arquivos vendorizados de three.js/GLTFLoader/modelo do estádio foram **removidos do
+> repositório** (não só desconectados), `js/ui.js` voltou a chamar `buildPitchSVG`
+> diretamente. `FORMATION`/`poseFor`/`poseForKick` nunca mudaram — só o renderizador foi
+> e voltou. Bundle: `2137 KB → 1242 KB` só com a remoção do 3D (ver seção "Imagens reais"
+> abaixo pro que veio depois, subindo de novo pra `~1640 KB`).
 
 ## Lista grande de imersão/UX — Fatia 1 (feito) + roteiro futuro
 
@@ -381,7 +384,17 @@ setado uma única vez dentro de `applyMatch` ao lado do bloco que já atualiza
 `g.clubRivalry` pro mesmo jogo. `timelineHTML` foi exportado em `CQ.ui` pra ficar
 testável diretamente (os testes leem a string HTML real gerada pela função).
 
-## Campo 3D de verdade no modo Ao Vivo (item 2 do roteiro, Fatia 1, feito)
+## Campo 3D de verdade no modo Ao Vivo (item 2 do roteiro, Fatia 1 — REVERTIDO)
+
+> **Revertido numa sessão seguinte**: usuário testou em produção e achou "bem engessado
+> e ruim" (nenhum jogador visível no ângulo padrão, câmera estática por padrão, estádio
+> vazio "parece amador"), pediu explicitamente pra voltar ao campo 2D. `js/pitch3d.js`,
+> `js/vendor/three.min.js`, `js/vendor/OrbitControls.js`, `js/vendor/GLTFLoader.js` e
+> `js/vendor/stadium-model.js` foram **excluídos do repositório** (não arquivados) —
+> nada nesta seção (nem na seção seguinte, sobre o modelo do estádio) descreve código
+> que ainda existe; fica só como histórico de decisão pra não repetir a mesma tentativa
+> sem uma mudança de design que resolva o problema relatado (câmera/ângulo/densidade de
+> estádio). Ver "Campo 2D animado" acima pro estado atual.
 
 Substitui `buildPitchSVG` como renderizador do modo Ao Vivo. Pedido explícito do
 usuário mesmo depois de avisado do tamanho do trabalho e de que introduz a primeira
@@ -434,6 +447,10 @@ inicialmente era 100% procedural (4 paredes + textura de torcida em canvas) — 
 seguinte pra como isso foi substituído por um modelo real.
 
 ### Estádio: de procedural pra modelo 3D real (feedback do usuário — "muito amador")
+
+> **Também revertido** — junto com o campo 3D inteiro (nota no topo da seção acima).
+> `js/vendor/GLTFLoader.js`/`stadium-model.js`/`scripts/vendor-stadium.mjs` não existem
+> mais no repositório. Fica só como histórico da tentativa/pesquisa de licenciamento.
 
 A primeira versão da arquibancada era geometria simples de propósito (4 `BoxGeometry`
 com textura de pontinhos coloridos simulando torcida). O usuário testou, comparou com um
@@ -642,3 +659,67 @@ atributo secundário isolado) e depois "Distribuir automaticamente" nos 3 restan
 Com este item, **o roteiro grande de imersão/UX está 100% completo** — só o item 1
 (idade real via API-Football) segue em andamento, limitado pela cota diária da API
 (42/129 clubes até agora), resumível a qualquer momento sem trabalho de design.
+
+## Imagens reais (repositório) no lugar de ilustração feita à mão + reversão do 3D
+
+Usuário mandou 2 prints direto do jogo — o modal de "Ligação da namorada" (silhueta de
+tinta genérica, 2 bonecos + coração) e o campo 3D em produção (estádio vazio, ângulo
+parado) — com o feedback: "olha o estadio ta muito feio... isso ta muito amador",
+seguido de "as imagens preciso que vc pegue em algum repositorio" e "sobre o estadio ta
+bem engessado e ruim, vamos com um 2D pega em algum site ou repositorio". Três frentes:
+
+**1) Campo 3D → 2D, revertido de vez** (não só desconectado — apagado do repo):
+`js/pitch3d.js` e os 4 arquivos vendorizados (`three.min.js`/`OrbitControls.js`/
+`GLTFLoader.js`/`stadium-model.js`) foram excluídos. `js/ui.js` (`renderLiveOverlay`/
+`applyPitchPose`/`finishLive`) voltou ao código do commit `fce5a97` (campo 2D SVG já
+pronto e testado, só desconectado — `js/pitch.js` nunca mudou 1 linha nos dois lados da
+troca). CSS `.pv-*` restaurado, `.live-pitch3d` removido. Bundle: `2137 KB → 1242 KB`
+só com essa remoção. Ver notas de reversão nas seções "Campo 3D de verdade"/"Estádio:
+de procedural pra modelo 3D real" acima.
+
+**2) Ilustrações reais nos modais de eventos de vida** — as ~10 silhuetas de tinta
+desenhadas à mão (`sceneHospital`/`sceneContract`/etc., `js/util.js`) foram substituídas
+por ilustrações reais da [unDraw](https://undraw.co) (Katerina Limpitsouni, uso livre
+sem exigir atribuição — https://undraw.co/license), uma por categoria (hospital,
+contrato, entrevista, casal, time, redes sociais, descanso, evento formal, base,
+comunidade/torcida). Vendorizadas via `scripts/vendor-life-scenes.mjs` em
+`js/vendor/life-scenes.js` (`CQ.LIFE_IMGS`, base64, ~267 KB) — mesmo princípio de
+`embed-crests.mjs`: busca externa só em tempo de setup. `lifeSceneSVG(eventId)`
+(`js/util.js`) agora devolve um `<img>` em vez de montar SVG na mão; `LIFE_SCENE`
+continua mapeando os 17 ids de evento pras ~10 categorias. CSS novo
+(`.modal2-scene img`) aplica um filtro `sepia()`/`saturate()`/`hue-rotate()` pra tingir
+as cores originais da unDraw (roxo/rosa) pro tom kraft do resto do jogo, em vez de
+destoar cru. **Endpoint usado pra achar as URLs diretas**: `undraw.co` roda em Next.js
+— a busca client-side chama `/_next/data/{buildId}/search/{termo}.json`, que devolve
+JSON com `media: "https://cdn.undraw.co/.../slug.svg"` direto, sem precisar simular
+clique em botão de download nem login (mesma técnica de "achar a URL real por trás da
+UI" já usada com poly.pizza numa sessão anterior).
+
+**3) Atmosfera real de estádio** — uma foto real (não mais geometria nem SVG
+procedural) como pano de fundo discreto atrás do cabeçalho do modo Ao Vivo. Fonte:
+["Football stadium Za Lužánkami Brno Panorama 2010"](https://commons.wikimedia.org/wiki/File:Football_stadium_Za_Lu%C5%BE%C3%A1nkami_Brno_Panorama_2010.jpg)
+por Petr Šmerkl ("Sveter"), CC BY-SA 3.0, via Wikimedia Commons — escolhida por ser
+genérica (não um estádio de marca reconhecível) e por licença clara com atribuição
+simples. Baixada via `Special:FilePath/...?width=1280` (miniatura gerada pela própria
+Wikimedia — o original tem ~24 MB, a miniatura larga/baixa do panorama fica em ~100 KB).
+Vendorizada via `scripts/vendor-stadium-photo.mjs` em `js/vendor/stadium-photo.js`
+(`CQ.STADIUM_PHOTO`). `renderLiveOverlay` (`js/ui.js`) aplica como
+`background-image` do `.live-head` por trás de um gradiente escuro (mantém o placar
+legível). Atribuição obrigatória (CC BY-SA) no rodapé da capa — `.cover-foot.small`
+(novo modificador, `css/style.css`) empilha a 2ª linha do rodapé sem sobrepor a 1ª
+(as duas eram `position:absolute` no mesmo `bottom`, bug latente desde a sessão anterior
+que só foi percebido agora que o screenshot do Browser pane voltou a funcionar).
+
+**4) Reforço de "a partida precisa parecer estar rolando"** — cartão/vermelho ganharam
+o mesmo splash em tela cheia que gol já tinha (`goalSplash`/`cardSplash`, `js/ui.js`,
+disparado em `liveStep`), no lugar de só uma linha no feed de texto + pulso discreto no
+campo.
+
+Bundle final desta sessão: `1640 KB` (3D removido, +267 KB de ilustrações + 131 KB de
+foto real). Validado: suíte completa passando (contagem varia por temporada simulada
+estocástica, sempre 100% dos casos executados — ver "Determinismo"/"Testes" acima),
+verificação visual manual completa no Browser pane (screenshot voltou a funcionar nesta
+sessão): campo 2D com 22 marcadores + bola reagindo a decisão, modal de evento de vida
+com ilustração real tingida, foto de estádio visível atrás do cabeçalho do Ao Vivo,
+splash de cartão vermelho, rodapé da capa com as duas linhas de atribuição empilhadas
+sem sobrepor.

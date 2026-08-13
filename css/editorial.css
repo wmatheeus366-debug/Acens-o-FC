@@ -416,6 +416,10 @@ main.page, .cover { animation: pageIn 0.26s ease both; }
 @keyframes gsStamp { 0% { transform: rotate(-6deg) scale(.4); opacity: 0; } 55% { transform: rotate(-6deg) scale(1.12); opacity: 1; } 100% { transform: rotate(-6deg) scale(1); opacity: 1; } }
 @keyframes gsFade { 0%,72% { opacity: 1; } 100% { opacity: 0; } }
 
+/* splash de cartão no modo ao vivo — mesmo carimbo do gol, cor de amarelo/vermelho */
+.card-splash .gs-word { color: var(--gold); text-shadow: 6px 6px 0 #7a5a00, 12px 12px 0 rgba(0,0,0,.25); font-size: clamp(48px, 11vw, 130px); }
+.card-splash.red .gs-word { color: var(--verm); text-shadow: 6px 6px 0 #5c0f0a, 12px 12px 0 rgba(0,0,0,.25); }
+
 /* confete / papel picado (cerimônia de título) */
 .confetti { position: fixed; inset: 0; z-index: 250; pointer-events: none; overflow: hidden; }
 .confetti i { position: absolute; top: -14px; width: 9px; height: 14px; opacity: .9; animation: confFall linear forwards; }
@@ -510,8 +514,11 @@ main.page, .cover { animation: pageIn 0.26s ease both; }
 .modal2-icon svg { width: 72px; height: 72px; }
 /* cena editorial do evento de vida (item extra: ilustrações nos modais) — mesma
    silhueta em tinta sobre papel do avatar, só que numa cena pequena em vez de retrato */
-.modal2-scene { border-bottom: 1px solid var(--rule-soft); line-height: 0; }
-.modal2-scene svg { display: block; width: 100%; height: auto; max-height: 130px; }
+/* cena real (unDraw, ver js/vendor/life-scenes.js) tingida pro tom kraft do resto do
+   jogo — sem o filtro, o roxo/rosa originais destoariam do papel/tinta do resto da UI. */
+.modal2-scene { border-bottom: 1px solid var(--rule-soft); line-height: 0; background: var(--paper-2, var(--paper)); display: flex; align-items: center; justify-content: center; padding: 10px 0; }
+.modal2-scene img { display: block; width: auto; height: 128px; max-width: 90%; filter: sepia(.45) saturate(1.3) hue-rotate(-8deg) contrast(.96); }
+:root[data-theme="dark"] .modal2-scene img { filter: sepia(.3) saturate(1.1) hue-rotate(-8deg) contrast(.9) brightness(.92); }
 .modal2-body { padding: 16px 18px 18px; }
 .modal2-desc { font-family: var(--serif); font-size: 15.5px; line-height: 1.5; color: var(--ink-2); margin-bottom: 14px; }
 .modal2-desc::first-letter { font-family: var(--serif); font-weight: 900; font-size: 2.6em; line-height: .8; float: left; margin: 3px 8px -2px 0; color: var(--verm-dark); }
