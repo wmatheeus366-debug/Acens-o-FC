@@ -45,7 +45,7 @@ Fontes (Google Fonts) e bandeiras (flagcdn) vêm da web com fallback; todo o res
 
 ```
 # no navegador (index.html ou CRAQUE.html aberto), console:
-CQ.tests.run()             # tests/regression.js — ~166 checagens
+CQ.tests.run()             # tests/regression.js — ~174 checagens
 
 # idade real dos elencos (resumível — roda até bater na cota diária, ~100 req/dia):
 node scripts/sync-ages.mjs [teto de chamadas ao vivo, padrão 90]
@@ -283,7 +283,7 @@ preenchido numa derrota); banner de título com ordinal (BICAMPEÃO...PENTACAMPE
    three.js, o que quebra a filosofia atual de zero dependência externa).
 3. ✅ **Sistema de empréstimo (feito).** Ver seção própria abaixo.
 4. ✅ **Voltar a ex-clube depois dos 31 (feito).** Ver seção própria abaixo.
-5. Linha do tempo de marcos da carreira.
+5. ✅ **Linha do tempo de marcos da carreira (feito).** Ver seção própria abaixo.
 6. Sistema de ídolo em camadas (ídolo → ídolo da geração → maior de todos).
 7. Salvar carreira pra sempre ao aposentar ("hall da fama").
 8. Redes sociais reagindo de verdade a resultado/decisão.
@@ -360,3 +360,15 @@ campo novo no save (nenhuma "origem" pra lembrar, é só ida). Gatilho dentro de
 empréstimo (1 proposta só) — mostra todos os ex-clubes elegíveis de uma vez, já que a
 pergunta é "pra qual". Tela nova (`showHomecoming`, `js/ui.js`) no mesmo estilo visual
 do mercado/empréstimo.
+
+## Linha do tempo de marcos da carreira (item 5, feito)
+
+`timelineHTML` (`js/ui.js`) já existia e já era rica (estreia, transferências/
+empréstimos, títulos, prêmios, Bola de Ouro, ídolo, capitania) — faltavam os marcos de
+abertura pedidos. "Criação do jogador"/"Assinatura com o {clube}"/"Apresentação à
+torcida" são sintetizados na hora a partir de `p.career[0]` (ou clube/ano atual se
+calouro) — **sem estado novo persistido**, aparecem sempre. "Primeiro clássico
+disputado" precisou de 1 campo aditivo, `p.firstClassic = {year, oppName, clubName}`,
+setado uma única vez dentro de `applyMatch` ao lado do bloco que já atualiza
+`g.clubRivalry` pro mesmo jogo. `timelineHTML` foi exportado em `CQ.ui` pra ficar
+testável diretamente (os testes leem a string HTML real gerada pela função).

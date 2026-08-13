@@ -1635,9 +1635,20 @@ window.CQ = window.CQ || {};
   function timelineHTML(G) {
     const p = G.player;
     const events = [];
+    // prólogo: sintetizado do que já existe (p.career[0], ou o clube/ano atual se o
+    // jogador ainda é calouro sem temporada registrada) — sem campo novo persistido,
+    // criação/assinatura/apresentação acontecem todas no mesmo instante.
+    const startYear = p.career.length ? p.career[0].year : G.year;
+    const startClubName = p.career.length ? p.career[0].clubName : E().myClub(G).name;
+    events.push({ year: startYear, order: -3, cls: "debut", label: "Criação do jogador", detail: esc(p.name) + " começa a jornada rumo ao profissionalismo." });
+    events.push({ year: startYear, order: -2, cls: "debut", label: "Assinatura com o " + esc(startClubName), detail: "Primeiro contrato profissional assinado." });
+    events.push({ year: startYear, order: -1, cls: "debut", label: "Apresentação à torcida", detail: "Recebido pela torcida do " + esc(startClubName) + " como a nova promessa do elenco." });
     if (p.career.length) {
       const first = p.career[0];
       events.push({ year: first.year, order: 0, cls: "debut", label: "Estreia profissional", detail: "Começou a carreira no " + esc(first.clubName) + "." });
+    }
+    if (p.firstClassic) {
+      events.push({ year: p.firstClassic.year, order: 0.5, cls: "debut", label: "Primeiro clássico disputado", detail: "Viveu a rivalidade contra o " + esc(p.firstClassic.oppName) + " pela primeira vez, com a camisa do " + esc(p.firstClassic.clubName) + "." });
     }
     for (let i = 1; i < p.career.length; i++) {
       const prev = p.career[i - 1], cur = p.career[i];
@@ -2808,6 +2819,6 @@ window.CQ = window.CQ || {};
     setLogo: setLogo, clearLogo: clearLogo, toast: toast,
     requestTransfer: requestTransfer, cancelTransfer: cancelTransfer,
     setFocus: setFocus, buyAsset: buyAsset,
-    startClubPool: startClubPool, squadOf: squadOf
+    startClubPool: startClubPool, squadOf: squadOf, timelineHTML: timelineHTML
   };
 })();

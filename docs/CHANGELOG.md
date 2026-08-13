@@ -1219,3 +1219,26 @@ origem — aqui não tem "origem" pra lembrar, é só ida).
   corretamente ("Seu agente liga: um clube onde você já vestiu a camisa quer te trazer
   de volta. Pra onde você volta?"), aceitei a proposta do Santos e o clube trocou
   corretamente.
+
+## Linha do tempo: marcos do início da carreira (item 5 do roteiro)
+
+Pedido original: linha do tempo começando com "Criação do jogador. Assinatura com o
+Flamengo. Apresentação à torcida. Primeiro jogo relacionado. Primeiro clássico
+disputado." A linha do tempo (`timelineHTML`, `js/ui.js`) já existia e já era bem mais
+rica que isso (estreia, transferências/empréstimos, títulos, prêmios, Bola de Ouro,
+ídolo, capitania) — faltavam especificamente os 3 marcos de abertura e o "primeiro
+clássico" ("primeiro jogo" já era coberto pela "Estreia profissional" já existente).
+
+- **Prólogo sem estado novo**: "Criação do jogador", "Assinatura com o {clube}" e
+  "Apresentação à torcida" são sintetizados na hora a partir do que já existe
+  (`p.career[0]`, ou o clube/ano atual se o jogador ainda é calouro sem temporada
+  registrada) — não precisam de nenhum campo novo persistido, aparecem sempre, desde a
+  primeira vez que a linha do tempo é aberta.
+- **Primeiro clássico** precisou de 1 campo novo aditivo: `p.firstClassic =
+  {year, oppName, clubName}`, setado uma única vez dentro de `applyMatch`
+  (`js/engine.js`), bem ao lado do bloco que já atualizaria `g.clubRivalry` pro mesmo
+  jogo — sem duplicar a checagem de "é clássico".
+- Validado: 174/174 testes (5 checagens novas, incluindo a migração aditiva de
+  `p.firstClassic`). `timelineHTML` foi exportado em `CQ.ui` pra virar testável
+  diretamente — os testes leem a string HTML de verdade gerada pela função, não uma
+  simulação separada da lógica.

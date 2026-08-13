@@ -108,7 +108,7 @@ window.CQ = window.CQ || {};
         clubGoals: {}, idolClubs: [], compGoals: {},
         traits: [], decisiveGoals: 0, captain: null, squadRole: "titular", potUps: 0,
         records: { hatTricks: 0, bestSeasonG: 0, bestSeasonAvg: 0, biggestWin: null },
-        seenLiveIntro: false, loan: null
+        seenLiveIntro: false, loan: null, firstClassic: null
       },
       leagueOf: {}, champs: {}, feed: [], customLogos: {},
       boardFail: 0, retired: false, transferRequested: false,
@@ -1527,6 +1527,8 @@ window.CQ = window.CQ || {};
       g.clubRivalry = g.clubRivalry || {};
       const rec = g.clubRivalry[fx.oppId] || (g.clubRivalry[fx.oppId] = { v: 0, e: 0, d: 0 });
       if (res.win) rec.v++; else if (res.draw) rec.e++; else rec.d++;
+      // primeiro clássico da carreira — marco pra linha do tempo (js/ui.js), só uma vez
+      if (!p.firstClassic) p.firstClassic = { year: g.year, oppName: fx.opp.name, clubName: myClub(g).name };
     }
 
     // salário (≈ semanal)

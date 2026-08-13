@@ -67,7 +67,7 @@
     withTempGame(function () {
       const g = newCareer("MEI");
       const old = JSON.parse(JSON.stringify(g));
-      ["traits", "compGoals", "idolClubs", "clubGoals", "ballon", "milestones", "assets", "records", "captain", "squadRole", "loan"].forEach(function (k) { delete old.player[k]; });
+      ["traits", "compGoals", "idolClubs", "clubGoals", "ballon", "milestones", "assets", "records", "captain", "squadRole", "loan", "firstClassic"].forEach(function (k) { delete old.player[k]; });
       delete old.manager; delete old.worldStars; delete old.schemaVersion; delete old.world; delete old.clubRivalry;
       const raw = localStorage.getItem("craque-save-v1");
       localStorage.setItem("craque-save-v1", JSON.stringify(old));
@@ -85,6 +85,7 @@
         "n=" + (loaded && loaded.world && loaded.world.leagues ? Object.keys(loaded.world.leagues).length : -1));
       assert("save: migra g.clubRivalry", loaded && loaded.clubRivalry && typeof loaded.clubRivalry === "object");
       assert("save: migra p.loan (empréstimo) pra null", loaded && loaded.player.loan === null, "loan=" + JSON.stringify(loaded && loaded.player.loan));
+      assert("save: migra p.firstClassic pra null", loaded && loaded.player.firstClassic === null, "firstClassic=" + JSON.stringify(loaded && loaded.player.firstClassic));
     });
   }
 
@@ -883,6 +884,36 @@
     });
   }
 
+  // ---- Linha do tempo: prólogo sintetizado aparece sempre, mesmo pra calouro sem p.career ----
+  function testTimelinePrologueEvents() {
+    withTempGame(function () {
+      const g = newCareer("ATA", "vas");
+      const html = CQ.ui.timelineHTML(g);
+      assert("linha do tempo: 'Criação do jogador' aparece mesmo pra calouro", html.indexOf("Criação do jogador") >= 0);
+      assert("linha do tempo: 'Assinatura com o' aparece mesmo pra calouro", html.indexOf("Assinatura com o") >= 0);
+      assert("linha do tempo: 'Apresentação à torcida' aparece mesmo pra calouro", html.indexOf("Apresentação à torcida") >= 0);
+    });
+  }
+  // ---- Linha do tempo: primeiro clássico registrado só uma vez ----
+  function testFirstClassicRecorded() {
+    withTempGame(function () {
+      const g = newCareer("ATA"); // fla, já tem rivais reais (flu/vas/bot)
+      let classics = 0, guard = 0, firstSnapshot = null;
+      while (guard++ < 300) {
+        const fx = E().currentFixture(g);
+        if (!fx) break;
+        if (fx.classic) classics++;
+        E().applyMatch(g, E().resolveMatch(g, fx, {}));
+        if (classics === 1 && !firstSnapshot && g.player.firstClassic) firstSnapshot = JSON.stringify(g.player.firstClassic);
+      }
+      assert("clássico: pelo menos 1 clássico simulado (pré-condição do teste)", classics > 0, "classics=" + classics + " guard=" + guard);
+      assert("clássico: p.firstClassic fica registrado depois do 1º clássico", !!g.player.firstClassic, JSON.stringify(g.player.firstClassic));
+      if (classics > 1 && firstSnapshot) {
+        assert("clássico: 2º clássico em diante não sobrescreve o primeiro registrado", JSON.stringify(g.player.firstClassic) === firstSnapshot);
+      }
+    });
+  }
+
   // ---- Bug real corrigido: banner de campeão não pode comemorar quando quem venceu foi outra seleção/clube ----
   function testChampionBannerCorrectness() {
     withTempGame(function () {
@@ -1156,6 +1187,8 @@
     testFormerClubsDedup();
     testHomecomingTriggerFires();
     testAcceptHomecomingUsesAcceptOffer();
+    testTimelinePrologueEvents();
+    testFirstClassicRecorded();
     testChampionBannerCorrectness();
     testRivalsCoverage();
     testClubRivalryScoreboard();
