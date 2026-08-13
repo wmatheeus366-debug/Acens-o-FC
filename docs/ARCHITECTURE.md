@@ -47,7 +47,7 @@ Fontes (Google Fonts) e bandeiras (flagcdn) vêm da web com fallback; todo o res
 
 ```
 # no navegador (index.html ou CRAQUE.html aberto), console:
-CQ.tests.run()             # tests/regression.js — ~182 checagens
+CQ.tests.run()             # tests/regression.js — ~188 checagens
 
 # idade real dos elencos (resumível — roda até bater na cota diária, ~100 req/dia):
 node scripts/sync-ages.mjs [teto de chamadas ao vivo, padrão 90]
@@ -288,7 +288,8 @@ preenchido numa derrota); banner de título com ordinal (BICAMPEÃO...PENTACAMPE
 4. ✅ **Voltar a ex-clube depois dos 31 (feito).** Ver seção própria abaixo.
 5. ✅ **Linha do tempo de marcos da carreira (feito).** Ver seção própria abaixo.
 6. ✅ **Sistema de ídolo em camadas (feito).** Ver seção própria abaixo.
-7. Salvar carreira pra sempre ao aposentar ("hall da fama").
+7. ✅ **Salvar carreira pra sempre ao aposentar ("hall da fama") — feito.** Ver seção
+   própria abaixo.
 8. Redes sociais reagindo de verdade a resultado/decisão.
 9. Layout: painéis laterais usando o espaço vazio dos modais.
 10. Avatar editorial/silhueta no lugar do retrato cartunesco.
@@ -463,3 +464,28 @@ Migração: `p.genIdolYear`/`p.momentIdol` aditivos em `save.js migrate()`, sem 
 da geração (fabricando 2 Bolas de Ouro na carreira — atingir isso organicamente exigiria
 simulação longa demais pra um teste determinístico), ídolo do momento por fama alta,
 bônus de lealdade em `acceptRenew`, e migração de save antigo. 182/182 passando.
+
+## Hall da Fama (item 7 do roteiro, feito)
+
+Bug real corrigido: `resetToCover()` (botão "Começar nova carreira" na tela de
+aposentadoria) nunca limpava `localStorage`, mas a carreira aposentada era
+silenciosamente apagada assim que a próxima carreira salvasse por cima da mesma chave
+(`craque-save-v1`, um save só) — não existia rastro nenhum de carreiras encerradas.
+
+`js/save.js` ganha uma chave própria, **separada** do save ativo:
+`craque-hall-v1` — array de cartões-resumo leves (não o objeto `g` inteiro, que carrega
+`g.world`/`g.world.leagues`, centenas de KB, e inflaria a cota de localStorage depois de
+poucas carreiras). `induct(g)` monta o cartão (nome, posição, clubes, gols/assist./
+títulos/prêmios, Bolas de Ouro, veredito de `careerLegacy` — exportado em `CQ.ui` pra
+este fim —, camadas de ídolo) e empurra pro array, com teto de 60 carreiras (`HALL_CAP`,
+descarta as mais antigas). Chamado uma única vez, em `summaryNext()` (`js/ui.js`), no
+exato momento em que `sum.retiring` vira `G.retired = true`.
+
+Nova tela `hallHTML()`/`CQ.ui.go('hall')` — funciona **com ou sem carreira ativa**
+(checada em `render()` antes do fallback de "sem carreira → tela de capa"), acessível
+pela tela de capa e pela própria tela de aposentadoria (pra conferir a indução que
+acabou de acontecer). Sem migração de save necessária — chave nova e independente do
+esquema de `g`.
+
+Validado: 188/188 testes (indução adiciona cartão com os números certos, teto de 60
+respeitado mantendo as mais recentes, tela renderiza com e sem hall vazio).

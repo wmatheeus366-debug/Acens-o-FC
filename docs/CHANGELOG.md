@@ -1333,3 +1333,24 @@ aposentadoria) — só faltava construir as 2 do meio e amarrar tudo.
 - Validado: 182/182 testes (3 novos + extensão da migração). Verificação visual manual
   no Browser pane: as 4 camadas renderizando juntas na aba Clube, tier "LENDA IMORTAL"
   disparando corretamente na tela de aposentadoria com `genIdolYear` forçado.
+
+---
+
+## Hall da Fama (item 7 do roteiro)
+
+Bug real corrigido: carreira aposentada não deixava rastro nenhum — "Começar nova
+carreira" nunca limpava `localStorage`, mas o único save (`craque-save-v1`) era
+sobrescrito silenciosamente assim que a próxima carreira salvasse, apagando a anterior.
+
+- Nova chave `craque-hall-v1` (`js/save.js`), separada do save ativo: array de
+  cartões-resumo leves (não o `g` inteiro — `g.world` sozinho já passa de 270 KB, e
+  guardar isso por carreira estouraria a cota de localStorage rápido). `induct(g)` monta
+  o cartão (números da carreira + veredito de `careerLegacy`, agora exportado em
+  `CQ.ui`) e empurra pro array, com teto de 60 (`HALL_CAP`, descarta as mais antigas).
+  Chamado uma única vez, no exato momento em que `sum.retiring` vira `G.retired = true`
+  (`summaryNext`, `js/ui.js`).
+- Nova tela `CQ.ui.go('hall')` — funciona com ou sem carreira ativa (checada em
+  `render()` antes do fallback pra tela de capa), acessível pela capa e pela própria
+  tela de aposentadoria.
+- Sem migração de save (chave nova, independente do esquema de `g`).
+- Validado: 188/188 testes (indução, teto de 60, render com/sem hall vazio).

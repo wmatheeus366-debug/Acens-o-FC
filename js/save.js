@@ -6,6 +6,8 @@ window.CQ = window.CQ || {};
   "use strict";
   const KEY = "craque-save-v1";
   const SCHEMA_VERSION = 2;
+  const HALL_KEY = "craque-hall-v1"; // hall da fama: chave própria, separada do save ativo
+  const HALL_CAP = 60; // teto de carreiras guardadas — evita estourar cota de localStorage
 
   function save() {
     try {
@@ -145,10 +147,44 @@ window.CQ = window.CQ || {};
     CQ.ui.render();
   }
 
+  // hall da fama: carreira aposentada vira um cartão-resumo PERMANENTE, guardado numa
+  // chave própria (nunca sobrescrita quando uma nova carreira começa/salva por cima de
+  // craque-save-v1 — esse era o bug real: "nova carreira" sempre apagava a anterior sem
+  // deixar rastro). Guarda só um resumo leve (não o objeto `g` inteiro, que carrega
+  // g.world/g.world.leagues — centenas de KB — e infartaria a cota de localStorage
+  // depois de poucas carreiras); o resumo usa exatamente os mesmos números que a tela
+  // de aposentadoria já mostra (careerLegacy, exportado em CQ.ui pra este fim).
+  function hallList() {
+    try { return JSON.parse(localStorage.getItem(HALL_KEY) || "[]"); } catch (e) { return []; }
+  }
+  function induct(g) {
+    try {
+      const p = g.player;
+      const leg = CQ.ui && CQ.ui.careerLegacy ? CQ.ui.careerLegacy(p) : null;
+      const tot = CQ.engine && CQ.engine.careerTotals ? CQ.engine.careerTotals(g) : { goals: 0, assists: 0 };
+      const clubs = [];
+      p.career.forEach(function (c) { if (clubs.indexOf(c.clubName) < 0) clubs.push(c.clubName); });
+      const card = {
+        id: (g.seed || Date.now()) + "_" + g.year, name: p.name, pos: p.pos,
+        retiredYear: g.year, age: p.age, seasons: p.career.length, clubs: clubs,
+        goals: tot.goals, assists: tot.assists, titles: p.titles.length, awards: p.awards.length,
+        bolas: leg ? leg.bolas : 0, tier: leg ? leg.t : null,
+        idolClubNames: (p.idolClubs || []).map(function (id) { return CQ.DATA.CLUBS[id] ? CQ.DATA.CLUBS[id].name : id; }),
+        genIdol: !!p.genIdolYear, savedAt: Date.now()
+      };
+      const hall = hallList();
+      hall.push(card);
+      while (hall.length > HALL_CAP) hall.shift(); // mantém sempre as mais recentes
+      localStorage.setItem(HALL_KEY, JSON.stringify(hall));
+    } catch (e) {
+      console.warn("Falha ao guardar no hall da fama:", e); // nunca deve travar a aposentadoria
+    }
+  }
+
   CQ.save = {
-    KEY: KEY, SCHEMA_VERSION: SCHEMA_VERSION,
+    KEY: KEY, SCHEMA_VERSION: SCHEMA_VERSION, HALL_KEY: HALL_KEY,
     save: save, load: load, hasSave: hasSave, migrate: migrate, validateAndMigrate: validateAndMigrate,
     loadAndPlay: loadAndPlay, exportSave: exportSave, importSave: importSave,
-    resetGame: resetGame, resetToCover: resetToCover
+    resetGame: resetGame, resetToCover: resetToCover, induct: induct, hallList: hallList
   };
 })();

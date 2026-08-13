@@ -977,6 +977,53 @@
     });
   }
 
+  // ---- Hall da Fama: carreira aposentada vira cartão permanente numa chave própria ----
+  function testInductAddsToHall() {
+    withTempGame(function () {
+      const g = newCareer("ATA", "fla");
+      g.player.career = [{ year: 2026, clubId: "fla", clubName: "Flamengo", league: "Série A", pos: "ATA", j: 30, g: 20, a: 10, cs: 0, avg: 7.5, ov: 85, titles: [], awards: [], onLoan: false }];
+      g.player.titles = [{ year: 2026, key: "LIGA", name: "Brasileirão", club: "Flamengo" }];
+      g.year = 2030;
+      const rawHall = localStorage.getItem("craque-hall-v1");
+      const before = CQ.main.hallList().length;
+      CQ.main.induct(g);
+      const hall = CQ.main.hallList();
+      if (rawHall != null) localStorage.setItem("craque-hall-v1", rawHall); else localStorage.removeItem("craque-hall-v1");
+      assert("hall da fama: induct() adiciona 1 cartão numa chave separada do save ativo", hall.length === before + 1, "before=" + before + " depois=" + hall.length);
+      const card = hall[hall.length - 1];
+      assert("hall da fama: cartão guarda os números certos da carreira", card.name === g.player.name && card.goals === 20 && card.titles === 1 && card.retiredYear === 2030, JSON.stringify(card));
+    });
+  }
+
+  // ---- Hall da Fama: teto de carreiras guardadas, sempre mantendo as mais recentes ----
+  function testHallCapEnforced() {
+    withTempGame(function () {
+      const raw = localStorage.getItem("craque-hall-v1");
+      localStorage.removeItem("craque-hall-v1");
+      const g = newCareer("ATA", "fla");
+      g.player.career = [{ year: 2026, clubId: "fla", clubName: "Flamengo", league: "Série A", pos: "ATA", j: 10, g: 5, a: 2, cs: 0, avg: 7, ov: 80, titles: [], awards: [], onLoan: false }];
+      for (let i = 0; i < 65; i++) { g.year = 2026 + i; g.player.name = "Jogador " + i; CQ.main.induct(g); }
+      const hall = CQ.main.hallList();
+      if (raw != null) localStorage.setItem("craque-hall-v1", raw); else localStorage.removeItem("craque-hall-v1");
+      assert("hall da fama: teto de 60 carreiras respeitado", hall.length === 60, "len=" + hall.length);
+      assert("hall da fama: descarta as mais antigas, mantém as mais recentes", hall[hall.length - 1].name === "Jogador 64" && hall[0].name === "Jogador 5", JSON.stringify({ primeiro: hall[0].name, ultimo: hall[hall.length - 1].name }));
+    });
+  }
+
+  // ---- Hall da Fama: tela renderiza sem exceção, com e sem carreiras guardadas ----
+  function testHallHTMLRenders() {
+    const raw = localStorage.getItem("craque-hall-v1");
+    localStorage.setItem("craque-hall-v1", JSON.stringify([{ id: "x", name: "Craque Teste", pos: "ATA", retiredYear: 2040, age: 35, seasons: 10, clubs: ["Flamengo"], goals: 200, assists: 80, titles: 5, awards: 10, bolas: 2, tier: "LENDA IMORTAL", idolClubNames: ["Flamengo"], genIdol: true, savedAt: Date.now() }]));
+    let html = "", ok = true, err = "";
+    try { html = CQ.ui.hallHTML(); } catch (e) { ok = false; err = e.message; }
+    localStorage.removeItem("craque-hall-v1");
+    let emptyOk = true, emptyErr = "";
+    try { CQ.ui.hallHTML(); } catch (e) { emptyOk = false; emptyErr = e.message; }
+    if (raw != null) localStorage.setItem("craque-hall-v1", raw); else localStorage.removeItem("craque-hall-v1");
+    assert("hall da fama: hallHTML() renderiza o cartão guardado sem exceção", ok && html.indexOf("Craque Teste") >= 0 && html.indexOf("LENDA IMORTAL") >= 0, err);
+    assert("hall da fama: hallHTML() não lança exceção com o hall vazio", emptyOk, emptyErr);
+  }
+
   // ---- Bug real corrigido: banner de campeão não pode comemorar quando quem venceu foi outra seleção/clube ----
   function testChampionBannerCorrectness() {
     withTempGame(function () {
@@ -1261,6 +1308,9 @@
     testGenIdolTwoBallons();
     testMomentIdolTransient();
     testLoyaltyRenewBonus();
+    testInductAddsToHall();
+    testHallCapEnforced();
+    testHallHTMLRenders();
     const pass = results.filter(function (r) { return r.pass; }).length;
     console.log("%cCRAQUE regressão: " + pass + "/" + results.length + " passaram", "font-weight:bold");
     results.forEach(function (r) { console.log((r.pass ? "✓" : "✗ FALHOU") + " " + r.name + (r.detail ? "  [" + r.detail + "]" : "")); });

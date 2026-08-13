@@ -69,6 +69,9 @@ window.CQ = window.CQ || {};
     const s = CQ.state;
     const app = $("#app");
     if (s.screen === "create") { app.innerHTML = createHTML(); runEntranceAnimations(); sweepCrests(); return; }
+    // hall da fama: acessível com ou sem carreira ativa (não depende de s.game), por
+    // isso checado ANTES do fallback de "sem carreira ativa → tela de capa" abaixo.
+    if (s.screen === "hall") { app.innerHTML = hallHTML(); runEntranceAnimations(); sweepCrests(); return; }
     if (!s.game || s.screen === "cover") { app.innerHTML = coverHTML(); runEntranceAnimations(); sweepCrests(); return; }
     if (s.game.retired && s.screen !== "retro") s.screen = "retro";
     let body = "";
@@ -204,8 +207,40 @@ window.CQ = window.CQ || {};
         ${has ? `<button class="btn btn-big" onclick="CQ.main.loadAndPlay()">Continuar carreira</button>` : ""}
         <button class="btn btn-ghost" onclick="CQ.main.importSave()">Importar save</button>
       </div>
+      <div class="btnrow mt8"><button class="btn btn-ghost" onclick="CQ.ui.go('hall')">${I.trophy} Hall da Fama</button></div>
       <div class="cover-foot">Roda 100% no seu navegador · progresso salvo localmente</div>
     </div>`;
+  }
+
+  // ---------------- hall da fama ----------------
+  // carreiras aposentadas ficam guardadas pra sempre aqui (chave própria, nunca
+  // sobrescrita quando uma nova carreira começa) — acessível com ou sem carreira ativa.
+  function hallHTML() {
+    const hall = (CQ.main.hallList ? CQ.main.hallList() : []).slice().reverse();
+    const back = CQ.state.game ? (CQ.state.game.retired ? "retro" : "home") : "cover";
+    const rows = hall.map(function (c) {
+      return `<div class="card mb8"><div class="card-b">
+        <div class="flex-b" style="align-items:flex-start">
+          <div><b style="font-family:var(--serif);font-size:18px">${esc(c.name)}</b>
+            <span class="condsmall"> · ${D.POSITIONS[c.pos] ? esc(D.POSITIONS[c.pos].name) : esc(c.pos)}</span>
+            <div class="small muted">${esc(c.clubs.join(" · ") || "—")}</div></div>
+          <div class="tnum" style="text-align:right;white-space:nowrap"><b>${c.retiredYear}</b><div class="condsmall">${c.seasons} temporada${c.seasons === 1 ? "" : "s"}</div></div>
+        </div>
+        <div class="tiles mt8">
+          <div class="tile"><b class="tnum">${c.goals}</b><span>Gols</span></div>
+          <div class="tile"><b class="tnum">${c.assists}</b><span>Assist.</span></div>
+          <div class="tile"><b class="tnum">${c.titles}</b><span>Títulos</span></div>
+          <div class="tile"><b class="tnum">${c.bolas}</b><span>Bola de Ouro</span></div>
+        </div>
+        <p class="small mt8">${c.tier ? `<b>${esc(c.tier)}</b>` : ""}${c.genIdol ? ' <span class="badge badge-gold">Ídolo da geração</span>' : ""}${c.idolClubNames && c.idolClubNames.length ? `<br><span class="muted">Ídolo eterno de: ${esc(c.idolClubNames.join(", "))}</span>` : ""}</p>
+      </div></div>`;
+    }).join("");
+    return `<main class="page" style="max-width:720px">
+      <div class="kicker mt12">Craques que penduraram as chuteiras</div>
+      <h1 class="headline mb12">Hall da Fama</h1>
+      ${hall.length ? rows : '<div class="card"><div class="card-b muted">Nenhuma carreira aposentada ainda — quando você pendurar as chuteiras, ela entra pra sempre aqui.</div></div>'}
+      <div class="btnrow mt16"><button class="btn" onclick="CQ.ui.go('${back}')">Voltar</button></div>
+    </main>`;
   }
 
   // ---------------- criação ----------------
@@ -1388,7 +1423,7 @@ window.CQ = window.CQ || {};
     const G = g(), sum = G.pendingSummary;
     closeOverlay();
     CQ.state.summary = null;
-    if (sum.retiring) { G.retired = true; CQ.main.save(); go("retro"); return; }
+    if (sum.retiring) { G.retired = true; CQ.main.save(); CQ.main.induct(G); go("retro"); return; }
     if (sum.offers) { showMarket(); return; }
     if (sum.loanOffer) { showLoanOffer(); return; }
     if (sum.homecomingOffers) { showHomecoming(); return; }
@@ -2777,6 +2812,7 @@ window.CQ = window.CQ || {};
         ${histHTML(p)}
         <div class="card"><div class="card-b center">
           <button class="btn btn-pri btn-big" onclick="CQ.main.resetToCover()">Começar nova carreira</button>
+          <button class="btn btn-ghost mt8" onclick="CQ.ui.go('hall')">${I.trophy} Ver Hall da Fama</button>
         </div></div>
       </div>
     </div>`;
@@ -2797,6 +2833,7 @@ window.CQ = window.CQ || {};
     setLogo: setLogo, clearLogo: clearLogo, toast: toast,
     requestTransfer: requestTransfer, cancelTransfer: cancelTransfer,
     setFocus: setFocus, buyAsset: buyAsset,
-    startClubPool: startClubPool, squadOf: squadOf, timelineHTML: timelineHTML
+    startClubPool: startClubPool, squadOf: squadOf, timelineHTML: timelineHTML, careerLegacy: careerLegacy,
+    hallHTML: hallHTML
   };
 })();
