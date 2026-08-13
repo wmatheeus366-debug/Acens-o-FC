@@ -51,19 +51,49 @@ window.CQ = window.CQ || {};
     return tex;
   }
 
+  // bonequinho de verdade (cabeça+pescoço+tronco+braços+pernas+chuteira), não mais um
+  // cone/cilindro achatado — usa CapsuleGeometry (confirmada presente no build r140
+  // vendorizado) pra tronco/braços/pernas terem ponta arredondada em vez de topo reto,
+  // que era o que dava a cara de "peão de baralho" na primeira versão desta fatia.
   function makePlayerMesh(club, isMe, num) {
     const g = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.3, 3.2, 10), new THREE.MeshLambertMaterial({ color: hexColor(club && club.c1) }));
-    body.position.y = 1.9;
-    const shorts = new THREE.Mesh(new THREE.CylinderGeometry(1.25, 1.1, 1, 10), new THREE.MeshLambertMaterial({ color: hexColor(club && club.c2) }));
-    shorts.position.y = 0.5;
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.85, 10, 8), new THREE.MeshLambertMaterial({ color: 0xe8b98a }));
-    head.position.y = 4.1;
-    g.add(body, shorts, head);
+    const skin = 0xe8b98a, boots = 0x201c17;
+    const jerseyC = hexColor(club && club.c1), shortsC = hexColor(club && club.c2);
+    const mat = function (c) { return new THREE.MeshStandardMaterial({ color: c, roughness: 0.75, metalness: 0.05 }); };
+
+    // pernas (base no chão, y=0) — cápsula fina, ponta arredondada em vez de cilindro reto
+    const legGeo = new THREE.CapsuleGeometry(0.24, 0.75, 3, 8);
+    const legMat = mat(skin);
+    const legL = new THREE.Mesh(legGeo, legMat); legL.position.set(-0.3, 0.615, 0);
+    const legR = new THREE.Mesh(legGeo, legMat); legR.position.set(0.3, 0.615, 0);
+    // chuteiras
+    const bootGeo = new THREE.BoxGeometry(0.32, 0.18, 0.52);
+    const bootMat = mat(boots);
+    const bootL = new THREE.Mesh(bootGeo, bootMat); bootL.position.set(-0.3, 0.1, 0.07);
+    const bootR = new THREE.Mesh(bootGeo, bootMat); bootR.position.set(0.3, 0.1, 0.07);
+    // shorts (cilindro curto, mais largo que a perna — cintura visível)
+    const shorts = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.68, 0.55, 10), mat(shortsC));
+    shorts.position.y = 1.505;
+    // tronco (cápsula — camisa)
+    const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.55, 0.5, 4, 10), mat(jerseyC));
+    torso.position.y = 2.53;
+    // braços (cápsulas finas, levemente abertas do corpo — silhueta reconhecível de
+    // qualquer ângulo da câmera, não só de frente)
+    const armGeo = new THREE.CapsuleGeometry(0.18, 0.85, 3, 8);
+    const armMat = mat(jerseyC);
+    const armL = new THREE.Mesh(armGeo, armMat); armL.position.set(-0.78, 2.62, 0); armL.rotation.z = 0.22;
+    const armR = new THREE.Mesh(armGeo, armMat); armR.position.set(0.78, 2.62, 0); armR.rotation.z = -0.22;
+    // pescoço + cabeça
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.22, 8), mat(skin));
+    neck.position.y = 3.39;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.5, 14, 10), mat(skin));
+    head.position.y = 4.0;
+
+    g.add(legL, legR, bootL, bootR, shorts, torso, armL, armR, neck, head);
     if (isMe) {
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(1.8, 0.15, 6, 20), new THREE.MeshBasicMaterial({ color: 0xd4af37 }));
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(1.15, 0.1, 6, 20), new THREE.MeshBasicMaterial({ color: 0xd4af37 }));
       ring.rotation.x = Math.PI / 2;
-      ring.position.y = 0.12;
+      ring.position.y = 0.06;
       g.add(ring);
     }
     return g;

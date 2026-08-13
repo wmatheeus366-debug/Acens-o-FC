@@ -1354,3 +1354,23 @@ sobrescrito silenciosamente assim que a próxima carreira salvasse, apagando a a
   tela de aposentadoria.
 - Sem migração de save (chave nova, independente do esquema de `g`).
 - Validado: 188/188 testes (indução, teto de 60, render com/sem hall vazio).
+
+---
+
+## Campo 3D: bonecos de verdade (correção de feedback visual)
+
+Feedback do usuário logo após a entrega do campo 3D: os marcadores de jogador (cone/
+cilindro achatado + esfera) pareciam "peão de baralho", feio demais mesmo pro escopo
+estilizado combinado. `makePlayerMesh` (`js/pitch3d.js`) foi refeita do zero com um
+bonequinho de verdade — cabeça, pescoço, tronco, 2 braços, 2 pernas e chuteiras — usando
+`THREE.CapsuleGeometry` (confirmada presente no build r140 vendorizado, apesar do plano
+original ter evitado por precaução) pra tronco/braços/pernas terem ponta arredondada em
+vez do topo reto que dava a cara de cone. Trocado `MeshLambertMaterial` por
+`MeshStandardMaterial` (roughness alto, sem metalness) nas peças do corpo — resposta de
+luz mais suave com as mesmas 2 luzes já existentes na cena.
+
+Continua dentro do mesmo orçamento de peças simples (nenhum modelo externo, nenhuma
+textura de rosto/uniforme detalhada, sem rig/animação de membro) — só a geometria base
+ficou mais parecida com uma pessoa. Validado visualmente no Browser pane (câmera
+aproximada manualmente via console pra inspecionar um jogador de perto) e nos 182/182
+testes (nenhum deles depende da geometria interna do boneco, só de `toWorld`).
