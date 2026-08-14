@@ -1911,3 +1911,34 @@ Validado: suíte completa 293/293 (5 testes novos: progressão de namoro, gating
 consequência por reputação, suspensão de verdade em evento de conduta, retrocompat dos
 17 originais, fallback de imagem nunca quebra) + verificação visual no Browser pane
 (modal de "Alguém novo na sua vida" renderizando a foto real do casal na chuva).
+
+---
+
+## Logo da competição: bug de logos sumidas no Calendário + tamanho pequeno
+
+Usuário reportou dois problemas na mesma leva: no confronto principal da Home e no
+painel "Próximos jogos" o logo da competição estava pequeno demais perto dos escudos;
+na aba Calendário (Torneios) os logos simplesmente **não apareciam** nas linhas de LIGA
+(a maioria do calendário).
+
+**Causa do bug**: `compTag(comp)` (`js/ui.js`, monta a etiqueta colorida de cada linha
+do calendário/panorama/sorteio de grupos) indexava `CQ.COMP_LOGOS[comp]` direto com o
+`compKey` cru — sem passar pelo `fxCompLogoKey(G, key)` que já resolve os rótulos
+genéricos "LIGA"/"COPA" pro código real da competição daquele ano (criado na entrega do
+logo do confronto principal). Como a esmagadora maioria das linhas do calendário é
+"LIGA", o logo nunca batia com nenhuma chave real — só a Copa do Brasil e as
+competições continentais (que já usam código específico) apareciam.
+
+`compTag` agora recebe `G` como primeiro argumento e resolve a chave antes de indexar
+`CQ.COMP_LOGOS` — mesma correção nos 4 pontos que chamam a função (calendário, painel
+de panorama, sorteio de grupos).
+
+**Tamanho**: `.lm-vs .comp-logo` (confronto principal da Home) foi de 30px pra 42px —
+mais proporcional aos escudos de 62px ao lado. `.outer-rail-r .comp-logo` ("Próximos
+jogos") ganhou uma regra própria de 26px (era o padrão de 20px, pensado pra selos de
+tabela, pequeno demais quando é o único indicador de qual campeonato é cada linha).
+
+Validado: suíte completa 294/294 + verificação no Browser pane — as 38 linhas de LIGA
+do calendário de uma temporada simulada passaram a mostrar o escudo real da competição
+(antes, 0), tamanho do logo confirmado via `getComputedStyle` nos 2 pontos (42px/26px),
+sem estourar a largura de 250px do painel lateral.

@@ -135,7 +135,7 @@ body::before { opacity: var(--noise-op); }
 .lead-matchup .lm-name { font-family: var(--serif); font-weight: 700; font-size: 18px; color: #f4efe2; }
 .lead-matchup .lm-role { font-family: var(--cond); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.2em; color: rgba(244,239,226,.5); }
 .lead-matchup .lm-vs { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; font-family: var(--serif); font-weight: 900; font-style: italic; font-size: 30px; color: var(--verm); }
-.lead-matchup .lm-vs .comp-logo { width: 30px; height: 30px; }
+.lead-matchup .lm-vs .comp-logo { width: 42px; height: 42px; }
 :root[data-theme="dark"] .lead-matchup { outline: 1px solid var(--rule); }
 .lead-cta { margin-top: 18px; }
 .lead-cta .btnrow { justify-content: flex-start; }

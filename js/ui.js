@@ -2475,8 +2475,13 @@ window.CQ = window.CQ || {};
   const COMP_ABBR = { EST: "EST", LIGA: "LIGA", BRA: "LIGA", BRB: "SÉRIE B", CDB: "COPA BR", COPA: "COPA", LIB: "LIBERT", SUL: "SULA", UCL: "UCL", UEL: "UEL", UECL: "CONFERENCE", SEL: "SELEÇÃO", WC: "COPA", CA: "COPA AM", EU: "EURO", GC: "COPA OURO", AC: "COPA ÁSIA", MUN: "MUNDIAL", SUPER: "SUPERMUNDIAL" };
   // classe de cor por competição (para diferenciar no calendário/panorama)
   const COMP_COLOR = { EST: "c-est", LIGA: "c-liga", BRA: "c-liga", BRB: "c-serieb", CDB: "c-copa", COPA: "c-copa", LIB: "c-lib", SUL: "c-sula", UCL: "c-ucl", UEL: "c-uel", UECL: "c-uel", SEL: "c-sel", WC: "c-sel", CA: "c-sel", EU: "c-sel", GC: "c-sel", AC: "c-sel", MUN: "c-mun", SUPER: "c-mun" };
-  function compTag(comp) {
-    const logo = CQ.COMP_LOGOS && CQ.COMP_LOGOS[comp];
+  // `comp` às vezes é só um rótulo genérico ("LIGA"/"COPA", ver fxCompLogoKey) — sem
+  // resolver pro código real da competição daquele ano, CQ.COMP_LOGOS nunca bate e o
+  // logo simplesmente não aparece (bug relatado: "nem entrou as logos" no calendário,
+  // onde a maioria das linhas é justamente LIGA).
+  function compTag(G, comp) {
+    const key = fxCompLogoKey(G, comp);
+    const logo = CQ.COMP_LOGOS && CQ.COMP_LOGOS[key];
     const icon = logo ? `<img class="comp-logo cal-tag-logo" src="${logo}" alt="">` : "";
     return `<span class="cal-tag ${COMP_COLOR[comp] || ""}">${icon}${esc(COMP_ABBR[comp] || comp)}</span>`;
   }
@@ -2521,11 +2526,11 @@ window.CQ = window.CQ || {};
         const a = m.home ? m.gm : m.go, b = m.home ? m.go : m.gm;
         const mine = m.plays ? notaPill(m.nota) : '<span class="cal-dnp">—</span>';
         statusCell = `<span class="cal-res"><span class="result-pill ${pill}">${pill}</span> <b class="tnum">${a}-${b}</b></span>`;
-        rowsOut += `<tr class="cal-done"><td>${compTag(m.comp)}</td><td><span class="clubcell">${oppCrest} ${opp}</span></td><td>${localTag}</td><td class="num">${statusCell}</td><td class="num">${mine}</td></tr>`;
+        rowsOut += `<tr class="cal-done"><td>${compTag(G, m.comp)}</td><td><span class="clubcell">${oppCrest} ${opp}</span></td><td>${localTag}</td><td class="num">${statusCell}</td><td class="num">${mine}</td></tr>`;
         return;
       }
       statusCell = isNext ? '<span class="cal-next">Próximo</span>' : '<span class="muted small">Agendado</span>';
-      rowsOut += `<tr class="${isNext ? "cal-now" : ""}"><td>${compTag(m.comp)}${m.decisive ? ' <span class="cal-dec">decisivo</span>' : ""}</td><td><span class="clubcell">${oppCrest} ${opp}</span></td><td>${localTag}</td><td class="num" colspan="2">${statusCell}</td></tr>`;
+      rowsOut += `<tr class="${isNext ? "cal-now" : ""}"><td>${compTag(G, m.comp)}${m.decisive ? ' <span class="cal-dec">decisivo</span>' : ""}</td><td><span class="clubcell">${oppCrest} ${opp}</span></td><td>${localTag}</td><td class="num" colspan="2">${statusCell}</td></tr>`;
     });
     const upcoming = sched.length - played;
     return `<div class="card">
@@ -2566,7 +2571,7 @@ window.CQ = window.CQ || {};
       const badgeCls = c.statusTag === "campeão" ? "badge-gold" : c.statusTag === "fora" ? "badge-verm" : c.statusTag === "encerrado" ? "badge-soft" : "badge-green";
       const next = c.nextOpp;
       return `<div class="card" style="box-shadow:none">
-        <div class="card-h"><h3>${compTag(c.key === "CONTI" && G.season.comps.CONTI ? G.season.comps.CONTI.id : c.key)} ${esc(c.name)}</h3><span class="badge ${badgeCls}">${esc(c.statusTag)}</span></div>
+        <div class="card-h"><h3>${compTag(G, c.key === "CONTI" && G.season.comps.CONTI ? G.season.comps.CONTI.id : c.key)} ${esc(c.name)}</h3><span class="badge ${badgeCls}">${esc(c.statusTag)}</span></div>
         <div class="card-b">
           <div class="flex-b"><span class="condsmall">Situação</span><b class="small">${esc(c.phase)}</b></div>
           <hr class="rule">
@@ -2611,7 +2616,7 @@ window.CQ = window.CQ || {};
           ${t.id.indexOf("nat:") === 0 ? crest(t.id, "crest-24") : crest(t.id, "crest-24")}
           <span>${esc(t.name)}</span>${t.me ? '<b class="verm">VOCÊ</b>' : ""}</div>`;
       }).join("");
-      return `<div class="draw-group"><div class="draw-group-h">${compTag(d.key)} ${esc(d.name)} · ${esc(d.sub)}</div>
+      return `<div class="draw-group"><div class="draw-group-h">${compTag(g(), d.key)} ${esc(d.name)} · ${esc(d.sub)}</div>
         <div class="draw-balls">${pots}</div></div>`;
     }).join("");
     overlay(`<div class="live-head"><span class="lh-comp">Sorteio dos grupos · ${g().year}</span>${I.trophy}</div>
