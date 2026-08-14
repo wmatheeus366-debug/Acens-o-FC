@@ -1119,3 +1119,25 @@ corretos e fallback SVG, ciclo completo de slots de save incluindo estresse de 2
 saves, service worker registrado/ativado com precache correto). `node
 scripts/build.mjs` + `node scripts/build-sw.mjs`: bundle final **2812 KB** (29
 arquivos JS), `sw.js` gerado (22 KB, precache de 2849 KB).
+
+## Margens externas em telas muito largas (feito)
+
+`.page` (o container central de toda tela) trava em `max-width: 1240px` — em
+monitores bem largos isso deixava uma faixa vazia enorme dos 2 lados. `outerRailsHTML`
+(`js/ui.js`, chamado no fim de `render()`) monta 2 painéis com `position: fixed`
+ancorados fora do `.page` (`.outer-rail-l`/`.outer-rail-r`, CSS em `css/style.css`),
+só exibidos a partir de `min-width: 1900px` — abaixo disso a regra `@media` os mantém
+`display: none`, sem custo de layout.
+
+- **Esquerda**: reaproveita `sidePanelHTML()` (já existia, desenhado originalmente
+  pro painel lateral dos modais largos — overall/fama/moral/condição/patrimônio).
+- **Direita**: próximos jogos agendados, via `E().peekSchedule(G)` (já usado em
+  `selHTML`), filtrado pra só os ainda não jogados.
+
+Aparece em toda tela com carreira ativa (não só a Home) — `render()` é o único ponto
+que monta isso, então as 5 telas principais ganham de graça. Sem carreira ativa
+(`CQ.state.game` nulo — capa, criação, hall), `outerRailsHTML()` devolve `""`.
+
+Validado: `testOuterRailsHTML` (novo) + verificação manual no Browser pane em 2200px
+(dado real nos 2 painéis, sem sobrepor `.page`, escondido corretamente abaixo do
+limite) nas 5 telas principais.

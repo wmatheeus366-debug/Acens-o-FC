@@ -164,6 +164,32 @@ h1, h2, h3, h4 { font-family: var(--serif); font-weight: 600; line-height: 1.12;
 .cols-3 { display: grid; grid-template-columns: 250px minmax(0, 1fr) 300px; gap: 22px; align-items: start; }
 .stack { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 
+/* ---------------- Margens externas (telas muito largas) ---------------- */
+/* .page trava em 1240px de largura — em monitores bem largos sobrava uma faixa preta
+   enorme dos dois lados. Preenche com 2 painéis fixos fora do .page (resumo do craque
+   à esquerda, próximos jogos à direita), só a partir de uma viewport larga o bastante
+   pra caberem sem espremer o conteúdo central — abaixo disso nem entram no DOM
+   (outerRailsHTML, js/ui.js, já devolve "" se não há carreira ativa; a regra @media
+   aqui é só quem decide exibir ou não o que já existe). */
+.outer-rail {
+  display: none;
+  position: fixed;
+  top: 132px;
+  width: 250px;
+  max-height: calc(100vh - 156px);
+  overflow-y: auto;
+  z-index: 5;
+}
+.outer-rail-l { right: calc(50vw + 640px); }
+.outer-rail-r { left: calc(50vw + 640px); }
+/* sidePanelHTML() (js/ui.js) foi desenhado pro contexto do modal largo
+   (.overlay-box.panel .ov-side já dá padding/borda por conta própria) — fora dali
+   (aqui, dentro de um .card comum) precisa do próprio padding */
+.outer-rail-l .ov-side { display: block; padding: 14px; }
+@media (min-width: 1900px) {
+  .outer-rail { display: block; }
+}
+
 .card {
   background: var(--paper);
   border: 1px solid var(--ink);

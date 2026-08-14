@@ -1752,3 +1752,32 @@ drag-and-drop real disparando a mesma função que um drag de verdade usaria, gr
 com dados corretos, ciclo completo de slots de save com estresse de 22 saves,
 service worker registrado com precache correto). `node scripts/build.mjs` + `node
 scripts/build-sw.mjs`: bundle final **2812 KB** (29 arquivos JS), `sw.js` 22 KB.
+
+---
+
+## Margens externas em telas muito largas (painel do craque + próximos jogos)
+
+Usuário mandou print reclamando de espaço vazio enorme dos dois lados da tela em
+monitores largos — `.page` trava em 1240px de largura desde sempre, e num monitor bem
+maior isso deixava uma faixa preta enorme sem nada.
+
+Em vez de só alargar o conteúdo central (deixaria as linhas de texto compridas
+demais pra leitura confortável), 2 painéis fixos aparecem fora do `.page` quando a
+tela é larga o bastante pra caberem sem espremer nada (a partir de ~1900px): à
+esquerda, o resumo do craque (`sidePanelHTML`, reaproveitado do painel que já existia
+nos modais largos — overall, fama, moral, condição, patrimônio); à direita, os
+próximos jogos agendados (`peekSchedule`, já usado na tela de Seleção). Os dois
+painéis usam `position: fixed`, então ficam visíveis mesmo rolando a página — em
+telas normais (abaixo do limite), nem aparecem, sem custo nenhum de layout.
+
+Aparece em toda tela com carreira ativa (Início, Carreira, Torneios, Redes, Clube) —
+não só na Home — já que o espaço vazio nas laterais existia em todo lugar, não só
+ali.
+
+Validado: 262/262 (1 teste novo, `testOuterRailsHTML`) + verificação manual no
+Browser pane em 2200px de largura (painéis com dado real, sem sobrepor o conteúdo
+central, escondidos corretamente abaixo do limite) em 5 telas diferentes. Achado
+durante a verificação: um service worker registrado numa sessão de teste anterior
+(Workbox) estava servindo um `CRAQUE.html` desatualizado do cache — não é um bug do
+recurso em si, só um artefato de teste (corrigido limpando o cache/registro antigo
+antes de revalidar).

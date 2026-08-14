@@ -961,6 +961,29 @@
     });
   }
 
+  // ---- Margens externas (telas muito largas): painéis reais, sem duplicar/inventar dado ----
+  function testOuterRailsHTML() {
+    withTempGame(function () {
+      const g = newCareer("ATA", "vas");
+      CQ.state.game = g;
+      let err = null, html = null;
+      try { html = CQ.ui.outerRailsHTML(); } catch (e) { err = e; }
+      assert("margens externas: outerRailsHTML() não lança exceção", !err, err && err.stack);
+      assert("margens externas: monta os 2 painéis (esquerda e direita)", html && html.indexOf("outer-rail-l") >= 0 && html.indexOf("outer-rail-r") >= 0, "");
+      assert("margens externas: painel esquerdo mostra o nome do jogador (mesmo dado de sidePanelHTML)", html && html.indexOf(g.player.name) >= 0, "");
+      const upcoming = (E().peekSchedule(g) || []).filter(function (m) { return !m.done; });
+      if (html && upcoming.length && upcoming[0].oppName) {
+        assert("margens externas: painel direito mostra o próximo adversário real", html.indexOf(upcoming[0].oppName) >= 0, upcoming[0].oppName);
+      }
+      // sem carreira ativa (CQ.state.game null), nunca pode quebrar — mesma checagem que sidePanelHTML já faz
+      CQ.state.game = null;
+      let err2 = null, html2 = null;
+      try { html2 = CQ.ui.outerRailsHTML(); } catch (e) { err2 = e; }
+      assert("margens externas: sem carreira ativa, outerRailsHTML() não lança exceção", !err2, err2 && err2.stack);
+      assert("margens externas: sem carreira ativa, devolve vazio (nunca aparece na tela de capa)", html2 === "", JSON.stringify(html2));
+    });
+  }
+
   // ---- Campeões: as 5 competições continentais entram no histórico todo ano (não só LIB/UCL) ----
   function testChampsCoversAllContis() {
     withTempGame(function () {
@@ -1718,6 +1741,7 @@
     testLineupPrefsAffectSelection();
     testCareerChartsRenderCorrectData();
     testSaveSlotsWiredSafely();
+    testOuterRailsHTML();
     testChampsCoversAllContis();
     testMundialRegistersChampionEvenLosing();
     testTituloOrdinalBanner();

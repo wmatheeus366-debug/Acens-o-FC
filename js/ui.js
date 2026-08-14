@@ -98,7 +98,7 @@ window.CQ = window.CQ || {};
       case "retro": body = retroHTML(); break;
       default: body = homeHTML();
     }
-    app.innerHTML = mastheadHTML() + `<main class="page">${body}</main>` + bottomNavHTML();
+    app.innerHTML = mastheadHTML() + `<main class="page">${body}</main>` + bottomNavHTML() + outerRailsHTML();
     runEntranceAnimations();
     sweepCrests();
     initTacticsSortable();
@@ -1033,6 +1033,29 @@ window.CQ = window.CQ || {};
       </div>
     </aside>`;
   }
+  // margens externas (fora do .page, que trava em 1240px) — só aparecem em monitores
+  // muito largos (regra @media em css/style.css, .outer-rail); reaproveita
+  // sidePanelHTML (já existia pros modais largos) pro craque à esquerda, e monta uma
+  // lista curta de próximos jogos (peekSchedule, já usado em selHTML) à direita.
+  // Sempre "" sem carreira ativa (mesma checagem de sidePanelHTML) — nunca aparece nas
+  // telas de capa/criação/hall.
+  function outerRailsHTML() {
+    const G = g();
+    if (!G || !G.player) return "";
+    const left = `<div class="outer-rail outer-rail-l"><div class="card">${sidePanelHTML()}</div></div>`;
+    const upcoming = (E().peekSchedule(G) || []).filter(function (m) { return !m.done; }).slice(0, 6);
+    const rows = upcoming.map(function (m) {
+      const tag = m.home === true ? "casa" : m.home === false ? "fora" : "";
+      return `<div class="flex-b" style="padding:7px 0;border-bottom:1px dashed var(--rule-soft)">
+        <span class="flex" style="gap:8px;min-width:0">${m.oppId ? crest(m.oppId, "crest-20") : ""}<span style="min-width:0"><b class="small">${m.oppName ? esc(m.oppName) : "A definir"}</b><br><span class="condsmall">${esc(m.label)}</span></span></span>
+        ${tag ? `<span class="condsmall" style="flex-shrink:0">${tag}</span>` : ""}
+      </div>`;
+    }).join("") || '<p class="small muted" style="padding:8px 0">Sem próximos jogos agendados no momento.</p>';
+    const right = `<div class="outer-rail outer-rail-r"><div class="card"><div class="section-banner"><span class="sb-title">Próximos jogos</span></div>
+      <div class="card-b tight" style="padding:2px 14px">${rows}</div></div></div>`;
+    return left + right;
+  }
+
   // `wide`: false/undefined = padrão (680px); true = largo (860px, ex.: modo ao vivo);
   // "panel" = largo + painel lateral fixo de resumo do jogador, pras decisões grandes
   // (mercado, empréstimo, volta a ex-clube) onde sobrava bastante espaço vazio em
@@ -3358,6 +3381,7 @@ window.CQ = window.CQ || {};
     startClubPool: startClubPool, squadOf: squadOf, timelineHTML: timelineHTML, careerLegacy: careerLegacy,
     hallHTML: hallHTML, sidePanelHTML: sidePanelHTML, peersHTML: peersHTML,
     probableLineup: probableLineup,
-    saveToNewSlot: saveToNewSlot, loadSaveSlot: loadSaveSlot, deleteSaveSlot: deleteSaveSlot
+    saveToNewSlot: saveToNewSlot, loadSaveSlot: loadSaveSlot, deleteSaveSlot: deleteSaveSlot,
+    outerRailsHTML: outerRailsHTML
   };
 })();
