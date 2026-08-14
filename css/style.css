@@ -409,6 +409,10 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 /* ---------------- Campo 2D animado (modo Ao Vivo) ---------------- */
 .live-pitch { padding: 8px 12px 10px; border-bottom: 1px solid var(--rule-soft); }
 .pv-svg { display: block; width: 100%; height: auto; aspect-ratio: 15 / 9; background: var(--paper); }
+/* campo real (footballsim + football2d, js/live-sim.js/js/ui.js mountPitchCanvas) —
+   canvas puro, sem <viewBox>: aspect-ratio dá a altura CSS, o buffer real é
+   dimensionado em JS (devicePixelRatio) pra ficar nítido em telas de alta densidade. */
+.pv-canvas { display: block; width: 100%; height: auto; aspect-ratio: 15 / 9; max-height: 60vh; background: var(--paper); }
 .pv-grass { fill: var(--green); }
 .pv-lines { fill: none; stroke: rgba(255, 253, 246, .55); stroke-width: .6; }
 :root[data-theme="dark"] .pv-lines { stroke: rgba(255, 253, 246, .3); }

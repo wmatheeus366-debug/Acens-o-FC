@@ -653,6 +653,100 @@
     assert("campo: os 2 times nunca ficam com a mesma cor de sprite", mesmaCor === 0, "colisões=" + mesmaCor);
   }
 
+  // ---- Motor de partida real (js/live-sim.js + js/vendor/footballsim.js) ----
+  // CQ_FOOTBALLSIM (as funções em si) só existe depois de avaliar o texto de
+  // CQ_FOOTBALLSIM_SRC — de propósito (ver js/live-sim.js): o motor só roda de
+  // verdade dentro de um Worker; aqui, pro teste, ativa na mesma thread (o Worker
+  // real só adiciona a camada de postMessage por cima do mesmo simulateLoop
+  // serializado por .toString(), não muda a lógica testada).
+  function activateFootballsimForTest() {
+    if (!window.CQ_FOOTBALLSIM && window.CQ_FOOTBALLSIM_SRC) {
+      // eslint-disable-next-line no-eval
+      (0, eval)(window.CQ_FOOTBALLSIM_SRC);
+    }
+    return !!window.CQ_FOOTBALLSIM;
+  }
+  function stubProbableLineup() {
+    const prev = CQ.ui;
+    CQ.ui = Object.assign({}, CQ.ui, {
+      probableLineup: function (G, fixture) {
+        const p = G.player;
+        const squad = G.world.clubs[p.clubId].roster.map(function (j) { return { name: j.name, pos: j.pos, ov: j.ovr }; });
+        const buckets = { GOL: 1, ZAG: 2, LAT: 2, VOL: 2, MEI: 2, PON: 1, ATA: 1 };
+        const out = [];
+        Object.keys(buckets).forEach(function (pos) {
+          out.push.apply(out, squad.filter(function (j) { return j.pos === pos; }).sort(function (a, b) { return b.ov - a.ov; }).slice(0, buckets[pos]));
+        });
+        const idx = out.findIndex(function (j) { return j.pos === p.pos; });
+        const me = { name: p.name, pos: p.pos, ov: p.overall, isMe: true };
+        if (idx >= 0) out[idx] = me; else out.push(me);
+        return out;
+      }
+    });
+    return function restore() { CQ.ui = prev; };
+  }
+  function testLiveSimTranslateShape() {
+    if (!CQ.liveSim) { assert("motor real: js/live-sim.js carregado", false, "CQ.liveSim ausente"); return; }
+    if (!activateFootballsimForTest()) { assert("motor real: js/vendor/footballsim.js carregado", false, "CQ_FOOTBALLSIM_SRC ausente"); return; }
+    const restore = stubProbableLineup();
+    let ok = true, detail = "";
+    try {
+      withTempGame(function () {
+        const g = newCareer("ATA", "vas");
+        const oppId = Object.keys(CQ.DATA.CLUBS).find(function (id) { return id !== "vas" && CQ.DATA.CLUBS[id].league === "BRA"; });
+        const fx = { compKey: "LIGA", label: "Teste", oppId: oppId, home: true, myTeam: E().myClub(g), opp: CQ.DATA.CLUBS[oppId], isNatMatch: false, decisive: true };
+        const teams = CQ.liveSim.buildTeams(g, fx);
+        const sim = CQ.liveSim.simulateLoop(window.CQ_FOOTBALLSIM, teams.mine, teams.opp, CQ.liveSim.PITCH, 42, 300); // poucas iterações — só a forma do resultado importa aqui
+        const res = CQ.liveSim.translate(g, fx, teams, sim);
+        // mesmo shape que resolveMatch já produz — applyMatch não pode notar diferença
+        ["fixture", "plays", "starts", "minutes", "gm", "go", "pg", "pa", "saves", "bigSaves", "nota", "tackles", "cardY", "cardR", "isGK", "win", "draw", "loss"].forEach(function (k) {
+          if (!(k in res)) { ok = false; detail += "falta " + k + " "; }
+        });
+        if (!Array.isArray(res.simEvents)) { ok = false; detail += "simEvents não é array "; }
+        if (!Array.isArray(res.simFrames) || !res.simFrames.length) { ok = false; detail += "simFrames vazio "; }
+      });
+    } catch (e) { ok = false; detail += "exceção: " + e.message; }
+    restore();
+    assert("motor real: translate() devolve o mesmo shape de resolveMatch + simEvents/simFrames", ok, detail);
+  }
+  function testLiveSimDeterminism() {
+    if (!CQ.liveSim || !activateFootballsimForTest()) { assert("motor real: determinismo (mesma seed → mesmo resultado)", false, "motor indisponível"); return; }
+    const restore = stubProbableLineup();
+    let ok = true, detail = "";
+    try {
+      withTempGame(function () {
+        const g = newCareer("ATA", "vas");
+        const oppId = Object.keys(CQ.DATA.CLUBS).find(function (id) { return id !== "vas" && CQ.DATA.CLUBS[id].league === "BRA"; });
+        const fx = { compKey: "LIGA", label: "Teste", oppId: oppId, home: true, myTeam: E().myClub(g), opp: CQ.DATA.CLUBS[oppId], isNatMatch: false, decisive: true };
+        const teams = CQ.liveSim.buildTeams(g, fx);
+        const a = CQ.liveSim.simulateLoop(window.CQ_FOOTBALLSIM, teams.mine, teams.opp, CQ.liveSim.PITCH, 777, 300);
+        const teams2 = CQ.liveSim.buildTeams(g, fx);
+        const b = CQ.liveSim.simulateLoop(window.CQ_FOOTBALLSIM, teams2.mine, teams2.opp, CQ.liveSim.PITCH, 777, 300);
+        ok = a.gm === b.gm && a.go === b.go && JSON.stringify(a.events) === JSON.stringify(b.events);
+        detail = a.gm + "x" + a.go + " vs " + b.gm + "x" + b.go;
+      });
+    } catch (e) { ok = false; detail += "exceção: " + e.message; }
+    restore();
+    assert("motor real: determinismo (mesma seed → mesmo placar e mesmos eventos)", ok, detail);
+  }
+  // ---- fallback: buildTeams falha de forma limpa quando falta dado de elenco (é
+  // exatamente esse tipo de exceção que CQ.liveSim.run captura pra cair no caminho
+  // estatístico de sempre, sem quebrar a tela do jogador — ver js/live-sim.js) ----
+  function testLiveSimBuildTeamsFallsBackCleanly() {
+    if (!CQ.liveSim) { assert("motor real: buildTeams falha de forma limpa sem elenco do mundo", false, "CQ.liveSim ausente"); return; }
+    const restore = stubProbableLineup();
+    let threw = false, detail = "";
+    try {
+      withTempGame(function () {
+        const g = newCareer("ATA", "vas");
+        const fx = { compKey: "LIGA", label: "Teste", oppId: "id-que-nao-existe", home: true, myTeam: E().myClub(g), opp: { id: "id-que-nao-existe", name: "Fantasma", str: 70, c1: "#888", c2: "#fff" }, isNatMatch: false, decisive: true };
+        CQ.liveSim.buildTeams(g, fx);
+      });
+    } catch (e) { threw = true; detail = e.message; }
+    restore();
+    assert("motor real: buildTeams lança exceção limpa (não trava) quando o adversário não tem elenco no mundo", threw, detail);
+  }
+
   // ---- Campo 2D animado: jerseySVG usa a cor real do clube em cada padrão de listra ----
   function testJerseySVGAllPatterns() {
     const amostra = { plain: "pal", hoops: "fla", stripes: "bot", sash: "sao" };
@@ -1461,6 +1555,9 @@
     testPitchFormation();
     testPitchPoseForAllEventTypes();
     testPitchSpriteColors();
+    testLiveSimTranslateShape();
+    testLiveSimDeterminism();
+    testLiveSimBuildTeamsFallsBackCleanly();
     testJerseySVGAllPatterns();
     testCrestProceduralStillConsistent();
     testWorldAgeDistribution();

@@ -730,8 +730,23 @@ window.CQ = window.CQ || {};
         </div></div>`);
       return;
     }
-    CQ.state.live = CQ.live.buildLive(G, fx);
-    renderLiveOverlay(true);
+    // CQ.liveSim (js/live-sim.js) roda a partida de verdade (física/IA real, footballsim)
+    // num Web Worker — não trava a tela, mas demora alguns segundos (mais lento que o
+    // instantâneo de antes). Sem esse módulo, ou se der qualquer problema, cai direto
+    // no caminho estatístico de sempre (buildLive sem 2º argumento) sem exibir nada
+    // disso — startLiveDirect faz exatamente o que essa função sempre fez.
+    function startLiveDirect(simResult) {
+      CQ.state.live = CQ.live.buildLive(G, fx, simResult || null);
+      renderLiveOverlay(true);
+    }
+    if (CQ.liveSim && CQ.liveSim.runAsync) {
+      overlay(`<div class="card"><div class="card-h"><h3>Preparando a partida</h3></div>
+        <div class="card-b"><p class="small muted">Simulando a partida com física e IA de
+        verdade, jogada a jogada — só um instante...</p></div></div>`);
+      CQ.liveSim.runAsync(G, fx).then(startLiveDirect);
+      return;
+    }
+    startLiveDirect(null);
   }
 
   function actionPlay() {
@@ -1056,6 +1071,95 @@ window.CQ = window.CQ || {};
   }
 
   // ---------------- partida ao vivo ----------------
+  // ---- campo em canvas (footballsim + football2d) — só quando a partida foi resolvida
+  // pelo motor real (live.res.simFrames existe, ver js/live-sim.js/js/live.js). Sem
+  // isso (caminho estatístico, Worker indisponível, ou qualquer falha), cai pro campo
+  // SVG de sempre (buildPitchSVG) — os dois nunca coexistem na mesma partida.
+  let pitchCanvasState = null;
+  const spriteImgCache = {};
+  function spriteImg(src) {
+    if (!spriteImgCache[src]) { const im = new Image(); im.src = src; spriteImgCache[src] = im; }
+    return spriteImgCache[src];
+  }
+  function mountPitchCanvas(fx, res, player) {
+    const canvas = $(".pv-canvas");
+    if (!canvas || !window.CQ_FOOTBALL2D || !CQ.PLAYER_SPRITES || !CQ.liveSim) return false;
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = Math.max(1, Math.round(rect.width * dpr));
+    canvas.height = Math.max(1, Math.round(rect.height * dpr));
+    const ctx = canvas.getContext("2d");
+    const dims = CQ_FOOTBALL2D.getGameDimensions(ctx);
+    const sprites = CQ.pitch.pickTeamSprites(fx.myTeam, fx.opp);
+    const mineIdx = (res && res.plays) ? CQ.pitch.FORMATION.findIndex(function (f) { return f.pos === player.pos; }) : -1;
+    pitchCanvasState = { ctx: ctx, dims: dims, mySprite: sprites.mine, oppSprite: sprites.opp, mineIdx: mineIdx, myNum: player && player.num, rafId: null };
+    if (res.simFrames && res.simFrames.length) drawCanvasFrame(res.simFrames[0]);
+    return true;
+  }
+  function fsPt(pos) {
+    const st = pitchCanvasState, d = st.dims, P = CQ.liveSim.PITCH;
+    // o eixo comprido do footballsim (gol-a-gol) é Y (pitchHeight=1050); o football2d
+    // (e nosso SVG antigo) desenham o campo deitado, gol na esquerda/direita — troca
+    // os eixos aqui, não em fsToPct (que fica genérico/reaproveitável).
+    const pct = CQ.pitch.fsToPct([pos[1], pos[0]], P.pitchHeight, P.pitchWidth);
+    return [d.x + (pct[0] / 100) * d.width, d.y + (pct[1] / 100) * d.height];
+  }
+  function drawCanvasFrame(frame) {
+    const st = pitchCanvasState;
+    if (!st || !frame) return;
+    const ctx = st.ctx, d = st.dims;
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    CQ_FOOTBALL2D.drawField(ctx, d);
+    const spriteSize = Math.max(16, d.width * 0.028);
+    function drawTeam(list, src, mineFlag) {
+      list.forEach(function (pos, i) {
+        const [x, y] = fsPt(pos);
+        const isMe = mineFlag && i === st.mineIdx;
+        const img = spriteImg(src);
+        if (img.complete && img.naturalWidth) ctx.drawImage(img, x - spriteSize / 2, y - spriteSize / 2, spriteSize, spriteSize);
+        else { ctx.beginPath(); ctx.arc(x, y, spriteSize / 2.6, 0, 2 * Math.PI); ctx.fillStyle = mineFlag ? "#3a6" : "#833"; ctx.fill(); }
+        if (isMe) {
+          ctx.beginPath(); ctx.arc(x, y, spriteSize * 0.62, 0, 2 * Math.PI);
+          ctx.strokeStyle = "#e0b13c"; ctx.lineWidth = Math.max(1.5, spriteSize * 0.06); ctx.stroke();
+        }
+      });
+    }
+    drawTeam(frame.mine, CQ.PLAYER_SPRITES[st.mySprite], true);
+    drawTeam(frame.opp, CQ.PLAYER_SPRITES[st.oppSprite], false);
+    const ballImg = spriteImg(CQ.PLAYER_SPRITES.ball);
+    const [bx, by] = fsPt(frame.ball);
+    const bs = Math.max(8, d.width * 0.016);
+    if (ballImg.complete && ballImg.naturalWidth) ctx.drawImage(ballImg, bx - bs / 2, by - bs / 2, bs, bs);
+    else { ctx.beginPath(); ctx.arc(bx, by, bs / 2, 0, 2 * Math.PI); ctx.fillStyle = "#fffdf6"; ctx.fill(); }
+  }
+  // anima uma janela curta de frames reais (ITER_FROM..ITER_TO) — chamado a cada
+  // evento revelado que tenha `iter` (gol/cartão vindos do footballsim, ver
+  // js/live.js buildLive). ~24 quadros/seg, mesmo espírito visual do pulso que o
+  // campo SVG já fazia, só que com movimento de verdade em vez de um salto de pose.
+  function canvasPlayFrames(frames, fromIter, toIter) {
+    const st = pitchCanvasState;
+    if (!st || !frames || !frames.length) return;
+    if (st.rafId) cancelAnimationFrame(st.rafId);
+    const lo = U.clamp(fromIter, 0, frames.length - 1), hi = U.clamp(toIter, 0, frames.length - 1);
+    const seq = frames.slice(Math.min(lo, hi), Math.max(lo, hi) + 1);
+    if (!seq.length) return;
+    const reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced) { drawCanvasFrame(seq[seq.length - 1]); return; }
+    let i = 0;
+    const stepMs = 40;
+    let last = 0;
+    function tick(ts) {
+      if (CQ.state.live === null || pitchCanvasState !== st) return; // partida encerrada/trocada
+      if (ts - last >= stepMs) { drawCanvasFrame(seq[i]); i++; last = ts; }
+      if (i < seq.length) st.rafId = requestAnimationFrame(tick); else st.rafId = null;
+    }
+    st.rafId = requestAnimationFrame(tick);
+  }
+  function unmountPitchCanvas() {
+    if (pitchCanvasState && pitchCanvasState.rafId) cancelAnimationFrame(pitchCanvasState.rafId);
+    pitchCanvasState = null;
+  }
+
   function renderLiveOverlay(fresh) {
     const live = CQ.state.live;
     const fx = live.fixture;
@@ -1069,14 +1173,21 @@ window.CQ = window.CQ || {};
       <span class="lh-comp">${esc(fx.label)}</span>
       <span class="live-clock"><span class="liveblink"></span><span id="lv-score" class="tnum">${liveScoreStr(live)}</span></span>
     </div>`;
-    // campo 2D animado (js/pitch.js): SVG puro, inserido 1x e mantido vivo no DOM daqui
-    // pra frente — liveStep()/liveDecide()/shootReveal() só mexem em classe/transform
-    // dele depois, nunca recriam (mesmo padrão de #lv-feed/#lv-score/#lv-foot). Modo
-    // largo do overlay dá espaço pro campo sem espremer o feed de texto. (Housed um
-    // campo 3D via three.js aqui por uma sessão — revertido a pedido do usuário: "tá
-    // bem engessado e ruim, vamos com um 2D". Ver docs/CHANGELOG.md.)
-    const pitchHtml = (CQ.pitch && CQ.pitch.buildPitchSVG) ? CQ.pitch.buildPitchSVG(fx, live.res, g().player) : "";
+    // campo real (footballsim + football2d, ver js/live-sim.js) quando a partida foi
+    // simulada de verdade (live.res.simFrames) — canvas, montado DEPOIS do overlay
+    // entrar no DOM (mountPitchCanvas precisa do elemento já existindo). Sem isso, cai
+    // pro campo SVG de sempre (js/pitch.js buildPitchSVG), inserido 1x e mantido vivo
+    // no DOM daqui pra frente — liveStep()/liveDecide()/shootReveal() só mexem em
+    // classe/transform dele depois, nunca recriam. Modo largo do overlay dá espaço pro
+    // campo sem espremer o feed de texto. (Um campo 3D via three.js morou aqui por uma
+    // sessão — revertido a pedido do usuário: "tá bem engessado e ruim". Ver
+    // docs/CHANGELOG.md pra história completa dessa tela.)
+    const useCanvas = !!(live.res && live.res.simFrames && live.res.simFrames.length);
+    const pitchHtml = useCanvas
+      ? `<div class="live-pitch"><canvas class="pv-canvas"></canvas></div>`
+      : ((CQ.pitch && CQ.pitch.buildPitchSVG) ? CQ.pitch.buildPitchSVG(fx, live.res, g().player) : "");
     overlay(`<div class="live-sticky">${header}${pitchHtml}</div><div class="mm-feed" id="lv-feed"></div><div id="lv-foot" style="padding:12px 16px"></div>`, true);
+    if (useCanvas) mountPitchCanvas(fx, live.res, g().player);
     if (fresh) { if (CQ.audio) CQ.audio.play("whistle"); liveStep(); }
   }
 
@@ -1133,6 +1244,17 @@ window.CQ = window.CQ || {};
     if (!CQ.pitch || !events || !events.length) return;
     const live = CQ.state.live;
     const reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // campo em canvas (footballsim): eventos com `.iter` (gol/cartão vindos da
+    // simulação real, ver js/live.js buildLive) tocam a janela de frames reais ao
+    // redor daquele instante — bem mais fiel que o salto de pose do campo SVG.
+    if (pitchCanvasState && live.res && live.res.simFrames) {
+      const frames = live.res.simFrames;
+      events.forEach(function (e) {
+        if (typeof e.iter !== "number") return;
+        canvasPlayFrames(frames, Math.max(0, e.iter - 45), Math.min(frames.length - 1, e.iter + 12));
+      });
+      return;
+    }
     if (reduced) { applyPitchPose(CQ.pitch.poseFor(events[events.length - 1])); return; }
     events.forEach(function (e, i) {
       setTimeout(function () {
@@ -1286,6 +1408,7 @@ window.CQ = window.CQ || {};
   function finishLive() {
     const live = CQ.state.live;
     CQ.state.live = null;
+    unmountPitchCanvas(); // nunca deixar um requestAnimationFrame pendente fora da partida
     closeOverlay();
     E().applyMatch(g(), live.res);
     CQ.main.save();
@@ -3002,6 +3125,7 @@ window.CQ = window.CQ || {};
     requestTransfer: requestTransfer, cancelTransfer: cancelTransfer,
     setFocus: setFocus, buyAsset: buyAsset, investPoint: investPoint, autoDistributePoints: autoDistributePoints,
     startClubPool: startClubPool, squadOf: squadOf, timelineHTML: timelineHTML, careerLegacy: careerLegacy,
-    hallHTML: hallHTML, sidePanelHTML: sidePanelHTML, peersHTML: peersHTML
+    hallHTML: hallHTML, sidePanelHTML: sidePanelHTML, peersHTML: peersHTML,
+    probableLineup: probableLineup
   };
 })();

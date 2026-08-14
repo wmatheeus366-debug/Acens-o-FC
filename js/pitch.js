@@ -162,8 +162,16 @@ window.CQ = window.CQ || {};
     return { ball: [l.side === "my" ? 88 : 12, 50], result: l.ok ? "goal" : "miss", goalSide: side };
   }
 
+  // converte uma posição real do footballsim (0-pitchWidth, 0-pitchHeight — ver
+  // js/live-sim.js PITCH) pro mesmo espaço 0-100% que FORMATION/buildPitchSVG já usam,
+  // pra js/ui.js (dono do <canvas>, ver "não manipula DOM aqui" no topo do arquivo)
+  // desenhar os frames reais da simulação com a mesma convenção de coordenadas.
+  function fsToPct(pos, pitchW, pitchH) {
+    return [U.clamp((pos[0] / pitchW) * 100, 0, 100), U.clamp((pos[1] / pitchH) * 100, 0, 100)];
+  }
+
   CQ.pitch = {
     FORMATION: FORMATION, FLAVOR_ICON: FLAVOR_ICON, buildPitchSVG: buildPitchSVG, poseFor: poseFor, poseForKick: poseForKick,
-    SPRITE_REF: SPRITE_REF, rankedSpriteColors: rankedSpriteColors, pickTeamSprites: pickTeamSprites
+    SPRITE_REF: SPRITE_REF, rankedSpriteColors: rankedSpriteColors, pickTeamSprites: pickTeamSprites, fsToPct: fsToPct
   };
 })();

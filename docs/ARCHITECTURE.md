@@ -18,7 +18,10 @@ Desenvolvimento com arquivos separados; distribuição num arquivo único `CRAQU
 | `js/engine.js` | `CQ.engine` | Modelo, calendário, simulação, prêmios, mercado, técnico, traços, aposentadoria | util, DATA, world, (nar) |
 | `js/market.js` | `CQ.market` | Mercado autônomo entre NPCs: clubes comprando/vendendo jogadores entre si a cada temporada | util, DATA, world, engine |
 | `js/narrative.js` | `CQ.nar` | Feed, entrevistas, eventos de vida, enquetes, rival | util, DATA, engine |
-| `js/live.js` | `CQ.live` | Partidas ao vivo: cronologia, decisões, pênaltis lance a lance | util, engine |
+| `js/vendor/footballsim.js` | `window.CQ_FOOTBALLSIM_SRC` | Bundle IIFE do motor real de simulação **eozgit/footballsim** (MIT), guardado como STRING (não executado no carregamento) — só roda dentro do Worker do modo Ao Vivo. Refetch via `scripts/vendor-footballsim.mjs` | — |
+| `js/vendor/football2d.js` | `CQ.CQ_FOOTBALL2D` | Bundle IIFE de `drawField`/dimensões da **cyntler/football2d** (MIT) — só o desenho do campo, sem jogador (a lib não desenha nenhum). Refetch via `scripts/vendor-football2d.mjs` | — |
+| `js/live-sim.js` | `CQ.liveSim` | Adaptador: monta `Team`/`Player` do footballsim a partir do elenco persistido (`buildTeams`), roda a simulação real num Web Worker (`runAsync`, nunca rejeita — `null` em qualquer falha), traduz o resultado pro mesmo formato de `resolveMatch` (`translate`) | util, DATA, pitch, vendor/footballsim |
+| `js/live.js` | `CQ.live` | Partidas ao vivo: cronologia, decisões, pênaltis lance a lance — tenta `CQ.liveSim` primeiro (só quando o jogador assiste ao vivo), fallback estatístico idêntico ao de sempre quando indisponível | util, engine, liveSim |
 | `js/ui.js` | `CQ.ui` | Todas as telas, overlays, render | util, DATA, engine, nar, live, save |
 | `js/save.js` | `CQ.save` | Persistência: esquema, migração, validação, localStorage, export/import | util, engine, ui |
 | `js/main.js` | `CQ.main`, `CQ.state` | Bootstrap, estado global, tema (claro/escuro) | save, ui |
@@ -762,3 +765,112 @@ Testado com a partida exata do relato (Vasco × Guarani): Vasco vira vermelho, G
 vira azul — nenhum verde, bem distintos. Validado: novo `testPitchSpriteColors` (nenhum
 clube testado escolhe verde; os 2 times nunca empatam de cor) + verificação visual
 manual reproduzindo a mesma partida.
+
+## Motor de partida real: FootballSim (lógica) + Football2D (visual) no Ao Vivo (feito)
+
+Pedido do usuário: usar dois repositórios de terceiros no modo Ao Vivo —
+**eozgit/footballsim** pra lógica/inteligência da partida (fork MIT de
+GallagherAiden/footballSimulationEngine) e **cyntler/football2d** pro visual do campo
+(MIT). Escopo confirmado com o usuário: **só a tela de partida ao vivo** — temporada,
+carreira, mercado, lesão, disciplina e narrativa continuam 100% no motor estatístico de
+sempre (`resolveMatch`, `js/engine.js`); as ~180 partidas/rodada dos outros clubes e as
+partidas do próprio jogador não assistidas ao vivo nunca passam por aqui.
+
+**football2d não desenha jogador nenhum** (confirmado lendo o código-fonte, não só o
+README — `startMatch` recebe os times e nunca os usa) — só o campo (`drawField`, com
+proporção métrica real). O usuário confirmou usar os dois mesmo assim: football2d
+desenha o gramado, e os sprites Kenney que o jogo já tinha (`CQ.PLAYER_SPRITES`)
+continuam desenhando os 22 jogadores/bola por cima, agora em posições reais.
+
+### Vendorização (nenhuma das duas libs publica bundle pronto pro navegador)
+
+Mesmo princípio já usado pra three.js/GLTFLoader/Kenney/unDraw/Wikimedia: buscar só em
+tempo de build, nunca em tempo de execução. Novo `esbuild` (dependência de
+desenvolvimento) compila cada repo (clonado via `git clone --depth 1` em
+`scripts/.cache/`, gitignored) num IIFE de arquivo único, via um entry-point sintético
+que reexporta só o necessário:
+
+- **`scripts/vendor-footballsim.mjs`** → `js/vendor/footballsim.js`: reexporta
+  `initiateGame`/`playIteration`/`startSecondHalf` (API pública) + `setMatchSeed`
+  (interna, não exportada pelo pacote — o entry-point sintético a expõe). Guardado como
+  **string** (`window.CQ_FOOTBALLSIM_SRC`), deliberadamente **não executado** no
+  carregamento da página — só é `eval`'d dentro do Worker do modo Ao Vivo (ver abaixo).
+- **`scripts/vendor-football2d.mjs`** → `js/vendor/football2d.js`: reexporta só
+  `drawField`/`getGameDimensions`/constantes de campo — nada do loop/`startMatch`
+  próprio da lib (não desenha nada útil). Executa direto (`window.CQ_FOOTBALL2D`) —
+  barato e síncrono, sem necessidade de Worker.
+
+### Web Worker: por quê
+
+`playIteration()` (1 chamada = 1 tick de simulação) mede **~1.9ms/iteração** — uma
+partida completa (2700 iterações × 2 tempos = 5400) leva ~10s rodando sem parar, tempo
+suficiente pra travar a aba se rodasse na thread principal. Mesma solução que o próprio
+demo oficial do footballsim usa. Como o build final é **um único arquivo HTML** (sem
+`js/live-sim.js` como URL separada pra passar a `new Worker(url)`), o Worker é montado a
+partir de um **Blob**: o texto do bundle (`CQ_FOOTBALLSIM_SRC`) concatenado com um
+pequeno `self.onmessage` que chama `simulateLoop` — uma função pura em `js/live-sim.js`
+escrita para depender só dos próprios parâmetros (sem variável de fora), justamente pra
+poder ser serializada via `.toString()` e embutida verbatim no Worker.
+
+`CQ.liveSim.runAsync(g, fixture)` **nunca rejeita** — resolve `null` em qualquer falha
+(vendor ausente, `Worker` indisponível, exceção, timeout) e `js/live.js` cai de volta
+pro caminho estatístico de sempre, byte a byte idêntico a antes (`buildLive` aceita
+`simResult` como parâmetro opcional; ausente → comportamento antigo inalterado).
+
+**Timeout do Worker**: `TIME_BUDGET_MS` em `js/live-sim.js` está calibrado em **20s**
+(medição real de ~10-12s + margem pra aparelho mais lento) — um valor menor faria o
+recurso cair silenciosamente pro fallback estatístico em produção mesmo funcionando
+tecnicamente, sem nenhum aviso visível pro jogador.
+
+### O que é autoridade, o que é visual
+
+- **`nota` (fórmula de rating do jogador) não muda uma vírgula** — extraída pra uma
+  função pura `computeNota(pos, ctx, rng)` (`js/engine.js`), chamada tanto pelo caminho
+  estatístico de sempre (alimentada por `U.poisson`) quanto pelo caminho novo
+  (alimentada pelas estatísticas REAIS que o footballsim registrou: `tackles`,
+  passes concluídos, cartões do próprio jogador). Só a fonte dos números de entrada
+  muda; pesos e ordem de consumo de RNG são idênticos.
+- **Placar e eventos (gol/cartão) passam a vir da simulação real** quando o jogador
+  assiste ao vivo — antes vinham de `U.poisson`/`U.chance`.
+- **Sem assistência nativa** no footballsim (campo `assists` não existe no tipo
+  `Stats`) — `pa` continua de uma aproximação própria, documentada como tal.
+- **Determinismo**: `setMatchSeed` (Mulberry32, já embutido no footballsim) é chamado
+  com um seed derivado de `g.seed + fixture.oppId + g.year + rodada` — mesmo padrão de
+  `U.rngFor` já usado no resto do jogo.
+
+### Sistema de coordenadas (3 convenções reconciliadas)
+
+footballsim usa campo retrato (`pitchWidth=680` como eixo curto/lateral,
+`pitchHeight=1050` como eixo longo/gol-a-gol); football2d e o SVG antigo do CRAQUE são
+paisagem (gols à esquerda/direita). Resolvido só na camada de UI (`fsPt` em
+`js/ui.js`): troca os eixos na conversão (`CQ.pitch.fsToPct([pos[1], pos[0]], ...)`) —
+`CQ.pitch.fsToPct` em si continua genérica.
+
+### Renderização
+
+`js/ui.js` escolhe o renderizador canvas (`mountPitchCanvas`/`drawCanvasFrame`/
+`canvasPlayFrames`) só quando `live.res.simFrames` existe e não está vazio; senão usa o
+SVG antigo (`buildPitchSVG`/`poseFor`) — os dois nunca se misturam parcialmente. Cada
+evento revelado (`pitchReact`) anima a janela real de frames ao redor do minuto daquele
+evento (`iter-45` a `iter+12`) em vez de pular pra uma pose estática. Eventos são
+detectados por **diff** de `stats.goals`/`stats.cards.*` a cada `playIteration` (o
+footballsim não expõe log de eventos pronto); gol contra é detectado quando o
+`lastTouch.playerName` não pertence ao elenco do time que marcou (o footballsim credita
+o time mas não o jogador nesse caso) — tratado com narrativa própria ("Complicou pro
+próprio lado...") em vez de "undefined marca...".
+
+### Limitação conhecida, documentada sem esconder
+
+`scripts/live-sim-check.mjs` (8 partidas de diagnóstico) mostrou um viés de placar
+(time "mine" vencendo a maioria, "opp" quase nunca marcando) — amostra pequena demais
+pra afirmar causa raiz (o próprio jogo já é raro em gols, ~0.88/partida), mas
+documentado aqui como área de calibração futura em vez de escondido. `initiateGame`
+sempre trata "mine" como `team1`/`kickOffTeam` (posse inicial), o que pode ter algum
+efeito — a investigar com uma amostra maior.
+
+Validado: suíte completa (`CQ.tests.run()`, 218/218 no bundle final) + 3 testes novos
+(`testLiveSimTranslateShape`, `testLiveSimDeterminism`,
+`testLiveSimBuildTeamsFallsBackCleanly`) + verificação end-to-end real no Browser pane
+(partida completa da criação da carreira até "Encerrar partida", incluindo uma decisão
+de pênalti, canvas montado/desmontado sem erro, `p.stats` atualizado) + `node
+scripts/build.mjs` (bundle final 1863 KB).

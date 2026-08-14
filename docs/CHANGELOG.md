@@ -1625,3 +1625,50 @@ distintos. Validado: suíte completa (novo `testPitchSpriteColors` — nenhuma d
 cores escolhidas é verde pra nenhum clube testado, e nunca os 2 times empatam na
 mesma cor) + verificação visual manual completa no Browser pane reproduzindo a mesma
 partida do relato original.
+
+---
+
+## Motor de partida real — FootballSim (lógica) + Football2D (visual) no Ao Vivo
+
+Pedido do usuário: "Base visual: Football2D. Lógica e inteligência: FootballSim" — os
+dois repositórios de terceiros confirmados (`eozgit/footballsim`, MIT;
+`cyntler/football2d`, MIT), escopo travado só na tela de partida ao vivo (temporada,
+carreira, mercado, lesão, disciplina e narrativa continuam intocados).
+
+Descoberta feita antes de qualquer código (não só pelo README): football2d não desenha
+nenhum jogador — o usuário confirmou usar mesmo assim, com o gramado real da lib por
+baixo e os sprites Kenney que o jogo já tinha desenhando os 22 jogadores/bola em cima,
+agora em posições REAIS em vez de poses fixas.
+
+Nenhuma das duas libs publica bundle pronto pro navegador — novos
+`scripts/vendor-footballsim.mjs`/`scripts/vendor-football2d.mjs` (esbuild + entry-point
+sintético) empacotam cada uma num IIFE só (`js/vendor/footballsim.js`,
+`js/vendor/football2d.js`). O footballsim mede ~1.9ms/iteração (~10s por partida
+completa) — rodar isso na thread principal travaria a aba, então a simulação roda dentro
+de um **Web Worker montado a partir de um Blob** (o bundle final é um único HTML, sem
+URL separada pra `new Worker(url)`). `CQ.liveSim.runAsync` nunca rejeita — qualquer falha
+(lib ausente, `Worker` indisponível, exceção, timeout) cai de volta pro motor
+estatístico de sempre, sem quebrar a tela.
+
+A fórmula de `nota` (rating do jogador) **não mudou uma vírgula** — foi extraída pra uma
+função pura (`computeNota`, `js/engine.js`) chamada tanto pelo caminho estatístico
+antigo quanto pelo novo, só trocando a origem dos números de entrada (agora reais:
+desarmes, passes certos, cartões, gols do próprio jogador, quando a partida é assistida
+ao vivo). Placar e eventos passam a vir da simulação real nesse caso; o resto do jogo
+(as outras ~180 partidas/rodada, partidas não assistidas) nunca é afetado.
+
+Corrigido durante a validação final: o timeout do Worker (`TIME_BUDGET_MS`) estava em
+1800ms — bem abaixo do tempo real medido (~10-12s) — o que faria o recurso cair pro
+fallback estatístico silenciosamente em uso real, mesmo funcionando nos testes. Ajustado
+pra 20s (margem sobre o tempo medido).
+
+Testado de ponta a ponta no Browser pane: partida real da criação da carreira até
+"Encerrar partida", incluindo uma decisão de pênalti, campo em canvas com o gramado do
+football2d e os sprites reagindo às posições reais da simulação, sem nenhum erro no
+console. Limitação conhecida e documentada sem esconder: `scripts/live-sim-check.mjs`
+(8 partidas de diagnóstico) mostrou um viés de placar a favor do time "mine" — amostra
+pequena demais pra afirmar causa raiz, fica como calibração futura.
+
+Validado: suíte completa 218/218 (3 testes novos: `testLiveSimTranslateShape`,
+`testLiveSimDeterminism`, `testLiveSimBuildTeamsFallsBackCleanly`) + `node
+scripts/build.mjs` (bundle final **1863 KB**, 20 arquivos JS).

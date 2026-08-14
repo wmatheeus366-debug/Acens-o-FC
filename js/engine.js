@@ -1272,6 +1272,35 @@ window.CQ = window.CQ || {};
     return U.clamp(sh, 0, 0.62);
   }
 
+  // nota (rating 3-10) de uma partida, por posição — cada uma pontua pelas AÇÕES da
+  // sua função (ataque marca/assiste, zaga desarma/afasta, etc.). Extraída de dentro
+  // de resolveMatch pra poder ser reaproveitada por js/live-sim.js: o motor de
+  // simulação real (footballsim) decide QUANTOS desarmes/gols/cartões aconteceram de
+  // verdade numa partida assistida ao vivo, mas a fórmula que transforma esses números
+  // em nota — e os pesos por posição — continua sendo só essa, sem duplicar.
+  function computeNota(pos, ctx, rng) {
+    const win = ctx.gm > ctx.go, draw = ctx.gm === ctx.go;
+    const cs = ctx.go === 0;
+    const resB = win ? 0.35 : draw ? 0.05 : -0.4;
+    const noise = U.rf(-0.4, 0.5, rng);
+    const cardPen = (ctx.cardR ? 1.6 : ctx.cardY ? 0.2 : 0) + (ctx.error ? 1.3 : 0);
+    let nota;
+    if (pos === "ATA" || pos === "PON") {
+      nota = 6.0 + ctx.pg * 1.05 + ctx.pa * 0.7 + ctx.keyPasses * 0.16 + resB + (ctx.overall - ctx.oppStr) / 45 + noise - cardPen;
+    } else if (pos === "MEI") {
+      nota = 6.05 + ctx.pg * 0.9 + ctx.pa * 0.8 + ctx.keyPasses * 0.22 + ctx.tackles * 0.06 + resB + noise - cardPen;
+    } else if (pos === "VOL") {
+      nota = 6.2 + ctx.tackles * 0.14 + ctx.intercepts * 0.14 + ctx.duels * 0.05 + ctx.keyPasses * 0.12 + ctx.pg * 0.7 + ctx.pa * 0.6 + resB + noise - cardPen;
+    } else if (pos === "LAT") {
+      nota = 6.28 + ctx.tackles * 0.12 + ctx.intercepts * 0.12 + ctx.keyPasses * 0.17 + ctx.pa * 0.72 + ctx.pg * 0.6 + (cs ? 0.35 : 0) + resB + noise - cardPen;
+    } else if (pos === "ZAG") {
+      nota = 6.2 + ctx.tackles * 0.12 + ctx.intercepts * 0.14 + ctx.clearances * 0.08 + ctx.duels * 0.05 + (cs ? 0.9 : -ctx.go * 0.28) + ctx.pg * 0.8 + resB + noise - cardPen;
+    } else { // GOL
+      nota = 6.1 + ctx.saves * 0.15 + ctx.bigSaves * 0.3 + (cs ? 0.9 : -ctx.go * 0.4) + (win ? 0.3 : draw ? 0.05 : -0.3) + noise - cardPen;
+    }
+    return U.clamp(Math.round(nota * 10) / 10, 3, 10);
+  }
+
   // resolve uma partida do jogador (modo sim ou base do ao-vivo)
   // Determinístico: usa um RNG derivado da seed + ano + índice da partida.
   function resolveMatch(g, fixture, opts) {
@@ -1332,27 +1361,12 @@ window.CQ = window.CQ || {};
       cardY = U.chance(pos === "ZAG" || pos === "VOL" ? 0.16 : 0.07, rng);
       cardR = U.chance(0.012, rng);
 
-      const win = gm > go, draw = gm === go;
-      const cs = go === 0;
-      const resB = win ? 0.35 : draw ? 0.05 : -0.4;
-      const noise = U.rf(-0.4, 0.5, rng);
-      const cardPen = (cardR ? 1.6 : cardY ? 0.2 : 0) + (error ? 1.3 : 0);
-
-      // cada posição atinge nota alta pelas AÇÕES da sua função
-      if (pos === "ATA" || pos === "PON") {
-        nota = 6.0 + pg * 1.05 + pa * 0.7 + keyPasses * 0.16 + resB + (p.overall - sOpp) / 45 + noise - cardPen;
-      } else if (pos === "MEI") {
-        nota = 6.05 + pg * 0.9 + pa * 0.8 + keyPasses * 0.22 + tackles * 0.06 + resB + noise - cardPen;
-      } else if (pos === "VOL") {
-        nota = 6.2 + tackles * 0.14 + intercepts * 0.14 + duels * 0.05 + keyPasses * 0.12 + pg * 0.7 + pa * 0.6 + resB + noise - cardPen;
-      } else if (pos === "LAT") {
-        nota = 6.28 + tackles * 0.12 + intercepts * 0.12 + keyPasses * 0.17 + pa * 0.72 + pg * 0.6 + (cs ? 0.35 : 0) + resB + noise - cardPen;
-      } else if (pos === "ZAG") {
-        nota = 6.2 + tackles * 0.12 + intercepts * 0.14 + clearances * 0.08 + duels * 0.05 + (cs ? 0.9 : -go * 0.28) + pg * 0.8 + resB + noise - cardPen;
-      } else { // GOL
-        nota = 6.1 + saves * 0.15 + bigSaves * 0.3 + (cs ? 0.9 : -go * 0.4) + (win ? 0.3 : draw ? 0.05 : -0.3) + noise - cardPen;
-      }
-      nota = U.clamp(Math.round(nota * 10) / 10, 3, 10);
+      nota = computeNota(pos, {
+        gm: gm, go: go, pg: pg, pa: pa, keyPasses: keyPasses, tackles: tackles,
+        intercepts: intercepts, duels: duels, clearances: clearances,
+        cardY: cardY, cardR: cardR, error: error, saves: saves, bigSaves: bigSaves,
+        overall: p.overall, oppStr: sOpp
+      }, rng);
     }
 
     return {
@@ -2537,7 +2551,7 @@ window.CQ = window.CQ || {};
   CQ.engine = {
     ATTRS: ATTRS,
     newGame: newGame, startSeason: startSeason, nextSeason: nextSeason,
-    currentFixture: currentFixture, resolveMatch: resolveMatch, applyMatch: applyMatch,
+    currentFixture: currentFixture, resolveMatch: resolveMatch, applyMatch: applyMatch, computeNota: computeNota,
     seasonOver: seasonOver, endSeason: endSeason,
     tableOf: tableOf, ensureRound: ensureRound, leagueZones: leagueZones,
     overallOf: overallOf, buildAttrs: buildAttrs, calcSalary: calcSalary,

@@ -16,49 +16,98 @@ window.CQ = window.CQ || {};
     return out.sort(function (a, b) { return a - b; });
   }
 
-  function buildLive(g, fixture) {
+  // `simResult` (opcional): resultado real da simulação do footballsim
+  // (CQ.liveSim.runAsync, já no MESMO shape de resolveMatch + `simEvents`/`simFrames`
+  // — ver js/live-sim.js), montado ASSINCRONAMENTE em js/ui.js ANTES de chamar
+  // buildLive (Worker à parte, nunca bloqueia a thread principal). Passado, `res` já
+  // vem pronto e os gols/cartões usam o minuto/autor REAIS da simulação em vez do
+  // sorteio de minuto (minutesFor) — todo o resto da função (clima, decisões
+  // interativas, intervalo/fim de jogo) é genérico e não muda nem um pouco.
+  // Sem `simResult` (undefined/null — Worker indisponível, motor externo falhou, ou
+  // partida não é decisiva o bastante pra valer o custo), cai 100% no caminho
+  // estatístico de sempre, sem nenhuma mudança de comportamento.
+  function buildLive(g, fixture, simResult) {
     const p = g.player;
-    const res = CQ.engine.resolveMatch(g, fixture, {});
+    const res = simResult || CQ.engine.resolveMatch(g, fixture, {});
     const meName = fixture.isNatMatch ? fixture.myTeam.name : CQ.engine.myClub(g).name;
     const events = [];
     const used = [];
-
-    // distribui gols base
-    const myGoalMin = minutesFor(res.gm, used, 4, 89);
-    const opGoalMin = minutesFor(res.go, used, 4, 89);
-    let pgLeft = res.pg, paLeft = res.pa;
-
     const evs = [];
-    myGoalMin.forEach(function (m) {
-      let who, text, big = false, tag = "team";
-      if (pgLeft > 0) {
-        pgLeft--;
-        who = p.name;
-        text = "GOOOOL! " + p.name + " marca para " + (fixture.home ? "o " + meName : "o " + meName + " fora de casa") + "!";
-        big = true;
-        tag = "me";
-      } else if (paLeft > 0) {
-        paLeft--;
-        text = "Gol do " + meName + "! Assistência primorosa de " + p.name + ".";
-        big = true;
-        tag = "assist";
-      } else {
-        text = "Gol do " + meName + "! A equipe amplia a pressão.";
+
+    if (simResult && simResult.simEvents) {
+      // caminho footballsim: minuto e autor de cada gol/cartão vêm da partida real
+      // simulada (js/live-sim.js translate()), não de um sorteio.
+      let paLeft = res.pa;
+      simResult.simEvents.forEach(function (se) {
+        used.push(se.min);
+        if (se.type === "goal" && se.side === "mine") {
+          let text, big = false, tag = "team";
+          if (se.isMe) {
+            text = "GOOOOL! " + p.name + " marca para " + (fixture.home ? "o " + meName : "o " + meName + " fora de casa") + "!";
+            big = true; tag = "me";
+          } else if (paLeft > 0) {
+            paLeft--;
+            text = "Gol do " + meName + "! Assistência primorosa de " + p.name + ".";
+            big = true; tag = "assist";
+          } else if (se.name) {
+            text = "Gol do " + meName + "! " + se.name + " arrisca de longe... e balança as redes!";
+            big = true;
+          } else {
+            // autor não identificado pela simulação (gol contra do adversário)
+            text = "Gol do " + meName + "! Complicou pro próprio lado, e a bola morre no fundo do gol.";
+            big = true;
+          }
+          evs.push({ min: se.min, type: "goal", text: text, big: big, who: tag, iter: se.iter });
+        } else if (se.type === "goal" && se.side === "opp") {
+          const text = se.name
+            ? "Gol do " + fixture.opp.name + "! " + se.name + " define para os visitantes."
+            : "Gol do " + fixture.opp.name + ". Silêncio no setor " + (fixture.home ? "da casa" : "visitante") + "...";
+          evs.push({ min: se.min, type: "oppgoal", text: text, iter: se.iter });
+        } else if (se.type === "card" && se.isMe) {
+          evs.push({ min: se.min, type: "card", text: "Cartão amarelo para " + p.name + " após falta dura no meio-campo.", iter: se.iter });
+        } else if (se.type === "redcard" && se.isMe) {
+          evs.push({ min: se.min, type: "redcard", text: "EXPULSO! " + p.name + " recebe o vermelho direto. Que dor de cabeça.", iter: se.iter });
+        }
+        // cartão de outro jogador (não o usuário) não vira evento narrado — mesmo
+        // padrão do caminho estatístico, que só narra cartão do próprio jogador.
+      });
+    } else {
+      // caminho estatístico de sempre: distribui gols/cartões em minutos sorteados
+      const myGoalMin = minutesFor(res.gm, used, 4, 89);
+      const opGoalMin = minutesFor(res.go, used, 4, 89);
+      let pgLeft = res.pg, paLeft = res.pa;
+
+      myGoalMin.forEach(function (m) {
+        let who, text, big = false, tag = "team";
+        if (pgLeft > 0) {
+          pgLeft--;
+          who = p.name;
+          text = "GOOOOL! " + p.name + " marca para " + (fixture.home ? "o " + meName : "o " + meName + " fora de casa") + "!";
+          big = true;
+          tag = "me";
+        } else if (paLeft > 0) {
+          paLeft--;
+          text = "Gol do " + meName + "! Assistência primorosa de " + p.name + ".";
+          big = true;
+          tag = "assist";
+        } else {
+          text = "Gol do " + meName + "! A equipe amplia a pressão.";
+        }
+        // who (campo do campo 2D animado, js/pitch.js): "me" = o próprio gol do jogador,
+        // "assist" = assistência dele num gol do time, "team" = gol anônimo do time
+        evs.push({ min: m, type: "goal", text: text, big: big, who: tag });
+      });
+      opGoalMin.forEach(function (m) {
+        evs.push({ min: m, type: "oppgoal", text: "Gol do " + fixture.opp.name + ". Silêncio no setor " + (fixture.home ? "da casa" : "visitante") + "..." });
+      });
+      if (res.plays && res.cardY) {
+        const m = minutesFor(1, used, 20, 85)[0];
+        if (m) evs.push({ min: m, type: "card", text: "Cartão amarelo para " + p.name + " após falta dura no meio-campo." });
       }
-      // who (campo do campo 2D animado, js/pitch.js): "me" = o próprio gol do jogador,
-      // "assist" = assistência dele num gol do time, "team" = gol anônimo do time
-      evs.push({ min: m, type: "goal", text: text, big: big, who: tag });
-    });
-    opGoalMin.forEach(function (m) {
-      evs.push({ min: m, type: "oppgoal", text: "Gol do " + fixture.opp.name + ". Silêncio no setor " + (fixture.home ? "da casa" : "visitante") + "..." });
-    });
-    if (res.plays && res.cardY) {
-      const m = minutesFor(1, used, 20, 85)[0];
-      if (m) evs.push({ min: m, type: "card", text: "Cartão amarelo para " + p.name + " após falta dura no meio-campo." });
-    }
-    if (res.plays && res.cardR) {
-      const m = minutesFor(1, used, 55, 88)[0];
-      if (m) evs.push({ min: m, type: "redcard", text: "EXPULSO! " + p.name + " recebe o vermelho direto. Que dor de cabeça." });
+      if (res.plays && res.cardR) {
+        const m = minutesFor(1, used, 55, 88)[0];
+        if (m) evs.push({ min: m, type: "redcard", text: "EXPULSO! " + p.name + " recebe o vermelho direto. Que dor de cabeça." });
+      }
     }
     // lances de cor
     const colorN = U.ri(2, 4);
