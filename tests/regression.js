@@ -67,7 +67,7 @@
     withTempGame(function () {
       const g = newCareer("MEI");
       const old = JSON.parse(JSON.stringify(g));
-      ["traits", "compGoals", "idolClubs", "clubGoals", "ballon", "milestones", "assets", "records", "captain", "squadRole", "loan", "firstClassic", "genIdolYear", "momentIdol", "evoPoints"].forEach(function (k) { delete old.player[k]; });
+      ["traits", "compGoals", "idolClubs", "clubGoals", "ballon", "milestones", "assets", "records", "captain", "squadRole", "loan", "firstClassic", "genIdolYear", "momentIdol", "evoPoints", "relationship", "relHistory"].forEach(function (k) { delete old.player[k]; });
       delete old.manager; delete old.worldStars; delete old.schemaVersion; delete old.world; delete old.clubRivalry; delete old.lineupPrefs;
       const raw = localStorage.getItem("craque-save-v1");
       localStorage.setItem("craque-save-v1", JSON.stringify(old));
@@ -90,6 +90,8 @@
       assert("save: migra g.clubRivalry", loaded && loaded.clubRivalry && typeof loaded.clubRivalry === "object");
       assert("save: migra p.loan (empréstimo) pra null", loaded && loaded.player.loan === null, "loan=" + JSON.stringify(loaded && loaded.player.loan));
       assert("save: migra p.firstClassic pra null", loaded && loaded.player.firstClassic === null, "firstClassic=" + JSON.stringify(loaded && loaded.player.firstClassic));
+      assert("save: migra p.relationship pra null", loaded && loaded.player.relationship === null, "relationship=" + JSON.stringify(loaded && loaded.player.relationship));
+      assert("save: migra p.relHistory pra array vazio", loaded && Array.isArray(loaded.player.relHistory) && loaded.player.relHistory.length === 0, "relHistory=" + JSON.stringify(loaded && loaded.player.relHistory));
       assert("save: migra g.lineupPrefs (tática) pra objeto vazio", loaded && loaded.lineupPrefs && typeof loaded.lineupPrefs === "object", JSON.stringify(loaded && loaded.lineupPrefs));
     });
   }
@@ -520,6 +522,106 @@
       if (got !== map[k]) { ok = false; detail = k + " -> " + got + " (esperado " + map[k] + ")"; }
     });
     assert("discGroup: mapeia cada competição pro grupo de disciplina certo", ok, detail);
+  }
+
+  // ---- eventos de vida: progressão de namoro (prereq/repeatable/apply) ----
+  function findLifeEvent(id) { return CQ.nar.LIFE_EVENTS.find(function (e) { return e.id === id; }); }
+  function testRelationshipArcGating() {
+    withTempGame(function () {
+      const g = newCareer("MEI");
+      g.player.relationship = null; g.player.relHistory = [];
+      const nova = findLifeEvent("novaNamorada"), assumido = findLifeEvent("relAssumido"),
+        pedido = findLifeEvent("pedidoCasamento"), casamento = findLifeEvent("casamento"),
+        separacao = findLifeEvent("separacao"), filho = findLifeEvent("nascimentoFilho");
+      assert("namoro: novaNamorada elegível sem relacionamento ativo", nova.prereq(g));
+      assert("namoro: relAssumido NÃO elegível sem relacionamento ativo", !assumido.prereq(g));
+
+      nova.opts[0].apply(g);
+      assert("namoro: novaNamorada.apply cria relationship em estágio dating", g.player.relationship && g.player.relationship.stage === "dating", JSON.stringify(g.player.relationship));
+      assert("namoro: novaNamorada.apply registra 1 linha em relHistory", g.player.relHistory.length === 1 && g.player.relHistory[0].kind === "dating");
+      assert("namoro: novaNamorada deixa de ser elegível com relacionamento ativo", !nova.prereq(g));
+      assert("namoro: relAssumido passa a ser elegível em dating", assumido.prereq(g));
+      assert("namoro: pedidoCasamento ainda NÃO elegível em dating", !pedido.prereq(g));
+
+      assumido.opts[0].apply(g);
+      assert("namoro: relAssumido.apply avança pra public", g.player.relationship.stage === "public");
+      assert("namoro: pedidoCasamento elegível em public", pedido.prereq(g));
+
+      pedido.opts[0].apply(g);
+      assert("namoro: pedidoCasamento.apply avança pra engaged", g.player.relationship.stage === "engaged");
+      assert("namoro: casamento elegível em engaged", casamento.prereq(g));
+
+      casamento.opts[0].apply(g);
+      assert("namoro: casamento.apply avança pra married", g.player.relationship.stage === "married");
+      assert("namoro: nascimentoFilho elegível em married", filho.prereq(g));
+      assert("namoro: nascimentoFilho é repeatable", filho.repeatable === true);
+
+      filho.opts[0].apply(g);
+      filho.opts[0].apply(g);
+      const kids = g.player.relHistory.filter(function (r) { return r.kind === "kid"; });
+      assert("namoro: nascimentoFilho pode acontecer mais de 1 vez (repeatable de verdade)", kids.length === 2, "kids=" + kids.length);
+
+      separacao.opts[0].apply(g);
+      assert("namoro: separacao.apply zera relationship", g.player.relationship === null);
+      assert("namoro: separacao registra 'separated' em relHistory", g.player.relHistory[g.player.relHistory.length - 1].kind === "separated");
+      assert("namoro: novaNamorada volta a ficar elegível após separação", nova.prereq(g));
+    });
+  }
+
+  // ---- eventos de vida: consequência só aparece depois que a reputação já caiu ----
+  function testScandalConsequenceGating() {
+    withTempGame(function () {
+      const g = newCareer("ATA");
+      const crise = findLifeEvent("criseRedesSociais"), cancel = findLifeEvent("cancelamentoPatrocinio"),
+        multa = findLifeEvent("multaClube"), desculpas = findLifeEvent("pedidoDesculpas"),
+        volta = findLifeEvent("voltaPorCima");
+      g.player.rep = 80; g.player.morale = 70;
+      assert("escândalo: consequências NÃO elegíveis com reputação alta", !crise.prereq(g) && !cancel.prereq(g) && !multa.prereq(g) && !desculpas.prereq(g) && !volta.prereq(g));
+      g.player.rep = 20; g.player.morale = 70;
+      assert("escândalo: consequências ficam elegíveis com reputação baixa", crise.prereq(g) && cancel.prereq(g) && multa.prereq(g) && desculpas.prereq(g) && volta.prereq(g));
+      g.player.rep = 80; g.player.morale = 20;
+      assert("escândalo: voltaPorCima também é elegível só com moral baixa (rep alta)", volta.prereq(g) && !crise.prereq(g));
+    });
+  }
+
+  // ---- eventos de vida: conduta aplica suspensão de verdade via discGroup ----
+  function testDisciplinaryLifeEventsApplySuspension() {
+    withTempGame(function () {
+      const g = newCareer("VOL");
+      const fx = E().currentFixture(g);
+      assert("conduta: existe próximo confronto de clube pra aplicar a suspensão", fx && !fx.isNatMatch);
+      if (!fx || fx.isNatMatch) return;
+      const grp = E().discGroup(fx);
+      const briga = findLifeEvent("brigaTreino");
+      const antes = (g.player.disc[grp] && g.player.disc[grp].susp) || 0;
+      briga.opts[0].apply(g);
+      const depois = g.player.disc[grp] && g.player.disc[grp].susp;
+      assert("conduta: brigaTreino aplica suspensão no grupo do próximo jogo", depois >= 1 && depois >= antes, "grupo=" + grp + " antes=" + antes + " depois=" + depois);
+    });
+  }
+
+  // ---- eventos de vida: os 17 originais continuam sem prereq/repeatable (retrocompat) ----
+  function testLifeEventBackwardCompat() {
+    const legacyIds = ["hospital", "empresario", "coletiva", "aniversario", "colega", "influencer", "incomodo", "jantar", "base", "documentario", "tenis", "torcedor", "arbitro", "vaquinha", "namorada_liga", "bets", "presidente_evento"];
+    let ok = true, detail = "";
+    legacyIds.forEach(function (id) {
+      const ev = findLifeEvent(id);
+      if (!ev || ev.prereq || ev.repeatable) { ok = false; detail = id; }
+    });
+    assert("eventos de vida: os 17 originais continuam sem prereq/repeatable", ok, detail);
+    assert("eventos de vida: catálogo cresceu com os eventos novos (>=40 no total)", CQ.nar.LIFE_EVENTS.length >= 40, "n=" + CQ.nar.LIFE_EVENTS.length);
+  }
+
+  // ---- eventos de vida: nenhum id quebra a busca de ilustração (fallback sempre seguro) ----
+  function testLifeSceneFallbackNeverBreaks() {
+    let ok = true, bad = "";
+    CQ.nar.LIFE_EVENTS.forEach(function (e) {
+      try {
+        const html = CQ.util.lifeSceneSVG(e.id);
+        if (typeof html !== "string") { ok = false; bad = e.id + ": não retornou string"; }
+      } catch (err) { ok = false; bad = e.id + ": " + err.message; }
+    });
+    assert("eventos de vida: lifeSceneSVG nunca lança exceção pra nenhum id do catálogo", ok, bad);
   }
 
   // ---- Lesão mais rara: taxa observada não pode ficar perto do antigo teto de 14% ----
@@ -1749,6 +1851,11 @@
     testOtherCupsStaySingleLeg();
     testDiscGroupIsolation();
     testDiscGroupMapping();
+    testRelationshipArcGating();
+    testScandalConsequenceGating();
+    testDisciplinaryLifeEventsApplySuspension();
+    testLifeEventBackwardCompat();
+    testLifeSceneFallbackNeverBreaks();
     testInjuryRateLower();
     testMatchNotesAnyMatch();
     testPressConferenceStructure();

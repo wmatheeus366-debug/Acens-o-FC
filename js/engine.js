@@ -109,7 +109,10 @@ window.CQ = window.CQ || {};
         traits: [], decisiveGoals: 0, captain: null, squadRole: "titular", potUps: 0,
         records: { hatTricks: 0, bestSeasonG: 0, bestSeasonAvg: 0, biggestWin: null },
         seenLiveIntro: false, loan: null, firstClassic: null,
-        genIdolYear: null, momentIdol: false
+        genIdolYear: null, momentIdol: false,
+        // vida pessoal: instantâneo atual (pra gates de prereq nos LIFE_EVENTS) + log
+        // completo com data (pra timelineHTML) — ver js/narrative.js LIFE_EVENTS
+        relationship: null, relHistory: []
       },
       leagueOf: {}, champs: {}, feed: [], customLogos: {},
       boardFail: 0, retired: false, transferRequested: false,

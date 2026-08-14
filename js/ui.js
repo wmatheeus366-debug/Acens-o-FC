@@ -1156,7 +1156,20 @@ window.CQ = window.CQ || {};
   const LIFE_ICON = {
     hospital: "heart", empresario: "coin", coletiva: "press", aniversario: "heart", colega: "user",
     influencer: "feed", incomodo: "injury", jantar: "trophy", base: "star", documentario: "feed",
-    tenis: "coin", torcedor: "heart", arbitro: "whistle", vaquinha: "heart"
+    tenis: "coin", torcedor: "heart", arbitro: "whistle", vaquinha: "heart",
+    // namoro/traição/família — reaproveitam glifos existentes, sem SVG novo
+    novaNamorada: "heart", relAssumido: "heart", pedidoCasamento: "heart", casamento: "heart",
+    separacao: "heart", nascimentoFilho: "heart", traicaoDescoberta: "heart", rumorTraicao: "heart",
+    problemaFamiliar: "heart",
+    // carreira/mídia
+    encontroFamoso: "star", amizadeCelebridade: "star", videoclipe: "feed",
+    campanhaPublicitaria: "coin", propagandaApostas: "coin", voltaPorCima: "star",
+    // vício/conduta/incidente/vazamento/consequência
+    tigrinho: "coin", perdaApostas: "coin",
+    brigaTreino: "card", brigaBalada: "card", confusaoTorcedor: "card", expulsaoEvento: "card",
+    acidenteCarro: "injury", problemaPolicia: "injury",
+    vazamentoConversa: "feed", videoComprometedor: "feed", criseRedesSociais: "feed",
+    cancelamentoPatrocinio: "coin", multaClube: "coin", pedidoDesculpas: "press"
   };
   function showLifeEvent(ev) {
     CQ.state.lifeEv = ev;
@@ -1594,7 +1607,8 @@ window.CQ = window.CQ || {};
     dropConfetti(cores);
     if (CQ.audio) CQ.audio.play("trophy");
     const ordinal = t.nth >= 2 ? U.tituloOrdinal(t.nth) : "";
-    overlay(`<div class="trophy-banner">
+    overlay(`<div class="modal2-scene">${U.lifeSceneImg("party")}</div>
+    <div class="trophy-banner">
       ${compIcon(t.key)}
       <div class="tb-k">${ordinal ? esc(ordinal) + " · " : "É campeão · "}${g().year}</div>
       <h2>${esc(t.name)}</h2>
@@ -1664,7 +1678,10 @@ window.CQ = window.CQ || {};
       : b.rank === 1 ? '<span class="badge badge-gold">BOLA DE OURO — nº 1 do mundo</span>'
         : b.rank <= 3 ? `<span class="badge">Pódio mundial · ${b.rank}º</span>`
           : `<span class="small muted">Você ficou em ${b.rank}º no ranking mundial.</span>`;
-    return `<hr class="rule"><div class="flex-b mb8"><div class="kicker" style="flex:1">Ranking mundial (Bola de Ouro)</div>${verdict}</div>${podium}${rows}`;
+    // foto-herói só no maior reveal possível (nº 1 do mundo) — os outros ranks seguem
+    // só com o pódio/badge de sempre, sem a foto (ela é especial demais pra aparecer toda vez)
+    const hero = b.rank === 1 ? `<div class="modal2-scene">${U.lifeSceneImg("goat")}</div>` : "";
+    return `<hr class="rule">${hero}<div class="flex-b mb8"><div class="kicker" style="flex:1">Ranking mundial (Bola de Ouro)</div>${verdict}</div>${podium}${rows}`;
   }
 
   // monta a cerimônia de fim de temporada como uma sequência de "envelopes" — cada
@@ -1727,9 +1744,10 @@ window.CQ = window.CQ || {};
       const lostRows = aw.lost.map(function (a) {
         return `<p class="small muted">· ${esc(a.name)} ficou com ${esc(a.by || (a.num + " do concorrente"))}.</p>`;
       }).join("");
+      const awardHero = aw.won.length ? `<div class="modal2-scene">${U.lifeSceneImg("award")}</div>` : "";
       steps.push({
         confetti: null, sound: null,
-        html: `${head}<div style="padding:16px"><div class="kicker mb8">Prêmios</div>${awardRows}${lostRows}${nextBtn}</div>`
+        html: `${head}${awardHero}<div style="padding:16px"><div class="kicker mb8">Prêmios</div>${awardRows}${lostRows}${nextBtn}</div>`
       });
     }
 
@@ -1815,7 +1833,8 @@ window.CQ = window.CQ || {};
       <span class="flex">${crest(E().myClub(G), "crest-24")} <b>Renovar com o ${esc(E().myClub(G).name)}</b></span>
       <small>Novo salário ${U.fmtBRL(of.renew.salary)}/mês · mais ${of.renew.years} anos</small></button>`
       : '<p class="small muted">O clube atual não ofereceu renovação.</p>';
-    overlay(`<div class="live-head"><span class="lh-comp">Mercado da bola · janela de ${sum.year}</span>${I.coin}</div>
+    overlay(`<div class="modal2-scene">${U.lifeSceneImg("transfer")}</div>
+      <div class="live-head"><span class="lh-comp">Mercado da bola · janela de ${sum.year}</span>${I.coin}</div>
       <div style="padding:16px">
         <h3 class="mb8">Propostas na mesa</h3>
         <p class="small muted mb12">${sum.mustMove ? "A diretoria encerrou seu ciclo — escolha um novo destino." : of.requested ? "Você pediu para sair — estas são as portas que se abriram." : "Seu contrato chegou ao fim. Escolha seu futuro."}</p>
@@ -2101,6 +2120,18 @@ window.CQ = window.CQ || {};
       const cName = D.CLUBS[p.captain] ? D.CLUBS[p.captain].name : p.captain;
       events.push({ year: p.captainYear, order: 6, cls: "captain", label: "Vestiu a braçadeira", detail: "Nomeado capitão do " + esc(cName) + "." });
     }
+    // vida pessoal — 1 entrada por mudança de estágio do relacionamento (namoro/
+    // noivado/casamento/separação/filho), ver js/narrative.js LIFE_EVENTS + pushRel
+    const REL_LABEL = { dating: "Novo relacionamento", public: "Assumiu o namoro", engaged: "Pedido de casamento", married: "Casamento", separated: "Separação" };
+    (p.relHistory || []).forEach(function (r) {
+      if (r.kind === "kid") {
+        events.push({ year: r.year, order: 1.5, cls: "life", label: "Nascimento de " + esc(r.kidName || "um filho"), detail: "A família cresceu." });
+        return;
+      }
+      const partner = esc(r.partnerName || "alguém especial");
+      const DETAIL = { dating: "Começou a se relacionar com " + partner + ".", public: "Assumiu publicamente o namoro com " + partner + ".", engaged: "Pediu " + partner + " em casamento.", married: "Casou-se com " + partner + ".", separated: "Encerrou o relacionamento com " + partner + "." };
+      events.push({ year: r.year, order: 1.5, cls: "life", label: REL_LABEL[r.kind] || "Vida pessoal", detail: DETAIL[r.kind] || "" });
+    });
     if (G.retired && p.career.length) {
       const lastYear = p.career[p.career.length - 1].year;
       events.push({ year: lastYear, order: 9, cls: "retire", label: "Aposentadoria", detail: "Encerrou a carreira aos " + p.age + " anos." });
@@ -3165,7 +3196,9 @@ window.CQ = window.CQ || {};
               ${p.captain === p.clubId ? `<div class="notice ok mt8">${I.trophy} <b>Capitão do ${esc(cl.name)}</b> — a braçadeira é sua.</div>` : ""}
             </div>
           </div></div></div>
-        <div class="card"><div class="card-h"><h3>Centro de treinamento</h3></div><div class="card-b">
+        <div class="card"><div class="card-h"><h3>Centro de treinamento</h3></div>
+          <div class="modal2-scene">${U.lifeSceneImg("training")}</div>
+          <div class="card-b">
           <p class="small muted mb8">Cada ponto de evolução ganho você investe <b>na mão</b>, na aba Atributos de Carreira. O <b>foco de treino</b> abaixo só entra se você usar o atalho "Distribuir automaticamente" por lá — define pra que lado ele pesa o sorteio. Boas atuações rendem mais pontos (${p.age <= 24 ? "e até os 24 o crescimento é mais rápido" : p.age <= 33 ? "evolução gradual na sua fase" : "aqui o desafio é segurar o nível"}).</p>
           <div class="choice-grid" style="grid-template-columns:repeat(auto-fill,minmax(130px,1fr))">
             ${[["equil", "Equilibrado", "sem prioridade"], ["ataque", "Ataque", "finalização + posição"], ["criacao", "Criação", "passe + drible"], ["atletico", "Atlético", "ritmo + físico"], ["defensivo", "Defesa", "marcação + reflexo"], ["bolaparada", "Bola parada", "faltas e pênaltis"]].map(function (f) {
@@ -3360,7 +3393,8 @@ window.CQ = window.CQ || {};
     p.career.forEach(function (c) { if (clubs.indexOf(c.clubName) < 0) clubs.push(c.clubName); });
     const leg = careerLegacy(p);
     const idols = p.idolClubs && p.idolClubs.length ? p.idolClubs : [];
-    return `<div class="trophy-banner" style="border:2px solid var(--gold)">
+    return `<div class="modal2-scene" style="border:2px solid var(--gold);border-bottom:none">${U.lifeSceneImg("retirement")}</div>
+    <div class="trophy-banner" style="border:2px solid var(--gold)">
       <div class="tb-k">Edição histórica · aposentadoria</div>
       <h2>${esc(p.name)} pendura as chuteiras</h2>
       <p class="mt8 muted">${p.age} anos · ${p.career.length} temporadas como profissional</p>

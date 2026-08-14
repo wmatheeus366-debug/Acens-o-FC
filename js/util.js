@@ -164,7 +164,27 @@ window.CQ = window.CQ || {};
     incomodo: "rest",
     jantar: "formal", presidente_evento: "formal",
     base: "youth",
-    vaquinha: "community"
+    vaquinha: "community",
+    // namoro (progressão) — novaNamorada/relAssumido reaproveitam "couple" (mesma
+    // categoria de aniversario/namorada_liga, já é uma cena de casal)
+    novaNamorada: "couple", relAssumido: "couple",
+    pedidoCasamento: "proposal", casamento: "wedding", separacao: "breakup",
+    nascimentoFilho: "newborn", traicaoDescoberta: "affair", rumorTraicao: "rumor",
+    // carreira/mídia (gated por fama)
+    encontroFamoso: "vip", amizadeCelebridade: "celebfriend", videoclipe: "musicvideo",
+    campanhaPublicitaria: "adcampaign", propagandaApostas: "bettingad",
+    // vício/aposta
+    tigrinho: "tigrinho", perdaApostas: "bettingloss",
+    // conduta/incidente
+    brigaTreino: "fight", brigaBalada: "nightfight", confusaoTorcedor: "crowdtrouble", expulsaoEvento: "escorted",
+    acidenteCarro: "carcrash", problemaPolicia: "police",
+    // vazamento — "leak" cobre os dois (mesma direção visual: celular com algo borrado)
+    vazamentoConversa: "leak", videoComprometedor: "leak",
+    // consequência — "social" e "mic" já existem e encaixam bem, sem categoria nova
+    criseRedesSociais: "social", cancelamentoPatrocinio: "torncontract", multaClube: "disciplinary",
+    pedidoDesculpas: "mic",
+    // redenção/doméstico
+    voltaPorCima: "comeback", problemaFamiliar: "familycrisis"
   };
   function lifeSceneImg(key) {
     const src = CQ.LIFE_IMGS && CQ.LIFE_IMGS[key];
@@ -292,7 +312,7 @@ window.CQ = window.CQ || {};
   CQ.util = {
     hashStr, mulberry32, rngFor, ri, rf, choice, chance, shuffle, poisson, clamp,
     esc, cleanInput, fmtBRL, fmtNota, plural,
-    nameGen, portraitSVG, lifeSceneSVG, crestSVG, crestSVGFallback, flagImg, natAvatar, I,
+    nameGen, portraitSVG, lifeSceneSVG, lifeSceneImg, crestSVG, crestSVGFallback, flagImg, natAvatar, I,
     patternFillFor, jerseySVG, tituloOrdinal
   };
 })();

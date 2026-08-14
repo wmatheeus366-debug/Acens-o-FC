@@ -425,6 +425,38 @@ window.CQ = window.CQ || {};
   // PROFILES já usado pelo resto do feed), `text` aceita {name}/{club} (ver fillNames).
   // Nem toda opção precisa de post (a mais neutra/mediana costuma ficar de fora, mesmo
   // espírito de "só o que realmente vira notícia" que onMatch já segue pros resultados).
+
+  // nome do(a) parceiro(a) na progressão de relacionamento — pool próprio (o gerador de
+  // CQ.util.nameGen é só de nomes masculinos de jogador, não serve aqui); RNG não-semeada
+  // de propósito, mesmo espírito decorativo do resto de LIFE_EVENTS (nunca influencia o
+  // resultado de uma partida).
+  const PARTNER_FIRST = ["Bianca", "Larissa", "Camila", "Fernanda", "Juliana", "Amanda", "Beatriz", "Rafaela", "Isabela", "Gabriela", "Marina", "Carolina", "Letícia", "Yasmin", "Bruna", "Manuela"];
+  const PARTNER_LAST = ["Almeida", "Ribeiro", "Cardoso", "Barros", "Nogueira", "Correia", "Lopes", "Azevedo", "Monteiro", "Pires"];
+  function newPartnerName() { return U.choice(PARTNER_FIRST) + " " + U.choice(PARTNER_LAST); }
+
+  // registra 1 linha no log de vida pessoal (timelineHTML lê isso pra montar a linha do
+  // tempo) — `kind`: dating|public|engaged|married|separated|kid.
+  function pushRel(g, kind, extra) {
+    const rec = { year: g.year, kind: kind };
+    if (extra) for (const k in extra) rec[k] = extra[k];
+    g.player.relHistory.push(rec);
+    return rec;
+  }
+
+  // aplica N partidas de suspensão na competição do PRÓXIMO jogo (mesmo mecanismo de
+  // `p.disc`/`discGroup` que já resolve suspensão por cartão, js/engine.js) — pros
+  // eventos de conduta (briga, expulsão) que devem custar tempo de jogo de verdade.
+  // Sem próximo jogo de clube conhecido (ou é jogo de seleção), não faz nada — a
+  // suspensão só faz sentido contra uma competição concreta.
+  function applyDisciplinary(g, matches) {
+    const fx = CQ.engine.currentFixture(g);
+    if (!fx || fx.isNatMatch) return;
+    const grp = CQ.engine.discGroup(fx);
+    g.player.disc = g.player.disc || {};
+    const d = g.player.disc[grp] || (g.player.disc[grp] = { y: 0, susp: 0 });
+    d.susp = Math.max(d.susp, matches);
+  }
+
   const LIFE_EVENTS = [
     {
       id: "hospital", title: "Visita ao hospital infantil",
@@ -575,23 +607,441 @@ window.CQ = window.CQ || {};
         { label: "Ir e ficar discreto", fx: { rep: +2 }, note: "Presença cumprida, sem holofote." },
         { label: "Recusar por causa da rotina de treinos", fx: { rep: -3, cond: +4 }, note: "O presidente entendeu, mas anotou a ausência.", social: { k: "mesa", text: "{name} não compareceu ao evento institucional do {club}, citando a rotina de treinos." } }
       ]
+    },
+
+    // ---- namoro: progressão dating -> public -> engaged -> married (+ separação/filho) ----
+    {
+      id: "novaNamorada", title: "Alguém novo na sua vida",
+      desc: "Você conheceu alguém fora dos holofotes do futebol. Química imediata — ainda em segredo, mas você não consegue parar de pensar nisso.",
+      prereq: function (g) { return !g.player.relationship; },
+      opts: [
+        {
+          label: "Topar se ver com mais frequência", fx: { morale: +5 },
+          apply: function (g) { const name = newPartnerName(); g.player.relationship = { stage: "dating", partnerName: name, sinceYear: g.year }; pushRel(g, "dating", { partnerName: name }); },
+          note: "Vocês combinaram de se ver de novo. Por enquanto, é só entre vocês dois."
+        },
+        { label: "Manter só amizade por enquanto", fx: {}, note: "Você preferiu não se apressar. A vida de jogador já é corrida o bastante." }
+      ]
+    },
+    {
+      id: "relAssumido", title: "Assumir o relacionamento",
+      desc: "Vocês já foram vistos juntos algumas vezes. Ela pergunta: vale a pena assumir de vez, com tudo que isso atrai de holofote?",
+      prereq: function (g) { return g.player.relationship && g.player.relationship.stage === "dating"; },
+      opts: [
+        {
+          label: "Assumir publicamente", fx: { fame: +3 },
+          apply: function (g) { g.player.relationship.stage = "public"; pushRel(g, "public", { partnerName: g.player.relationship.partnerName }); },
+          note: "Uma foto de mãos dadas foi o bastante. Agora é oficial.",
+          social: { k: "torcida", text: "{name} assume namoro com {partner} — fotos de mãos dadas circulando. A torcida já shippou." }
+        },
+        { label: "Pedir mais um tempo em segredo", fx: {}, note: "Vocês seguem se vendo, mas longe das câmeras — por enquanto." }
+      ]
+    },
+    {
+      id: "pedidoCasamento", title: "Pedido de casamento",
+      desc: "Você planejou tudo em segredo: o lugar, o anel, as palavras certas. Chegou a hora.",
+      prereq: function (g) { return g.player.relationship && g.player.relationship.stage === "public"; },
+      opts: [
+        {
+          label: "Pedir em casamento", fx: { morale: +10, fame: +2 },
+          apply: function (g) { g.player.relationship.stage = "engaged"; pushRel(g, "engaged", { partnerName: g.player.relationship.partnerName }); },
+          note: "Ela disse sim. Você não lembra de ter sorrido tanto assim em muito tempo.",
+          social: { k: "torcida", text: "{name} pediu {partner} em casamento! O anel já virou assunto nas redes. 💍" }
+        },
+        { label: "Esperar mais um tempo", fx: { morale: -2 }, note: "Não era o momento certo — mas o plano continua na cabeça." }
+      ]
+    },
+    {
+      id: "casamento", title: "Casamento",
+      desc: "O grande dia chegou. Falta só decidir o tamanho da festa.",
+      prereq: function (g) { return g.player.relationship && g.player.relationship.stage === "engaged"; },
+      opts: [
+        {
+          label: "Festa grande, com a imprensa cobrindo tudo", fx: { morale: +8, fame: +5, money: -300000 },
+          apply: function (g) { g.player.relationship.stage = "married"; pushRel(g, "married", { partnerName: g.player.relationship.partnerName }); },
+          note: "Um casamento e tanto — as revistas disputaram o furo da noite.",
+          social: { k: "imprensa", text: "{name} se casa com {partner} em cerimônia badalada. As redes não falam de outra coisa." }
+        },
+        {
+          label: "Cerimônia íntima, só família e amigos", fx: { morale: +8, rep: +2 },
+          apply: function (g) { g.player.relationship.stage = "married"; pushRel(g, "married", { partnerName: g.player.relationship.partnerName }); },
+          note: "Sem holofote nenhum — só vocês dois e quem realmente importa."
+        }
+      ]
+    },
+    {
+      id: "separacao", title: "Separação",
+      desc: "As coisas esfriaram há um tempo. Hoje veio a conversa que os dois vinham adiando.",
+      prereq: function (g) { return !!g.player.relationship; },
+      opts: [
+        {
+          label: "Terminar em bons termos", fx: { morale: -6 },
+          apply: function (g) { pushRel(g, "separated", { partnerName: g.player.relationship.partnerName }); g.player.relationship = null; },
+          note: "Doeu, mas sem drama nenhum. Vocês dois seguem em frente."
+        },
+        {
+          label: "Terminar mal, com direito a climão público", fx: { morale: -10, rep: -3 },
+          apply: function (g) { pushRel(g, "separated", { partnerName: g.player.relationship.partnerName }); g.player.relationship = null; },
+          note: "A treta vazou nas redes antes mesmo de vocês avisarem a família.",
+          social: { k: "zoeira", text: "Fim do namoro de {name} vira climão público nas redes. Já tem gente escolhendo lado." }
+        }
+      ]
+    },
+    {
+      id: "nascimentoFilho", title: "Nascimento de um filho", repeatable: true,
+      desc: "O grande dia chegou — e agora sua família tem mais um integrante.",
+      prereq: function (g) { return g.player.relationship && g.player.relationship.stage === "married"; },
+      opts: [
+        {
+          label: "Tirar um tempo pra ficar com a família", fx: { morale: +10, cond: -6 },
+          apply: function (g) { pushRel(g, "kid", { kidName: U.choice(PARTNER_FIRST) }); },
+          note: "Os primeiros dias em casa, de olho no bebê. Nada mais importa agora.",
+          social: { k: "torcida", text: "Parabéns, {name}! Chegou mais um torcedor mirim na família. Bem-vindo(a)! 👶" }
+        },
+        {
+          label: "Só alguns dias de folga e voltar à rotina", fx: { morale: +4 },
+          apply: function (g) { pushRel(g, "kid", { kidName: U.choice(PARTNER_FIRST) }); },
+          note: "Voltou rápido ao CT — mas com um sorriso diferente no rosto."
+        }
+      ]
+    },
+
+    // ---- traição/rumor ----
+    {
+      id: "traicaoDescoberta", title: "Traição descoberta",
+      desc: "Fotos suas saindo escondido de um restaurante com outra pessoa vazaram. A relação, do jeito que estava, não sobrevive a isso.",
+      prereq: function (g) { return !!g.player.relationship; },
+      opts: [
+        {
+          label: "Assumir e pedir desculpas publicamente", fx: { rep: -8, fame: +2 },
+          apply: function (g) { pushRel(g, "separated", { partnerName: g.player.relationship.partnerName }); g.player.relationship = null; },
+          note: "Difícil de engolir, mas pelo menos você não fugiu da própria história.",
+          social: { k: "imprensa", text: "{name} confirma traição e pede desculpas publicamente. Fim do relacionamento confirmado.", hot: true }
+        },
+        {
+          label: "Negar tudo", fx: { rep: -4 },
+          apply: function (g) { pushRel(g, "separated", { partnerName: g.player.relationship.partnerName }); g.player.relationship = null; },
+          note: "As fotos não mentem, mesmo que você tente. O relacionamento não resistiu de qualquer forma."
+        }
+      ]
+    },
+    {
+      id: "rumorTraicao", title: "Rumor de traição",
+      desc: "Circulou um clique granulado, de longe, de você entrando num carro com outra pessoa. Ninguém confirma nada — mas o assunto pegou.",
+      prereq: function (g) { return !!g.player.relationship; },
+      opts: [
+        {
+          label: "Ignorar e deixar o boato morrer sozinho", fx: { rep: -1 }, note: "Sem resposta, sem manchete nova. O assunto esfriou em alguns dias.",
+          social: { k: "zoeira", text: "Ninguém confirma, ninguém desmente... a foto de {name} entrando no carro continua rodando os grupos." }
+        },
+        {
+          label: "Desmentir publicamente", fx: { rep: +2, morale: -2 }, note: "Uma nota rápida, mas o desgaste em casa já tinha acontecido.",
+          social: { k: "mesa", text: "{name} desmente rumor que circulava nas redes. Assunto encerrado, segundo a assessoria." }
+        }
+      ]
+    },
+
+    // ---- carreira/mídia (gated por fama) ----
+    {
+      id: "encontroFamoso", title: "Encontro com famoso",
+      desc: "Numa área VIP, você trocou ideia com uma celebridade que você via só na TV. A conversa rendeu além do esperado.",
+      prereq: function (g) { return g.player.fame >= 40; },
+      opts: [
+        {
+          label: "Trocar contato e manter a amizade", fx: { fame: +3 }, note: "Um novo número na agenda — e uma boa história pra contar.",
+          social: { k: "imprensa", text: "Flagra: {name} e um rosto famoso trocando ideia numa área VIP. O papo rendeu além do esperado." }
+        },
+        { label: "Só o papo educado, sem mais que isso", fx: { fame: +1 }, note: "Simpático, mas sem virar assunto." }
+      ]
+    },
+    {
+      id: "amizadeCelebridade", title: "Amizade com celebridade",
+      desc: "O que começou como um encontro casual virou amizade de verdade — vocês dois vistos juntos numa festa exclusiva.",
+      prereq: function (g) { return g.player.fame >= 55; },
+      opts: [
+        {
+          label: "Cultivar a amizade nas redes", fx: { fame: +5 }, note: "As redes adoraram a dupla. Vira e mexe aparecem juntos.",
+          social: { k: "torcida", text: "{name} e uma celebridade cada vez mais próximos — as redes já criaram até apelido pra dupla." }
+        },
+        { label: "Manter isso fora dos holofotes", fx: { rep: +2 }, note: "Amizade real, sem precisar de plateia." }
+      ]
+    },
+    {
+      id: "videoclipe", title: "Participação em videoclipe",
+      desc: "Um artista te chamou pra uma ponta no clipe da música nova — câmeras, luzes coloridas, set lotado.",
+      prereq: function (g) { return g.player.fame >= 60; },
+      opts: [
+        {
+          label: "Topar e se divertir no set", fx: { fame: +7, money: 250000 }, note: "O clipe estourou e sua cena virou meme em poucos dias.",
+          social: { k: "imprensa", text: "{name} faz participação especial em videoclipe e vira assunto nas redes. Cena já é meme." }
+        },
+        { label: "Recusar: futebol é o foco", fx: { rep: +2 }, note: "Um convite e tanto — mas você preferiu manter o foco." }
+      ]
+    },
+    {
+      id: "campanhaPublicitaria", title: "Campanha publicitária",
+      desc: "Uma marca grande te chamou pra estampar a campanha nacional da nova coleção — sessão de fotos em estúdio, produto na mão.",
+      prereq: function (g) { return g.player.fame >= 35; },
+      opts: [
+        {
+          label: "Fechar contrato de temporada inteira", fx: { money: 500000, fame: +4 }, note: "Seu rosto estampado em outdoor de norte a sul do país.",
+          social: { k: "imprensa", text: "{name} é o novo rosto da campanha nacional da marca. Outdoors já espalhados pelo país." }
+        },
+        { label: "Fechar só pra 1 campanha pontual", fx: { money: 200000, fame: +1 }, note: "Menos exposição, mas menos compromisso também." }
+      ]
+    },
+    {
+      id: "propagandaApostas", title: "Propaganda de apostas",
+      desc: "A campanha da casa de apostas que estampa seu nome já está no ar — painel neon, seu rosto em tamanho gigante. A repercussão foi imediata.",
+      prereq: function (g) { return g.player.fame >= 50; },
+      opts: [
+        {
+          label: "Curtir a exposição e seguir divulgando", fx: { fame: +4, rep: -5 }, note: "A campanha bombou — parte da torcida não gostou nadinha.",
+          social: { k: "zoeira", text: "Painel gigante de {name} estampando casa de apostas divide opiniões na web. Uns amaram, outros nem tanto." }
+        },
+        { label: "Pedir pra reduzir a exposição da campanha", fx: { fame: +1, rep: -1 }, note: "Um meio-termo que abrandou um pouco a repercussão." }
+      ]
+    },
+
+    // ---- vício/aposta ----
+    {
+      id: "tigrinho", title: "Polêmica com o \"Jogo do Tigrinho\"",
+      desc: "Prints seus jogando o famoso \"Jogo do Tigrinho\" durante a pré-temporada vazaram e viralizaram em minutos.",
+      opts: [
+        {
+          label: "Rir da situação e seguir a vida", fx: { rep: -3, fame: +3 }, note: "Virou meme, mas também virou assunto sério nos bastidores.",
+          social: { k: "zoeira", text: "Print de {name} jogando Tigrinho na pré-temporada virou meme oficial da internet brasileira." }
+        },
+        { label: "Apagar tudo e negar", fx: { rep: -5 }, note: "Print não se apaga da internet. Só piorou a repercussão." },
+        {
+          label: "Assumir o deslize e pedir desculpas", fx: { rep: +1, fame: +1 }, note: "A autocrítica foi bem recebida — a torcida valoriza honestidade.",
+          social: { k: "zoeira", text: "{name} pega leve no print jogando Tigrinho, mas assume o erro. Já virou piada nos grupos de zap." }
+        }
+      ]
+    },
+    {
+      id: "perdaApostas", title: "Perda em apostas",
+      desc: "Uma noite ruim nas apostas online custou bem mais do que devia. Agora é lidar com o rombo.",
+      opts: [
+        { label: "Cobrir com o próprio bolso e seguir escondido", fx: { money: -200000, morale: -4 }, note: "Ninguém soube. O prejuízo ficou só entre você e o extrato." },
+        {
+          label: "Contar pro empresário e pedir ajuda", fx: { money: -80000, morale: -2, rep: -1 }, note: "Doeu no orgulho, mas ele ajudou a resolver rápido.",
+          social: { k: "zoeira", text: "Rumor: {name} teria tido uma noite ruim nas apostas online. Assessoria não confirma nem desmente." }
+        }
+      ]
+    },
+
+    // ---- conduta (afeta próximo jogo via p.disc) ----
+    {
+      id: "brigaTreino", title: "Briga no treino",
+      desc: "Uma disputa de bola esquentou demais e você trocou empurrões com um companheiro — o resto do elenco correu pra separar.",
+      opts: [
+        {
+          label: "Perder a cabeça de vez", fx: { rep: -6, morale: -4 },
+          apply: function (g) { applyDisciplinary(g, 1); },
+          note: "O departamento técnico não gostou nada da cena. Você fica de fora do próximo jogo.",
+          social: { k: "mesa", text: "Bate-boca de {name} no treino do {club} vira assunto — clube já decidiu a punição interna." }
+        },
+        { label: "Segurar a discussão sem chegar às vias de fato", fx: { rep: -1, morale: -1 }, note: "Esquentou, mas não passou de bate-boca." }
+      ]
+    },
+    {
+      id: "brigaBalada", title: "Briga em balada",
+      desc: "Uma provocação boba numa balada virou confusão generalizada. Seguranças tiveram que separar tudo.",
+      opts: [
+        {
+          label: "Revidar", fx: { rep: -8, fame: +2 },
+          apply: function (g) { applyDisciplinary(g, 1); },
+          note: "Vídeos da confusão já circulam — e o clube não vai deixar barato.",
+          social: { k: "zoeira", text: "{name} se envolve em confusão numa balada. Vídeos da treta já bombam nas redes." }
+        },
+        { label: "Sair de fininho antes de piorar", fx: { rep: -2 }, note: "Escapou por pouco de virar manchete pior do que já foi." }
+      ]
+    },
+    {
+      id: "confusaoTorcedor", title: "Confusão com torcedor",
+      desc: "Um torcedor exaltado te cercou com o celular filmando, provocando pra tentar te tirar do sério.",
+      opts: [
+        {
+          label: "Confrontar de volta", fx: { rep: -5 }, note: "O vídeo da resposta ríspida rendeu manchete até o fim de semana.",
+          social: { k: "zoeira", text: "Vídeo de {name} confrontando torcedor viraliza. Opiniões bem divididas nos comentários." }
+        },
+        { label: "Manter a calma e seguir andando", fx: { rep: +2 }, note: "Frieza elogiada por quem viu a cena de perto." }
+      ]
+    },
+    {
+      id: "expulsaoEvento", title: "Expulsão de evento",
+      desc: "Um desentendimento com a organização terminou com você sendo escoltado pra fora de um evento badalado.",
+      prereq: function (g) { return g.player.fame >= 30; },
+      opts: [
+        {
+          label: "Fazer graça da situação depois, nas redes", fx: { fame: +3, rep: -3 }, note: "Virou meme rápido — mas a organização do evento não achou graça.",
+          social: { k: "zoeira", text: "{name} foi escoltado pra fora de um evento badalado — e ainda fez piada com a própria situação depois." }
+        },
+        { label: "Pedir desculpas discretamente", fx: { rep: +1 }, note: "Resolveu por baixo, sem alimentar a história." }
+      ]
+    },
+
+    // ---- incidente sério ----
+    {
+      id: "acidenteCarro", title: "Acidente de carro",
+      desc: "Um susto de madrugada: uma batida leve, sem ninguém gravemente ferido, mas o carro ficou destruído e as luzes de emergência chamaram atenção.",
+      opts: [
+        {
+          label: "Divulgar o ocorrido com transparência", fx: { rep: +2, cond: -4, morale: -3 }, note: "A postura aberta evitou que o boato crescesse sozinho.",
+          social: { k: "imprensa", text: "{name} confirma pequeno acidente de carro na madrugada. Sem feridos graves, segundo a assessoria." }
+        },
+        { label: "Tentar manter tudo em sigilo", fx: { rep: -3, cond: -4, morale: -3 }, note: "Vazou de qualquer jeito — e o silêncio pesou contra você." }
+      ]
+    },
+    {
+      id: "problemaPolicia", title: "Problema com a polícia",
+      desc: "Uma parada de rotina virou confusão, e você precisou prestar esclarecimentos numa delegacia.",
+      opts: [
+        { label: "Contratar advogado e resolver rápido", fx: { money: -150000, rep: -2 }, note: "Resolvido em poucos dias, sem maiores consequências." },
+        {
+          label: "Deixar o departamento jurídico do clube cuidar", fx: { rep: -5 }, note: "Demorou mais pra resolver, e a demora virou notícia.",
+          social: { k: "imprensa", text: "Caso envolvendo {name} numa parada de rotina segue sem posição oficial do clube. Demora chama atenção." }
+        }
+      ]
+    },
+
+    // ---- vazamento ----
+    {
+      id: "vazamentoConversa", title: "Vazamento de conversa",
+      desc: "Prints de uma conversa privada, tirados de contexto, começaram a circular pelos grupos de torcedores.",
+      opts: [
+        {
+          label: "Confirmar e explicar o contexto real", fx: { rep: -2, morale: -2 }, note: "Ajudou a esfriar um pouco, mas o estrago já tinha começado.",
+          social: { k: "imprensa", text: "{name} explica contexto de conversa privada vazada. Nota oficial busca conter a repercussão." }
+        },
+        { label: "Não comentar nada", fx: { rep: -4 }, note: "O silêncio deixou espaço pra cada um imaginar o pior." }
+      ]
+    },
+    {
+      id: "videoComprometedor", title: "Vídeo comprometedor",
+      desc: "Um vídeo desfocado, de origem incerta, começou a se espalhar rápido — as notificações não param de chegar.",
+      opts: [
+        {
+          label: "Se pronunciar imediatamente", fx: { rep: -3, fame: +2 },
+          note: "Pelo menos deu sua versão antes que a história fugisse do controle.",
+          social: { k: "imprensa", text: "{name} se pronuncia sobre vídeo que viralizou nas últimas horas. Assunto domina os grupos de torcida.", hot: true }
+        },
+        { label: "Deixar a assessoria administrar em silêncio", fx: { rep: -5 }, note: "Sem resposta oficial, o boato cresceu sozinho." }
+      ]
+    },
+
+    // ---- consequência (só aparecem depois que a reputação já caiu) ----
+    {
+      id: "criseRedesSociais", title: "Crise nas redes sociais",
+      desc: "As menções não param de chegar. Seu nome está nos assuntos do momento — e não pelo motivo certo.",
+      prereq: function (g) { return g.player.rep < 45; },
+      opts: [
+        {
+          label: "Sair das redes por uns dias", fx: { morale: +2, fame: -2 }, note: "O silêncio ajudou a esfriar os ânimos.",
+          social: { k: "zoeira", text: "{name} sumiu das redes essa semana. Fugindo da polêmica ou só descansando a cabeça?" }
+        },
+        { label: "Responder tudo, discutir com quem provoca", fx: { morale: -4, rep: -2 }, note: "Cada resposta rendia mais lenha pra fogueira." }
+      ]
+    },
+    {
+      id: "cancelamentoPatrocinio", title: "Cancelamento de patrocínio",
+      desc: "Um patrocinador avisou, discretamente, que não vai renovar o contrato depois da repercussão recente.",
+      prereq: function (g) { return g.player.rep < 40; },
+      opts: [
+        { label: "Aceitar e seguir em frente", fx: { money: -200000 }, note: "Doeu no bolso, mas sem desgaste público." },
+        {
+          label: "Brigar juridicamente pelo contrato", fx: { money: -50000, rep: -1 }, note: "A disputa vazou pra imprensa e rendeu mais desgaste do que valor recuperado.",
+          social: { k: "imprensa", text: "Rompimento de contrato entre {name} e patrocinador vai parar na Justiça. Disputa já é pública." }
+        }
+      ]
+    },
+    {
+      id: "multaClube", title: "Multa do clube",
+      desc: "O departamento disciplinar do clube formalizou uma multa depois da repercussão dos últimos episódios.",
+      prereq: function (g) { return g.player.rep < 50; },
+      opts: [
+        {
+          label: "Pagar e pedir desculpas ao elenco", fx: { money: -100000, rep: +2 }, note: "O grupo valorizou o gesto de assumir o erro.",
+          social: { k: "clube", text: "{name} é multado internamente pelo {club} — pagou e já pediu desculpas ao grupo, segundo a diretoria." }
+        },
+        {
+          label: "Contestar a multa", fx: { rep: -3 },
+          apply: function (g) { applyDisciplinary(g, 1); },
+          note: "A diretoria não gostou da resistência — e ainda te tirou do próximo jogo."
+        }
+      ]
+    },
+
+    // ---- redenção ----
+    {
+      id: "pedidoDesculpas", title: "Pedido público de desculpas",
+      desc: "A assessoria sugeriu uma coletiva só pra isso: uma chance de virar a página com a torcida.",
+      prereq: function (g) { return g.player.rep < 45; },
+      opts: [
+        {
+          label: "Fazer um pronunciamento sincero", fx: { rep: +8, morale: +2 },
+          note: "A torcida reconheceu o esforço genuíno de se explicar.",
+          social: { k: "torcida", text: "Pronunciamento sincero de {name} sobre os últimos episódios. Parte da torcida já perdoou." }
+        },
+        { label: "Deixar só uma nota fria da assessoria", fx: { rep: +2 }, note: "Cumpriu o protocolo, mas sem aquecer nada com a torcida." }
+      ]
+    },
+    {
+      id: "voltaPorCima", title: "Volta por cima",
+      desc: "Depois de um período turbulento, chegou a hora de decidir: deixar a fase ruim te definir, ou virar o jogo.",
+      prereq: function (g) { return g.player.rep < 50 || g.player.morale < 40; },
+      opts: [
+        {
+          label: "Redobrar o foco no treino", fx: { morale: +8, cond: -4, rep: +2 }, note: "Voltou a treinar como nos primeiros dias de profissional.",
+          social: { k: "torcida", text: "{name} voltando com tudo nos treinos depois da fase ruim. Ídolo não desiste." }
+        },
+        { label: "Buscar apoio de um psicólogo esportivo", fx: { morale: +10, rep: +3 }, note: "A cabeça no lugar certo mudou tudo — dentro e fora de campo." }
+      ]
+    },
+
+    // ---- doméstico ----
+    {
+      id: "problemaFamiliar", title: "Problema familiar",
+      desc: "Uma ligação de casa trouxe uma notícia difícil: alguém da família precisa de ajuda, e não é pouca coisa.",
+      opts: [
+        { label: "Viajar para resolver pessoalmente", fx: { morale: -4, cond: -3 }, note: "Faltou treino, mas a família vem primeiro." },
+        { label: "Resolver à distância, sem viajar", fx: { morale: -6 }, note: "Ficou a sensação de que devia ter ido." },
+        { label: "Bancar tudo financeiramente", fx: { morale: -2, money: -100000 }, note: "O dinheiro ajudou, mas não substitui a presença." }
+      ]
     }
   ];
 
+  // `prereq(g)` (opcional): evento só entra no sorteio quando a função devolve true —
+  // usado pela progressão de namoro/carreira/escândalo (ex.: só oferece "pedido de
+  // casamento" se já existe relacionamento no estágio certo). Eventos sem `prereq`
+  // continuam sempre elegíveis, exatamente como antes.
+  // `repeatable` (opcional): pula o dedup de `g.lifeSeen` — pro evento poder acontecer
+  // mais de uma vez na mesma carreira (ex.: nascimento de um 2º filho). Sem essa flag,
+  // comportamento idêntico ao de sempre (1 vez por "volta" completa do array).
   function maybeLifeEvent(g) {
     if (!U.chance(0.13)) return null;
     g.lifeSeen = g.lifeSeen || [];
-    let pool = LIFE_EVENTS.filter(function (e) { return g.lifeSeen.indexOf(e.id) < 0; });
-    if (!pool.length) { g.lifeSeen = []; pool = LIFE_EVENTS; }
+    function eligible(e) { return !e.prereq || e.prereq(g); }
+    let pool = LIFE_EVENTS.filter(function (e) {
+      if (!eligible(e)) return false;
+      return e.repeatable || g.lifeSeen.indexOf(e.id) < 0;
+    });
+    if (!pool.length) { g.lifeSeen = []; pool = LIFE_EVENTS.filter(eligible); }
+    if (!pool.length) return null; // nenhum evento elegível agora (ex.: carreira sem fama nenhuma ainda)
     const ev = U.choice(pool);
-    g.lifeSeen.push(ev.id);
+    if (!ev.repeatable) g.lifeSeen.push(ev.id);
     return ev;
   }
 
-  // {name}/{club} nos textos de opt.social — mesmo espírito do fill() de injectPoll,
-  // só que sem {rival} (eventos de vida não giram em torno do rival de geração).
+  // {name}/{club}/{partner} nos textos de opt.social — mesmo espírito do fill() de
+  // injectPoll, só que sem {rival} (eventos de vida não giram em torno do rival de
+  // geração). {partner} só é usado pelos eventos de namoro (relAssumido/casamento), que
+  // sempre rodam com `g.player.relationship` já preenchido nesse momento — sem
+  // relacionamento ativo, cai num texto genérico em vez de quebrar.
   function fillNames(g, s) {
-    return s.replace(/\{name\}/g, first(g.player.name)).replace(/\{club\}/g, CQ.engine.myClub(g).name);
+    const partner = g.player.relationship ? g.player.relationship.partnerName : "alguém especial";
+    return s.replace(/\{name\}/g, first(g.player.name)).replace(/\{club\}/g, CQ.engine.myClub(g).name).replace(/\{partner\}/g, partner);
   }
   function applyLifeEvent(g, ev, opt) {
     const p = g.player, fx = opt.fx || {};
@@ -600,6 +1050,10 @@ window.CQ = window.CQ || {};
     if (fx.morale) p.morale = U.clamp(p.morale + fx.morale, 5, 100);
     if (fx.cond) p.condition = U.clamp(p.condition + fx.cond, 0, 100);
     if (fx.money) p.money += fx.money;
+    // efeito estrutural além de rep/fame/morale/cond/money (ex.: avançar o estágio do
+    // relacionamento, aplicar suspensão via CQ.engine.discGroup) — cada opção que
+    // precisa disso carrega sua própria função (ver LIFE_EVENTS abaixo).
+    if (opt.apply) opt.apply(g);
     // a decisão tomada agora sempre pode virar post — cada opção que merece repercussão
     // já carrega o próprio texto (ver LIFE_EVENTS acima), em vez de checar fx solto aqui.
     if (opt.social) post(g, opt.social.k, fillNames(g, opt.social.text), opt.social.hot ? { hot: true } : {});

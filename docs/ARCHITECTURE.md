@@ -1161,3 +1161,26 @@ pênalti. O botão vira só um atalho ("Adiantar ›") pra quem quer pular a esp
 continuam pausando de verdade. `finishLive()` e qualquer chamada manual de
 `liveStep()`/`shootReveal()` cancelam o timer pendente primeiro — nunca um avanço
 fantasma depois da partida encerrada.
+
+## Namoro/escândalo/carreira: catálogo de eventos de vida + fotos StockCake (feito)
+
+`p.relationship`/`p.relHistory` (`js/engine.js` `newGame`, aditivo) são a máquina de
+estados de namoro (`dating→public→engaged→married`, mais `separated`/`kid`).
+`LIFE_EVENTS` (`js/narrative.js`) ganhou `prereq(g)`/`repeatable`/`opt.apply(g)` —
+retrocompatível, os 17 eventos originais não usam nenhum dos três. `maybeLifeEvent`
+filtra por `prereq` antes do dedup de `g.lifeSeen`, e só aplica dedup quando
+`!repeatable`. ~29 eventos novos (namoro, traição, vício/aposta, conduta, incidente,
+vazamento, consequência gated por `p.rep`, redenção, doméstico) — catálogo completo em
+`docs/CHANGELOG.md`. Eventos de conduta reaproveitam `p.disc`/`CQ.engine.discGroup`
+(mesmo mecanismo de suspensão por cartão) via `applyDisciplinary(g, n)`
+(`js/narrative.js`, privada). "Melhor jogador do mundo"/"Aposentadoria"/"Transferência"/
+"Premiação"/"Festa"/"Treino extra" viraram foto-herói em telas já existentes
+(`ballonBlock`/`retroHTML`/`showMarket`/`buildSummarySteps`/`showTitleCelebration`/
+centro de treinamento) — não `LIFE_EVENT` redundante.
+
+`js/vendor/life-scenes.js` trocou de fonte inteira: 40 fotos do StockCake (CC0,
+`scripts/vendor-scene-photos.mjs` novo, substitui `vendor-life-scenes.mjs`) no lugar
+das 10 ilustrações vetoriais da unDraw — `CQ.LIFE_IMGS`/`lifeSceneSVG()`/`lifeSceneImg()`
+(`js/util.js`, o último agora exportado) continuam os mesmos nomes, zero mudança de
+consumidor além das entradas novas em `LIFE_SCENE`. Bundle final **3862 KB** (delta de
++1015 KB só do banco de imagens, fotos pesam mais que SVG vetorial simples).

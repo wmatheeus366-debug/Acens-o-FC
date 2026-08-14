@@ -1835,3 +1835,79 @@ Validado: suíte completa 267/267 + verificação ponta a ponta no Browser pane 
 simulei uma partida decisiva inteira sem clicar em nada (só resolvendo as decisões que
 apareceram) e ela avançou sozinha do apito inicial até "Encerrar partida", pausando
 corretamente em cada decisão/pênalti no meio do caminho.
+
+---
+
+## Namoro/escândalo/carreira: ~29 eventos de vida novos + fotos StockCake em tudo
+
+Pedido do usuário: trocar as ilustrações dos modais de "fora de campo" por fotos de
+verdade do StockCake — e uma tabela com ~38 direções visuais, a maioria pra eventos que
+não existiam no jogo (namoro→noivado→casamento→separação/traição, apostas/vício,
+brigas, problema com a polícia, vazamento de vídeo, crise nas redes, cancelamento de
+patrocínio, aposentadoria, virar o melhor do mundo etc.). Perguntado sobre o tamanho do
+pedido, o usuário confirmou a opção grande: construir os eventos que faltavam como
+mecânica de verdade, cada um com imagem real — não só trocar a arte dos que já existiam.
+
+### Máquina de estados de namoro
+
+`p.relationship` (instantâneo atual: `{stage, partnerName, sinceYear}`) e `p.relHistory`
+(log completo, um item por mudança de estágio — também vira a fonte de dados da linha
+do tempo) são os 2 campos novos, aditivos (mesmo padrão de `p.loan`/`p.firstClassic`).
+`LIFE_EVENTS` (`js/narrative.js`) ganhou 2 campos opcionais — `prereq(g)` (só entra no
+sorteio quando a função devolve `true`) e `repeatable` (pula o dedup de `g.lifeSeen`,
+pro evento poder repetir — nascimento de um 2º filho, por exemplo) — retrocompatíveis:
+os 17 eventos originais não usam nenhum dos dois e continuam se comportando
+identicamente. `opt.apply(g)` é o gancho novo que muda estado estrutural (avançar o
+relacionamento, aplicar suspensão) além do `fx` numérico de sempre.
+
+Progressão real: `novaNamorada` (só sem relacionamento ativo) → `relAssumido` →
+`pedidoCasamento` → `casamento` → (`nascimentoFilho`, repetível) — com `separacao`/
+`traicaoDescoberta` podendo encerrar o ciclo a qualquer momento e liberar `novaNamorada`
+de novo. `rumorTraicao` é a versão ambígua, não encerra a relação.
+
+### Vício, conduta e consequência
+
+Eventos de conduta (`brigaTreino`/`brigaBalada`/`multaClube` ao contestar) aplicam 1
+partida de suspensão de verdade via `CQ.engine.discGroup` contra o próximo confronto do
+jogador — mesmo mecanismo que já resolve suspensão por cartão, sem duplicar lógica.
+`p.rep` (reputação) recebe seu primeiro efeito negativo do jogo (`tigrinho`,
+`brigaBalada`, `problemaPolicia` etc.) — o efeito mecânico dessa queda é abrir a
+elegibilidade dos eventos de "consequência" (`criseRedesSociais`/
+`cancelamentoPatrocinio`/`multaClube`/`pedidoDesculpas`, todos com `prereq: rep<X`) e
+de `voltaPorCima` (redenção, `rep<50 || morale<40`) — sem tocar `forcedOut`/ofertas de
+mercado (fora de escopo, o pedido era sobre eventos+imagens).
+
+Eventos de carreira/mídia (`encontroFamoso`/`amizadeCelebridade`/`videoclipe`/
+`campanhaPublicitaria`/`propagandaApostas`) são gated por `p.fame >= X`, crescente
+conforme o evento pede mais exposição.
+
+### Duas entradas da tabela viraram polimento de tela existente, não evento novo
+
+"Melhor jogador do mundo" já é a revelação da Bola de Ouro (`ballonBlock`) e
+"Aposentadoria" já é a tela `retroHTML` — ambas ganharam a foto-herói nova
+(`goat`/`retirement`) em vez de um `LIFE_EVENT` redundante com escolha falsa.
+"Transferência"/"Premiação"/"Festa"/"Treino extra" também viraram fotos-herói em telas
+já existentes (mercado, prêmios do balanço, comemoração de título, centro de
+treinamento) pelo mesmo motivo.
+
+### Imagens: StockCake substitui o banco unDraw inteiro
+
+O pedido cobria até os eventos que já tinham ilustração — decisão: substituir
+`js/vendor/life-scenes.js` inteiro (não manter 2 bancos em paralelo). 40 fotos ao todo
+(10 categorias antigas reskinadas + 30 novas), curadas manualmente no Browser pane
+(StockCake não tem API de busca pública — CC0, uso comercial livre, sem exigir
+atribuição, confirmado no próprio site) e processadas por `scripts/vendor-scene-
+photos.mjs` (novo, substitui `vendor-life-scenes.mjs`): recorte quadrado 480×480 +
+JPEG qualidade 70 via `sharp`. Runtime não mudou nada — continua `CQ.LIFE_IMGS`/
+`lifeSceneSVG()`, só o gerador e o conteúdo do arquivo. Algumas categorias (`affair`,
+`fight`, `nightfight`) caíram na substituição mais próxima disponível (não achei foto
+literal da cena) — documentado no cabeçalho do script.
+
+Tamanho: `life-scenes.js` foi de 267 KB (10 SVGs vetoriais) pra 1282 KB (40 fotos JPEG)
+— bundle final **3862 KB**. Sem teto rígido definido pro projeto até aqui; registrado
+aqui como sempre.
+
+Validado: suíte completa 293/293 (5 testes novos: progressão de namoro, gating de
+consequência por reputação, suspensão de verdade em evento de conduta, retrocompat dos
+17 originais, fallback de imagem nunca quebra) + verificação visual no Browser pane
+(modal de "Alguém novo na sua vida" renderizando a foto real do casal na chuva).
