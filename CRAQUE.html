@@ -204,7 +204,7 @@ h1, h2, h3, h4 { font-family: var(--serif); font-weight: 600; line-height: 1.12;
 /* logo da competição em "Próximos jogos" — maior que o padrão de 20px (tabela/tag),
    já que aqui ele é o único indicador de qual campeonato é cada linha, não um selo
    pequeno ao lado de um rótulo de texto */
-.outer-rail-r .comp-logo { width: 26px; height: 26px; }
+.outer-rail-r .comp-logo { width: 30px; height: 30px; }
 @media (min-width: 1900px) {
   .outer-rail { display: block; }
 }
@@ -560,14 +560,14 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
    sem chip, alguns logos de texto escuro (ex. Ligue 1) sumiriam num fundo escuro. Cai
    no ícone vetorial (trophyIcon, sem chip) quando não há logo real pra essa competição. */
 .comp-logo {
-  display: inline-block; width: 20px; height: 20px; object-fit: contain; vertical-align: middle;
+  display: inline-block; width: 26px; height: 26px; object-fit: contain; vertical-align: middle;
   background: #fff; border-radius: 4px; padding: 2px; box-shadow: 0 0 0 1px rgba(0,0,0,.1);
   flex-shrink: 0;
 }
 .trophy-banner .comp-logo { width: 44px; height: 44px; padding: 4px; margin-bottom: 8px; }
 .trophy-cell .comp-logo { width: 34px; height: 38px; padding: 3px; }
 .trophy-cell.big .comp-logo { width: 42px; height: 46px; padding: 4px; }
-.cal-tag-logo { width: 13px !important; height: 13px !important; padding: 1px !important; margin-right: 3px; border-radius: 3px; }
+.cal-tag-logo { width: 18px !important; height: 18px !important; padding: 1px !important; margin: 0 !important; border-radius: 3px; }
 
 /* ---------------- Formulários / criação ---------------- */
 
@@ -1061,7 +1061,11 @@ body::before { opacity: var(--noise-op); }
 .kicker::after { background: var(--ink); height: 2px; }
 
 /* ---------------- CALENDÁRIO ---------------- */
-.cal-tag { display: inline-block; font-family: var(--cond); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; border: 1px solid var(--ink); padding: 1px 6px; white-space: nowrap; }
+/* barra inteira tingida na cor da competição (não só uma borda fina) — pedido do
+   usuário: identificar de cara qual campeonato é cada linha, mesmo sem olhar o logo.
+   color-mix() lê a cor exata de cada .c-* (definidas abaixo), funciona igual nos 2
+   temas sem precisar duplicar hex claro/escuro por competição. */
+.cal-tag { display: inline-flex; align-items: center; gap: 5px; font-family: var(--cond); font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; border: 1px solid var(--ink-3); padding: 3px 8px; white-space: nowrap; }
 .cal-loc { font-family: var(--cond); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
 .cal-loc.home { color: var(--green); font-weight: 600; }
 .cal-loc.away { color: var(--ink-3); }
@@ -1324,18 +1328,20 @@ main.page, .cover { animation: pageIn 0.26s ease both; }
 .podium .pod.me .pod-name { color: var(--verm-dark); font-weight: 700; }
 
 /* ================= cores por competição (calendário / panorama) ================= */
-.cal-tag { border-left-width: 4px; }
-.cal-tag.c-est   { border-left-color: #5a2d82; }
-.cal-tag.c-liga  { border-left-color: var(--green); }
-.cal-tag.c-serieb{ border-left-color: var(--gray); }
-.cal-tag.c-copa  { border-left-color: #1a4c9c; }
-.cal-tag.c-lib   { border-left-color: #0b7a3b; }
-.cal-tag.c-sula  { border-left-color: #d0342c; }
-.cal-tag.c-ucl   { border-left-color: #1b2a6b; }
-.cal-tag.c-uel   { border-left-color: #d97a1e; }
-.cal-tag.c-sel   { border-left-color: #c9a227; }
-.cal-tag.c-mun   { border-left-color: var(--gold); }
-:root[data-theme="dark"] .cal-tag.c-ucl { border-left-color: #6b7ad0; }
+/* cada competição tinge a barra inteira do .cal-tag (fundo + borda), não só uma tira —
+   color-mix() com o token de tema quando existe (--green/--gold/--gray) deixa a cor
+   certa nos 2 temas automaticamente; as sem token de tema usam o hex fixo direto. */
+.cal-tag.c-est   { --cc: #8a4fc9; }
+.cal-tag.c-liga  { --cc: var(--green); }
+.cal-tag.c-serieb{ --cc: var(--gray); }
+.cal-tag.c-copa  { --cc: #3b7dde; }
+.cal-tag.c-lib   { --cc: #17a058; }
+.cal-tag.c-sula  { --cc: #e2453c; }
+.cal-tag.c-ucl   { --cc: #5a6fd9; }
+.cal-tag.c-uel   { --cc: #e2932e; }
+.cal-tag.c-sel   { --cc: #d9b53a; }
+.cal-tag.c-mun   { --cc: var(--gold); }
+.cal-tag[class*="c-"] { border-color: var(--cc); background: color-mix(in srgb, var(--cc) 22%, transparent); color: var(--ink); }
 
 /* ================= MODAIS REPAGINADOS (eventos / entrevistas) ================= */
 .modal2 { position: relative; }

@@ -1969,3 +1969,30 @@ não relacionado, `ida: empates na ida acontecem`, some ao rodar de novo — mes
 de flakiness já documentado nesta sessão) + conferência estrutural no Browser pane
 (`getComputedStyle` confirmando a imagem ocupando 100% da largura do modal, `src`
 validado como JPEG completo).
+
+---
+
+## Logo maior em todo lugar + cada competição com a barra inteira colorida
+
+Usuário: logo da competição continuava pequena (agora reclamando do Calendário e do
+painel "Próximos jogos" especificamente) e sugeriu que cada competição tivesse "uma
+cor na barra toda" pra identificar de cara qual campeonato é cada linha, sem depender
+só do logo.
+
+- `.cal-tag` (etiqueta de competição do calendário/panorama/sorteio de grupos): antes
+  só tinha uma tira colorida de 4px na borda esquerda — agora a barra inteira (fundo +
+  borda) fica tingida na cor da competição, via `color-mix(in srgb, var(--cc) 22%,
+  transparent)` — `--cc` é a cor "cheia" de cada competição (`--green` pra LIGA, `--gold`
+  pra Mundiais, hex fixo pras que não têm token de tema). `color-mix()` lê o valor atual
+  do token, então funciona certinho nos 2 temas sem duplicar hex claro/escuro por
+  competição.
+- Tamanhos: `.comp-logo` (padrão, usado em cabeçalhos de tabela/histórico/chaveamento)
+  de 20px pra 26px; `.cal-tag-logo` (dentro da etiqueta do calendário) de 13px pra
+  18px; `.outer-rail-r .comp-logo` ("Próximos jogos") de 26px pra 30px. Os que já
+  tinham tamanho próprio maior (confronto principal da Home, 42px; troféu/histórico de
+  campeões, 34-44px) não mudaram.
+
+Validado: suíte completa 294/294 + verificação estrutural no Browser pane
+(`getComputedStyle` confirmando a cor de fundo/borda calculada por `color-mix()` pro
+tema escuro, tamanhos de logo nos 3 pontos, sem estourar a largura da tabela do
+calendário nem do painel lateral de 250px).
