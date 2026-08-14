@@ -1942,3 +1942,30 @@ Validado: suíte completa 294/294 + verificação no Browser pane — as 38 linh
 do calendário de uma temporada simulada passaram a mostrar o escudo real da competição
 (antes, 0), tamanho do logo confirmado via `getComputedStyle` nos 2 pontos (42px/26px),
 sem estourar a largura de 250px do painel lateral.
+
+---
+
+## Fotos dos modais: recorte quadrado trocado por horizontal, bem maiores
+
+Usuário reportou: as fotos do StockCake nos modais (eventos de vida, Bola de Ouro,
+aposentadoria etc.) apareciam num quadrado pequeno (128px de altura) — "quase não dá
+pra ver a foto". Duas causas juntas: `scripts/vendor-scene-photos.mjs` recortava tudo
+em 480×480 (quadrado) na hora de embutir, e `.modal2-scene img` (`css/editorial.css`)
+limitava a altura exibida a 128px com `width:auto` — a imagem renderizada acabava
+pequena e cercada de espaço vazio dos dois lados.
+
+- `vendor-scene-photos.mjs`: recorte mudou de 480×480 pra 640×400 (8:5, horizontal) —
+  as 40 fotos foram todas regeradas com esse novo recorte.
+- `.modal2-scene img`: `width:100%; height:auto` (era `width:auto; height:128px`) — a
+  foto agora ocupa a largura inteira do modal (proporção 8:5 fixa, então a altura sai
+  proporcional sozinha), a mesma proporção/tamanho em todo lugar que usa `.modal2-scene`
+  (eventos de vida, Bola de Ouro, aposentadoria, mercado, prêmios, título, treino).
+
+Bundle: `life-scenes.js` foi de 1282 KB pra 1402 KB (+120 KB, recorte maior = arquivo
+um pouco mais pesado por foto) — bundle final **3983 KB**.
+
+Validado: suíte completa 294/294 (1 falha isolada num teste estocástico pré-existente
+não relacionado, `ida: empates na ida acontecem`, some ao rodar de novo — mesmo padrão
+de flakiness já documentado nesta sessão) + conferência estrutural no Browser pane
+(`getComputedStyle` confirmando a imagem ocupando 100% da largura do modal, `src`
+validado como JPEG completo).

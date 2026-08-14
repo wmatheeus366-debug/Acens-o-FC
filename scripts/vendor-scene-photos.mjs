@@ -94,10 +94,12 @@ const CREDIT = `/* CRAQUE — fotos reais dos modais de eventos de vida + de 6 t
 window.CQ = window.CQ || {};
 `;
 
-// recorte quadrado (encaixa o slot .modal2-scene) + compressão — cada foto de origem do
-// StockCake vem grande (banco de imagens em alta resolução); 480x480 é mais que o
-// suficiente pro tamanho exibido (128px de altura), qualidade 70 mantém o arquivo leve.
-const SIZE = 480, QUALITY = 70;
+// recorte horizontal 8:5 (encaixa o slot .modal2-scene, agora bem maior que antes —
+// pedido do usuário: "quase não dá pra ver a foto" no recorte quadrado de 128px de
+// altura anterior) + compressão — cada foto de origem do StockCake vem grande (banco de
+// imagens em alta resolução); 640x400 é mais que o suficiente pro tamanho exibido
+// (220px de altura), qualidade 72 mantém o arquivo leve sem serrilhar o recorte maior.
+const W = 640, H = 400, QUALITY = 72;
 
 const entries = [];
 let totalSrcKB = 0;
@@ -107,7 +109,7 @@ for (const [key, info] of Object.entries(SCENES)) {
   const buf = Buffer.from(await res.arrayBuffer());
   totalSrcKB += buf.length / 1024;
   const out = await sharp(buf)
-    .resize(SIZE, SIZE, { fit: "cover" })
+    .resize(W, H, { fit: "cover" })
     .jpeg({ quality: QUALITY, mozjpeg: true })
     .toBuffer();
   const b64 = out.toString("base64");

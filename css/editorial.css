@@ -517,8 +517,12 @@ main.page, .cover { animation: pageIn 0.26s ease both; }
    silhueta em tinta sobre papel do avatar, só que numa cena pequena em vez de retrato */
 /* cena real (unDraw, ver js/vendor/life-scenes.js) tingida pro tom kraft do resto do
    jogo — sem o filtro, o roxo/rosa originais destoariam do papel/tinta do resto da UI. */
-.modal2-scene { border-bottom: 1px solid var(--rule-soft); line-height: 0; background: var(--paper-2, var(--paper)); display: flex; align-items: center; justify-content: center; padding: 10px 0; }
-.modal2-scene img { display: block; width: auto; height: 128px; max-width: 90%; filter: sepia(.45) saturate(1.3) hue-rotate(-8deg) contrast(.96); }
+.modal2-scene { border-bottom: 1px solid var(--rule-soft); line-height: 0; background: var(--paper-2, var(--paper)); display: flex; align-items: center; justify-content: center; }
+/* fotos StockCake são todas 8:5 (640x400, ver scripts/vendor-scene-photos.mjs) — largura
+   igual em todo lugar (100% do modal) garante mesma proporção/tamanho sempre, bem maior
+   que o recorte quadrado antigo de 128px de altura (quase não dava pra ver a cena,
+   pedido do usuário). */
+.modal2-scene img { display: block; width: 100%; height: auto; filter: sepia(.45) saturate(1.3) hue-rotate(-8deg) contrast(.96); }
 :root[data-theme="dark"] .modal2-scene img { filter: sepia(.3) saturate(1.1) hue-rotate(-8deg) contrast(.9) brightness(.92); }
 .modal2-body { padding: 16px 18px 18px; }
 .modal2-desc { font-family: var(--serif); font-size: 15.5px; line-height: 1.5; color: var(--ink-2); margin-bottom: 14px; }
