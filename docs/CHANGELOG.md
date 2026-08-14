@@ -1781,3 +1781,32 @@ durante a verificação: um service worker registrado numa sessão de teste ante
 (Workbox) estava servindo um `CRAQUE.html` desatualizado do cache — não é um bug do
 recurso em si, só um artefato de teste (corrigido limpando o cache/registro antigo
 antes de revalidar).
+
+---
+
+## Logo da competição no confronto da Home e nos "Próximos jogos"
+
+Usuário gostou das margens externas (item anterior) e pediu um complemento: no lugar
+onde já aparecem as bandeiras/escudos dos times se enfrentando, mostrar também o logo
+da competição — tanto na manchete da Home (Brasil × Chile, Eliminatórias, etc.) quanto
+na lista de "Próximos jogos" do painel lateral novo, pra dar de cara pra reconhecer
+qual campeonato é cada confronto.
+
+O "×" entre os escudos do confronto principal ganhou o logo da competição em cima
+(`compIcon`, já existente desde a entrega dos logos de competição); cada linha de
+"Próximos jogos" ganhou o mesmo logo antes do escudo do adversário. Sempre com o
+mesmo fallback de sempre pro ícone vetorial quando não há logo real pra aquela
+competição (Estaduais, eliminatórias de seleção, Supermundial).
+
+**Detalhe técnico resolvido**: `fx.compKey`/o campo `.comp` dos próximos jogos às
+vezes são só um rótulo genérico — `"LIGA"` (a liga muda conforme o clube do jogador)
+e `"COPA"` (cobre 6 copas nacionais diferentes) nunca são chaves reais em
+`CQ.COMP_LOGOS` de propósito. Um novo `fxCompLogoKey(G, key)` resolve pro código real
+antes de pedir o logo (`G.season.comps.LIGA.id` pra liga, `G.season.comps.COPA.logoKey`
+pra copa) — sem essa resolução, esses 2 casos (os mais comuns do jogo!) sempre cairiam
+no ícone vetorial genérico.
+
+Validado: suíte completa 266/266 (2 testes novos) + verificação manual no navegador
+confirmando logo real numa partida de Brasileirão (confronto principal e nas 2 telas)
+e ícone vetorial de reserva numa partida de Estadual/eliminatória, sem estourar a
+largura dos 250px do painel lateral.

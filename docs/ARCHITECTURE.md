@@ -1141,3 +1141,12 @@ que monta isso, então as 5 telas principais ganham de graça. Sem carreira ativ
 Validado: `testOuterRailsHTML` (novo) + verificação manual no Browser pane em 2200px
 (dado real nos 2 painéis, sem sobrepor `.page`, escondido corretamente abaixo do
 limite) nas 5 telas principais.
+
+**Addendum — logo da competição (feito):** cada linha de "Próximos jogos" do painel
+direito e o confronto principal da Home (`.lm-vs`, entre os 2 escudos) agora mostram o
+logo da competição daquela partida (`compIcon`, com fallback pro ícone vetorial de
+sempre). `fx.compKey`/`m.comp` às vezes são só um rótulo genérico (`"LIGA"`, `"COPA"`)
+que nunca bate com `CQ.COMP_LOGOS` de propósito — novo `fxCompLogoKey(G, key)` resolve
+pro código real da competição daquele ano (`S.comps.LIGA.id`/`S.comps.COPA.logoKey`)
+antes de pedir o logo. Validado com `testLeadMatchupShowsCompLogo` (novo) + verificação
+manual avançando uma carreira até uma partida de liga real.

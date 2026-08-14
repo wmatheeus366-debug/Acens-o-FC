@@ -684,7 +684,7 @@ window.CQ = window.CQ || {};
         <p class="lead-deck">${leadDeck(G, fx)}</p>
         <div class="lead-matchup">
           <div class="lm-team">${crest(fx.home ? fx.myTeam : fx.opp, "")}<span class="lm-name">${esc(fx.home ? fx.myTeam.name : fx.opp.name)}</span><span class="lm-role">Mandante</span></div>
-          <div class="lm-vs">×</div>
+          <div class="lm-vs">${compIcon(fxCompLogoKey(G, fx.compKey))}<span class="lm-x">×</span></div>
           <div class="lm-team">${crest(fx.home ? fx.opp : fx.myTeam, "")}<span class="lm-name">${esc(fx.home ? fx.opp.name : fx.myTeam.name)}</span><span class="lm-role">Visitante</span></div>
         </div>
         <p class="mt8">Você: ${statusBadge}</p>
@@ -1047,7 +1047,7 @@ window.CQ = window.CQ || {};
     const rows = upcoming.map(function (m) {
       const tag = m.home === true ? "casa" : m.home === false ? "fora" : "";
       return `<div class="flex-b" style="padding:7px 0;border-bottom:1px dashed var(--rule-soft)">
-        <span class="flex" style="gap:8px;min-width:0">${m.oppId ? crest(m.oppId, "crest-20") : ""}<span style="min-width:0"><b class="small">${m.oppName ? esc(m.oppName) : "A definir"}</b><br><span class="condsmall">${esc(m.label)}</span></span></span>
+        <span class="flex" style="gap:8px;min-width:0">${compIcon(fxCompLogoKey(G, m.comp))}${m.oppId ? crest(m.oppId, "crest-20") : ""}<span style="min-width:0"><b class="small">${m.oppName ? esc(m.oppName) : "A definir"}</b><br><span class="condsmall">${esc(m.label)}</span></span></span>
         ${tag ? `<span class="condsmall" style="flex-shrink:0">${tag}</span>` : ""}
       </div>`;
     }).join("") || '<p class="small muted" style="padding:8px 0">Sem próximos jogos agendados no momento.</p>';
@@ -2294,6 +2294,17 @@ window.CQ = window.CQ || {};
     const src = CQ.COMP_LOGOS && CQ.COMP_LOGOS[key];
     if (src) return `<img class="comp-logo" src="${src}" alt="">`;
     return trophyIcon(key);
+  }
+  // "LIGA"/"COPA" são só rótulos genéricos em fx.compKey/peekSchedule's `.comp` (a
+  // liga do jogador muda de clube pra clube, e "COPA" cobre 6 copas nacionais
+  // diferentes) — resolve pro código real da competição daquele ano antes de pedir o
+  // logo, senão CQ.COMP_LOGOS nunca bate (LIGA/COPA nunca são chaves nele de propósito).
+  // EST/SEL(eliminatórias)/SUPER não têm resolução — compIcon já cai no vetorial certo.
+  function fxCompLogoKey(G, key) {
+    const S = G.season;
+    if (key === "LIGA" && S.comps.LIGA) return S.comps.LIGA.id;
+    if (key === "COPA" && S.comps.COPA && S.comps.COPA.logoKey) return S.comps.COPA.logoKey;
+    return key;
   }
 
   // taças vetoriais próprias por tipo de competição (não são réplicas oficiais)

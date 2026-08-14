@@ -975,12 +975,41 @@
       if (html && upcoming.length && upcoming[0].oppName) {
         assert("margens externas: painel direito mostra o próximo adversário real", html.indexOf(upcoming[0].oppName) >= 0, upcoming[0].oppName);
       }
+      if (html && upcoming.length) {
+        assert("margens externas: cada próximo jogo mostra o logo real ou o ícone vetorial da competição", html.indexOf("comp-logo") >= 0 || html.indexOf("<svg") >= 0, "");
+      }
       // sem carreira ativa (CQ.state.game null), nunca pode quebrar — mesma checagem que sidePanelHTML já faz
       CQ.state.game = null;
       let err2 = null, html2 = null;
       try { html2 = CQ.ui.outerRailsHTML(); } catch (e) { err2 = e; }
       assert("margens externas: sem carreira ativa, outerRailsHTML() não lança exceção", !err2, err2 && err2.stack);
       assert("margens externas: sem carreira ativa, devolve vazio (nunca aparece na tela de capa)", html2 === "", JSON.stringify(html2));
+    });
+  }
+
+  // ---- Confronto da Home mostra o logo da competição (não só as bandeiras dos times) ----
+  function testLeadMatchupShowsCompLogo() {
+    withTempGame(function () {
+      const g = newCareer("ATA", "vas");
+      CQ.state.game = g;
+      CQ.state.screen = "home";
+      let err = null;
+      try { CQ.ui.render(); } catch (e) { err = e; }
+      assert("confronto: render() da Home não lança exceção", !err, err && err.stack);
+      const lmVs = document.querySelector(".lm-vs");
+      if (lmVs) {
+        assert("confronto: mostra o logo real da competição ou o ícone vetorial de reserva", !!lmVs.querySelector("img.comp-logo, svg"), "");
+        assert("confronto: o × entre os times continua aparecendo", lmVs.textContent.indexOf("×") >= 0, "");
+      }
+      // avança até bater numa partida de LIGA (tem logo real garantido, ver COMP_LOGO_MAP)
+      // pra confirmar o caminho do logo de verdade, não só o fallback
+      let n = 0, fx = E().currentFixture(g);
+      while (fx && fx.compKey !== "LIGA" && n++ < 80) { E().applyMatch(g, E().resolveMatch(g, fx, {})); fx = E().currentFixture(g); }
+      if (fx && fx.compKey === "LIGA") {
+        CQ.ui.render();
+        const lmVs2 = document.querySelector(".lm-vs");
+        assert("confronto: partida de liga real mostra o logo real (não o vetorial)", lmVs2 && !!lmVs2.querySelector("img.comp-logo"), "");
+      }
     });
   }
 
@@ -1742,6 +1771,7 @@
     testCareerChartsRenderCorrectData();
     testSaveSlotsWiredSafely();
     testOuterRailsHTML();
+    testLeadMatchupShowsCompLogo();
     testChampsCoversAllContis();
     testMundialRegistersChampionEvenLosing();
     testTituloOrdinalBanner();
