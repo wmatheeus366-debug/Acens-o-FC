@@ -1672,3 +1672,32 @@ pequena demais pra afirmar causa raiz, fica como calibração futura.
 Validado: suíte completa 218/218 (3 testes novos: `testLiveSimTranslateShape`,
 `testLiveSimDeterminism`, `testLiveSimBuildTeamsFallsBackCleanly`) + `node
 scripts/build.mjs` (bundle final **1863 KB**, 20 arquivos JS).
+
+---
+
+## Logos reais de competição
+
+Pedido do usuário: logo real (PNG/SVG) de cada competição, pra diferenciar visualmente
+uma da outra em vez de depender só do texto — mesmo espírito/uso pessoal já documentado
+pros escudos de clube.
+
+Mesmo princípio de vendorização já usado no projeto inteiro (embutir em tempo de build,
+nunca depender de rede em tempo de jogo): novo `scripts/embed-comp-logos.mjs` baixa os
+logos reais de 25 competições (via a mesma base pública já usada pros escudos de clube,
+`media.api-sports.io`), redimensiona e embute em `js/comp-logos.js` (~70 KB). Cada logo
+foi conferido visualmente contra a marca oficial da competição antes de entrar (não só
+"a busca não deu 404") — 20 dos 25 checados um a um durante esta sessão.
+
+Aparece na sala de troféus (o lugar mais visível — banner de título e vitrine de
+troféus), nos cabeçalhos de tabela/chaveamento de cada competição, no histórico de
+campeões e na etiqueta miniatura do calendário/panorama. Sempre com fallback pro ícone
+vetorial próprio do jogo (já existente) quando não há logo real — nunca quebra a tela.
+
+3 competições ficam de fora de propósito, documentado sem esconder: a Copa do Mundo (o
+ID certo na API só tem um escudo genérico cinza cadastrado, não o troféu — provável
+restrição de marca da FIFA; o ícone vetorial dourado do jogo é visualmente melhor), os
+13 campeonatos estaduais (atrás de um único código, sem "o" logo certo), e o
+Supermundial (torneio fictício deste jogo, sem equivalente real no mundo).
+
+Validado: suíte completa 238/238 (3 testes novos) + verificação visual manual dos
+logos + `node scripts/build.mjs` (bundle final **1936 KB**, 21 arquivos JS).

@@ -1430,7 +1430,7 @@ window.CQ = window.CQ || {};
     if (CQ.audio) CQ.audio.play("trophy");
     const ordinal = t.nth >= 2 ? U.tituloOrdinal(t.nth) : "";
     overlay(`<div class="trophy-banner">
-      ${trophyIcon(t.key)}
+      ${compIcon(t.key)}
       <div class="tb-k">${ordinal ? esc(ordinal) + " · " : "É campeão · "}${g().year}</div>
       <h2>${esc(t.name)}</h2>
       ${ordinal ? `<p class="mt4 muted">${esc((t.nth) + "º título")}${t.club ? " pelo " + esc(t.club) : ""}</p>` : ""}
@@ -2050,7 +2050,7 @@ window.CQ = window.CQ || {};
 
   function trophHTML(p) {
     const titles = p.titles.slice().reverse().map(function (t) {
-      return `<div class="flex-b" style="padding:7px 0;border-bottom:1px dashed var(--rule-soft)"><span class="flex">${trophyIcon(t.key)} <span><b>${esc(t.name)}</b>${t.club ? `<br><span class="condsmall">pelo ${esc(t.club)}</span>` : ""}</span></span><span class="tnum muted">${t.year}</span></div>`;
+      return `<div class="flex-b" style="padding:7px 0;border-bottom:1px dashed var(--rule-soft)"><span class="flex">${compIcon(t.key)} <span><b>${esc(t.name)}</b>${t.club ? `<br><span class="condsmall">pelo ${esc(t.club)}</span>` : ""}</span></span><span class="tnum muted">${t.year}</span></div>`;
     }).join("") || '<p class="muted small">A sala de troféus ainda espera o primeiro.</p>';
     const awards = p.awards.slice().reverse().map(function (a) {
       return `<div class="flex-b" style="padding:7px 0;border-bottom:1px dashed var(--rule-soft)"><span class="flex">${I.star} <span>${esc(a.name)}${a.club ? `<br><span class="condsmall">no ${esc(a.club)}</span>` : ""}</span></span><span class="tnum muted">${a.year}</span></div>`;
@@ -2060,7 +2060,7 @@ window.CQ = window.CQ || {};
     if (p.titles.length) {
       const cells = p.titles.slice().reverse().map(function (t) {
         const big = ["WC", "UCL", "LIB"].indexOf(t.key) >= 0;
-        return `<div class="trophy-cell ${big ? "big" : ""}">${trophyIcon(t.key)}<span class="tc-n">${esc(D.COMP_NAMES[t.key] || t.name)}</span><span class="tc-y">${t.year}</span></div>`;
+        return `<div class="trophy-cell ${big ? "big" : ""}">${compIcon(t.key)}<span class="tc-n">${esc(D.COMP_NAMES[t.key] || t.name)}</span><span class="tc-y">${t.year}</span></div>`;
       }).join("");
       room = `<div style="grid-column:1/-1"><div class="card"><div class="section-banner"><span class="sb-title">Sala de troféus</span><span class="sb-meta">${p.titles.length} ${U.plural(p.titles.length, "taça", "taças")}</span></div>
         <div class="card-b" style="padding:0"><div class="trophy-room">${cells}</div></div></div></div>`;
@@ -2131,6 +2131,16 @@ window.CQ = window.CQ || {};
       ${clubRivalryCard(G)}
       ${histCard ? '<div style="grid-column:1/-1">' + histCard + '</div>' : ""}
     </div>`;
+  }
+
+  // logo real da competição (embutido, js/comp-logos.js — gerado por
+  // scripts/embed-comp-logos.mjs, uso local/pessoal) quando existe; senão cai no ícone
+  // vetorial de troféu (trophyIcon) — mesmo princípio de fallback do escudo de clube
+  // (crestSVG): nunca depende de rede em tempo de jogo, nunca quebra a tela.
+  function compIcon(key) {
+    const src = CQ.COMP_LOGOS && CQ.COMP_LOGOS[key];
+    if (src) return `<img class="comp-logo" src="${src}" alt="">`;
+    return trophyIcon(key);
   }
 
   // taças vetoriais próprias por tipo de competição (não são réplicas oficiais)
@@ -2247,7 +2257,9 @@ window.CQ = window.CQ || {};
   // classe de cor por competição (para diferenciar no calendário/panorama)
   const COMP_COLOR = { EST: "c-est", LIGA: "c-liga", BRA: "c-liga", BRB: "c-serieb", CDB: "c-copa", COPA: "c-copa", LIB: "c-lib", SUL: "c-sula", UCL: "c-ucl", UEL: "c-uel", UECL: "c-uel", SEL: "c-sel", WC: "c-sel", CA: "c-sel", EU: "c-sel", GC: "c-sel", AC: "c-sel", MUN: "c-mun", SUPER: "c-mun" };
   function compTag(comp) {
-    return `<span class="cal-tag ${COMP_COLOR[comp] || ""}">${esc(COMP_ABBR[comp] || comp)}</span>`;
+    const logo = CQ.COMP_LOGOS && CQ.COMP_LOGOS[comp];
+    const icon = logo ? `<img class="comp-logo cal-tag-logo" src="${logo}" alt="">` : "";
+    return `<span class="cal-tag ${COMP_COLOR[comp] || ""}">${icon}${esc(COMP_ABBR[comp] || comp)}</span>`;
   }
   // meses "editoriais" (fev-dez, temporada brasileira de verdade) — o jogo não modela
   // data real nenhuma (só ordem cronológica dentro da temporada), então o mês de cada
@@ -2486,7 +2498,7 @@ window.CQ = window.CQ || {};
       <span><i class="lg-lib"></i>Zona continental principal</span>
       ${z.sula > 0 ? '<span><i class="lg-sula"></i>Segunda vaga continental</span>' : ""}
       <span><i class="lg-reb"></i>Rebaixamento</span></div>` : "";
-    return `<div class="card"><div class="card-h"><h3>${esc(L.name)} · ${year != null ? year : g().year}</h3></div>
+    return `<div class="card"><div class="card-h"><h3>${compIcon(L.id)} ${esc(L.name)} · ${year != null ? year : g().year}</h3></div>
       <div class="card-b tight" style="overflow-x:auto"><table class="tbl">
       <thead><tr><th>#</th><th>Clube</th><th class="num">J</th><th class="num">V</th><th class="num">E</th><th class="num">D</th><th class="num">SG</th><th class="num">Pts</th></tr></thead>
       <tbody>${rows}</tbody></table>${legend}</div></div>`;
@@ -2536,12 +2548,15 @@ window.CQ = window.CQ || {};
     }).join("");
     const status = cup.champion ? `<p class="mt8"><b>Campeão: ${esc(cup.champion)}</b></p>`
       : !cup.alive ? `<p class="mt8 muted">Sua equipe foi eliminada nas ${CQ.engine.STAGE_NAMES[cup.eliminatedAt] || "fases iniciais"}.</p>` : "";
-    return `<div class="card"><div class="card-h"><h3>${esc(cup.name)} · ${g().year}</h3></div>
+    return `<div class="card"><div class="card-h"><h3>${compIcon(cup.logoKey || cup.id)} ${esc(cup.name)} · ${g().year}</h3></div>
       <div class="card-b"><div class="bracket">${rounds}</div>${status}</div></div>`;
   }
 
   function contiHTML(C) {
-    const group = leagueTableHTML(C.group, false).replace("card-h\"><h3>" + esc(C.group.name), "card-h\"><h3>" + esc(C.name) + " · Grupo");
+    // troca o cabeçalho inteiro (não só o texto) por regex — mais robusto que o antigo
+    // replace de string exata, que quebrava assim que leagueTableHTML passou a incluir
+    // o logo da competição antes do nome (compIcon)
+    const group = leagueTableHTML(C.group, false).replace(/<h3>.*?<\/h3>/, "<h3>" + compIcon(C.id) + " " + esc(C.name) + " · Grupo</h3>");
     let ko = "";
     if (C.bracket) {
       ko = '<div class="mt16">' + cupHTML(C.bracket) + '</div>';
@@ -2577,7 +2592,7 @@ window.CQ = window.CQ || {};
     const thirdBlock = T.thirdPlace ? `<div class="card mt16"><div class="card-h"><h3>Disputa de 3º lugar</h3></div>
       <div class="card-b"><div class="bracket"><div class="br-round">${tieHTML(T.thirdPlace)}</div></div></div></div>` : "";
 
-    return `<div class="card mb12"><div class="section-banner"><span class="sb-title">${esc(T.name)} ${g().year}</span><span class="sb-meta">${p.natTeam.caps} caps · ${p.natTeam.goals} gols pela seleção</span></div>
+    return `<div class="card mb12"><div class="section-banner"><span class="sb-title">${compIcon(T.kind)} ${esc(T.name)} ${g().year}</span><span class="sb-meta">${p.natTeam.caps} caps · ${p.natTeam.goals} gols pela seleção</span></div>
       <div class="card-b">${status}</div></div>
       ${groupBlock}${bracketBlock}${thirdBlock}`;
   }
@@ -2638,7 +2653,7 @@ window.CQ = window.CQ || {};
     const bracketBlock = T.bracket ? cupHTML(T.bracket)
       : (T.eliminatedAt === "G" ? '<div class="notice mt12">Eliminado na fase de grupos — não avançou ao mata-mata de 16.</div>'
         : '<div class="card"><div class="card-b muted">Mata-mata ainda não definido.</div></div>');
-    return `<div class="card mb12"><div class="section-banner"><span class="sb-title">Supermundial ${g().year}</span></div>
+    return `<div class="card mb12"><div class="section-banner"><span class="sb-title">${compIcon("SUPER")} Supermundial ${g().year}</span></div>
       <div class="card-b">${status}</div></div>
       ${groupBlock}${bracketBlock}`;
   }
@@ -2657,7 +2672,7 @@ window.CQ = window.CQ || {};
       const isMe = data[y] === E().myClub(G).name || data[y] === D.NATIONS[G.player.nat].name;
       return `<tr><td class="tnum">${y}</td><td><b>${esc(data[y])}</b> ${isMe && +y >= 2026 ? '<span class="badge badge-gold">com você</span>' : ""}</td></tr>`;
     }).join("");
-    return `<div class="card"><div class="card-h"><h3>Histórico de campeões</h3>${sel}</div>
+    return `<div class="card"><div class="card-h"><h3>${compIcon(f)} Histórico de campeões</h3>${sel}</div>
       <div class="card-b tight" style="max-height:480px;overflow-y:auto"><table class="tbl tbl-zebra"><thead><tr><th>Ano</th><th>Campeão</th></tr></thead><tbody>${rows}</tbody></table></div>
       <p class="small muted" style="padding:8px 14px">Edições até 2026 são fatos reais; a partir de 2027, a história é escrita por você.</p></div>
       ${hallScorersHTML(G, f)}`;

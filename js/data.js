@@ -622,10 +622,33 @@ window.CQ = window.CQ || {};
     mil: 1125, atn: 1137
   };
 
+  // ---------------- logos reais de competição (uso local/pessoal) ----------------
+  // ID da liga/copa na API-Football; a URL do logo é pública (media.api-sports.io/
+  // football/leagues/{id}.png), mesma base já usada pelos escudos de clube (CREST_MAP).
+  // Chave = código interno da competição (o mesmo usado em fx.compKey/COMP_ABBR/
+  // trophyIcon). Competição sem entrada aqui cai no ícone vetorial (trophyIcon)
+  // automaticamente — nunca quebra a tela. EST (13 campeonatos estaduais atrás de um
+  // único código) e SUPER (Supermundial — torneio fictício deste jogo, sem logo real
+  // no mundo) ficam de fora de propósito: não têm um logo real único que sirva.
+  const COMP_LOGO_MAP = {
+    // ligas nacionais
+    BRA: 71, BRB: 72, ESP: 140, ENG: 39, ITA: 135, GER: 78, FRA: 61, POR: 94,
+    // copas domésticas (Brasil usa CDB; as outras usam "COPA_"+liga, ver logoKey em cupComp)
+    CDB: 73, COPA_ESP: 143, COPA_ENG: 45, COPA_ITA: 137, COPA_GER: 81, COPA_FRA: 66, COPA_POR: 97,
+    // continentais de clube
+    LIB: 13, SUL: 11, UCL: 2, UEL: 3, UECL: 848,
+    // seleções — WC (Copa do Mundo) fica de fora de propósito: o id=1 confirmado certo
+    // na API só tem um escudo genérico cinza cadastrado (não o troféu real, provável
+    // restrição de marca da FIFA), pior que o ícone vetorial próprio do jogo — cai nele.
+    CA: 9, EU: 4, GC: 22, AC: 7,
+    // mundiais de clube
+    MUN: 15
+  };
+
   CQ.DATA = {
     NATIONS, CONFED_POOL, WORLD_POOL, NAT_STR,
     CLUBS, LEAGUES, EURO_LEAGUES, ESTADUAIS,
-    POSITIONS, ATTR_NAMES, LEGENDS, CHAMPS_SEED, COMP_NAMES, HALL_SCORERS, REAL_SQUADS, NAT_SQUADS, CREST_MAP,
+    POSITIONS, ATTR_NAMES, LEGENDS, CHAMPS_SEED, COMP_NAMES, HALL_SCORERS, REAL_SQUADS, NAT_SQUADS, CREST_MAP, COMP_LOGO_MAP,
     clubsOf: function (league) {
       return Object.keys(CLUBS).filter(function (id) { return CLUBS[id].league === league; }).map(function (id) { return CLUBS[id]; });
     },

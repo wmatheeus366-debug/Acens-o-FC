@@ -9,6 +9,7 @@ Desenvolvimento com arquivos separados; distribuição num arquivo único `CRAQU
 |---|---|---|---|
 | `js/util.js` | `CQ.util` | RNG por seed, formatação, sanitização, retratos/escudos/bandeiras SVG, ícones | — |
 | `js/data.js` | `CQ.DATA` | Clubes, ligas, seleções, lendas, posições, elencos reais, recordes | util |
+| `js/comp-logos.js` | `CQ.COMP_LOGOS` | Logos reais de competição (25 de 28 códigos — ver `COMP_LOGO_MAP` em `js/data.js`), embutidos como data-URI base64 — refetch via `scripts/embed-comp-logos.mjs` | — |
 | `js/birthdates.js` | `CQ.BIRTHDATES` | Data de nascimento REAL de jogadores de `REAL_SQUADS` (gerado, cresce aos poucos — `scripts/sync-ages.mjs`) | — |
 | `js/world.js` | `CQ.world` | Mundo persistente: identidade estável de NPCs nos 191 clubes, envelhecimento/aposentadoria ano a ano | util, DATA, (BIRTHDATES) |
 | `js/pitch.js` | `CQ.pitch` | Formação (11 posições), desenho do campo 2D (`buildPitchSVG`), escolha de cor de sprite por clube (`pickTeamSprites`/`rankedSpriteColors`) e tradução evento→pose visual (`poseFor`/`poseForKick`) — renderizador **e** consumido pela UI (voltou a ser o modo Ao Vivo padrão, ver nota abaixo) | util, DATA, PLAYER_SPRITES |
@@ -874,3 +875,60 @@ Validado: suíte completa (`CQ.tests.run()`, 218/218 no bundle final) + 3 testes
 (partida completa da criação da carreira até "Encerrar partida", incluindo uma decisão
 de pênalti, canvas montado/desmontado sem erro, `p.stats` atualizado) + `node
 scripts/build.mjs` (bundle final 1863 KB).
+
+## Logos reais de competição (feito)
+
+Pedido do usuário: logo real (PNG/SVG) de cada competição, pra diferenciar visualmente
+uma da outra — mesmo espírito/uso pessoal já documentado pros escudos de clube
+(`CREST_MAP`/`js/crests.js`).
+
+Mesmo princípio de vendorização já estabelecido no projeto (buscar só em tempo de
+build, embutir como data-URI, nunca depender de rede/CDN em tempo de jogo): novo
+`COMP_LOGO_MAP` em `js/data.js` mapeia cada código interno de competição (o mesmo já
+usado em `fx.compKey`/`COMP_ABBR`/`trophyIcon`) pro ID de liga da API-Football — mesma
+base pública (`media.api-sports.io`) já usada pelos escudos de clube. Novo
+`scripts/embed-comp-logos.mjs` (mesmo esqueleto de `embed-crests.mjs`) baixa, redimensiona
+(56px, webp) e embute tudo em `js/comp-logos.js` (`CQ.COMP_LOGOS`, ~70 KB).
+
+**Fallback obrigatório, mesmo padrão de `crestSVG`**: nova `compIcon(key)` (`js/ui.js`)
+devolve `<img class="comp-logo">` com o logo real quando `CQ.COMP_LOGOS[key]` existe;
+senão cai em `trophyIcon(key)`, o ícone vetorial próprio que já existia — nunca quebra a
+tela, nunca depende de `js/comp-logos.js` estar presente.
+
+**25 de 28 códigos têm logo real; 3 ficam de fora de propósito** (documentado
+honestamente, não escondido):
+- **`WC` (Copa do Mundo)**: o ID confirmado certo na API (`league=1`, verificado por
+  busca direta no endpoint `/leagues?search=`) só tem um escudo genérico cinza
+  cadastrado — não o troféu real, provável restrição de marca da FIFA (o Mundial de
+  Clubes, `MUN`/id 15, tem o troféu de verdade; a Copa do Mundo em si, não). O ícone
+  vetorial próprio (globo com fitas, dourado) é visualmente melhor que o placeholder
+  real — decisão consciente de não usar o "logo real" nesse caso específico.
+- **`EST` (Estaduais)**: 13 campeonatos diferentes (Carioca, Paulista, Mineiro...)
+  atrás de um único código — não existe "o" logo do Estadual, cada um teria o seu
+  próprio (fora do escopo desta entrega).
+- **`SUPER` (Supermundial)**: torneio fictício deste jogo (expansão além do Mundial de
+  Clubes real) — não existe no mundo real, então não tem logo real possível.
+
+Todos os outros 25 (verificados um a um por inspeção visual, não só "a chamada não deu
+erro 404"): as 8 ligas nacionais + 7 copas domésticas (Brasil usa `CDB`; as outras 6
+ganham um `logoKey` próprio — `"COPA_" + código da liga — setado em `buildEuroSeason`,
+já que o código interno genérico `"COPA"` sozinho não diz de qual país é a copa daquele
+ano), as 5 competições continentais de clube (Libertadores, Sul-Americana, Champions,
+Europa League, Conference League) e as 5 seleções restantes (Copa América, Eurocopa,
+Copa Ouro, Copa da Ásia, Mundial de Clubes).
+
+**Onde aparece**: sala de troféus (`trophHTML`, banner de título e vitrine de troféus —
+o lugar mais visível), cabeçalho de tabela de liga/estadual (`leagueTableHTML`),
+cabeçalho de chaveamento (`cupHTML`), grupo/chaveamento de seleção (`selTourHTML`),
+Supermundial (`superHTML`), histórico de campeões (`champsHTML`, logo do filtro
+selecionado) e a etiqueta de competição do calendário/panorama (`compTag`, versão
+miniatura de 13px). Chip branco arredondado atrás de cada logo (`.comp-logo`) garante
+contraste tanto no cabeçalho claro quanto na faixa escura do `.section-banner` — sem
+isso, logo de texto escuro (ex. Ligue 1) sumiria num fundo escuro.
+
+Validado: suíte completa 238/238 (3 testes novos: `testCompLogoMapIntegrity`,
+`testCompLogosMatchMap`, `testTrophyRoomRendersCompLogos` — este último renderiza a
+sala de troféus com um título de logo real e um fictício na mesma tela, confirmando os
+dois ramos do fallback lado a lado) + verificação visual manual de 20 dos 25 logos
+reais (comparação direta com a marca oficial de cada competição) + `node
+scripts/build.mjs` (bundle final 1936 KB).

@@ -509,6 +509,21 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .crest-34 { width: 34px; height: 37px; }
 .crest-48 { width: 48px; height: 52px; }
 
+/* ---------------- Logos de competição ---------------- */
+/* logo real embutido (js/comp-logos.js, compIcon em js/ui.js) — chip branco garante
+   contraste tanto no cabeçalho claro (.card-h) quanto na faixa escura (.section-banner);
+   sem chip, alguns logos de texto escuro (ex. Ligue 1) sumiriam num fundo escuro. Cai
+   no ícone vetorial (trophyIcon, sem chip) quando não há logo real pra essa competição. */
+.comp-logo {
+  display: inline-block; width: 20px; height: 20px; object-fit: contain; vertical-align: middle;
+  background: #fff; border-radius: 4px; padding: 2px; box-shadow: 0 0 0 1px rgba(0,0,0,.1);
+  flex-shrink: 0;
+}
+.trophy-banner .comp-logo { width: 44px; height: 44px; padding: 4px; margin-bottom: 8px; }
+.trophy-cell .comp-logo { width: 34px; height: 38px; padding: 3px; }
+.trophy-cell.big .comp-logo { width: 42px; height: 46px; padding: 4px; }
+.cal-tag-logo { width: 13px !important; height: 13px !important; padding: 1px !important; margin-right: 3px; border-radius: 3px; }
+
 /* ---------------- Formulários / criação ---------------- */
 
 .field { margin-bottom: 14px; }

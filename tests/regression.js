@@ -1148,6 +1148,59 @@
     });
   }
 
+  // ---- Logos reais de competição (js/data.js COMP_LOGO_MAP + js/comp-logos.js) ----
+  function testCompLogoMapIntegrity() {
+    const map = CQ.DATA.COMP_LOGO_MAP;
+    assert("logo de competição: COMP_LOGO_MAP existe", !!map, "");
+    if (!map) return;
+    const badVals = Object.keys(map).filter(function (k) { return typeof map[k] !== "number" || map[k] <= 0; });
+    assert("logo de competição: todo valor de COMP_LOGO_MAP é um ID numérico positivo", badVals.length === 0, badVals.join(","));
+    // WC (Copa do Mundo) fica de fora de propósito — o ID real da API só tem escudo
+    // genérico cadastrado; o ícone vetorial embutido é melhor. EST/SUPER também de
+    // fora (13 estaduais atrás de 1 código / torneio fictício sem logo real no mundo).
+    ["WC", "EST", "SUPER"].forEach(function (k) {
+      assert("logo de competição: " + k + " fica fora do mapa de propósito", !map[k], "");
+    });
+    ["BRA", "CDB", "LIB", "UCL", "ESP", "ENG"].forEach(function (k) {
+      assert("logo de competição: " + k + " está mapeado", !!map[k], "");
+    });
+  }
+  function testCompLogosMatchMap() {
+    const logos = CQ.COMP_LOGOS;
+    if (!logos) { assert("logo de competição: js/comp-logos.js ausente é tolerado (compIcon cai no vetorial)", true, ""); return; }
+    const map = CQ.DATA.COMP_LOGO_MAP;
+    const orphan = Object.keys(logos).filter(function (k) { return !map[k]; });
+    assert("logo de competição: todo logo embutido corresponde a uma chave de COMP_LOGO_MAP", orphan.length === 0, orphan.join(","));
+    const badUri = Object.keys(logos).filter(function (k) { return typeof logos[k] !== "string" || logos[k].indexOf("data:image/webp;base64,") !== 0; });
+    assert("logo de competição: todo logo embutido é um data-URI webp válido", badUri.length === 0, badUri.join(","));
+  }
+  // ---- Sala de troféus: logo real quando existe, ícone vetorial quando não (nunca lança exceção) ----
+  function testTrophyRoomRendersCompLogos() {
+    withTempGame(function () {
+      const g = newCareer("ATA", "fla");
+      const cl = E().myClub(g);
+      // UCL tem logo real embutido; SUPER (Supermundial, torneio fictício) não — cobre
+      // os dois ramos de compIcon (logo real / fallback vetorial) na mesma renderização
+      g.player.titles = [
+        { year: g.year, key: "UCL", name: "Champions League", club: cl.name },
+        { year: g.year, key: "SUPER", name: "Supermundial", club: cl.name }
+      ];
+      CQ.state.game = g;
+      CQ.state.screen = "career";
+      CQ.state.ctab = "troph";
+      let err = null;
+      try { CQ.ui.render(); } catch (e) { err = e; }
+      assert("sala de troféus: render() não lança exceção com títulos reais/fictícios misturados", !err, err && err.stack);
+      const app = document.getElementById("app");
+      const cells = app.querySelectorAll(".trophy-cell");
+      assert("sala de troféus: 1 card por título", cells.length === 2, "n=" + cells.length);
+      const hasRealLogo = !!app.querySelector(".trophy-cell img.comp-logo");
+      const hasVectorFallback = !!app.querySelector(".trophy-cell svg");
+      assert("sala de troféus: UCL usa o logo real embutido (ou cai no vetorial se comp-logos.js não carregou)", hasRealLogo || !CQ.COMP_LOGOS, "");
+      assert("sala de troféus: SUPER (fictício) sempre usa o ícone vetorial, nunca um logo real", hasVectorFallback, "");
+    });
+  }
+
   // ---- Olheiro de base: promessa notável vira notícia + aba Base bem formada ----
   function testProspectBreakout() {
     withTempGame(function () {
@@ -1580,6 +1633,9 @@
     testTimelinePrologueEvents();
     testFirstClassicRecorded();
     testChampionBannerCorrectness();
+    testCompLogoMapIntegrity();
+    testCompLogosMatchMap();
+    testTrophyRoomRendersCompLogos();
     testRivalsCoverage();
     testClubRivalryScoreboard();
     testScoutingRumor();

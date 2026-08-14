@@ -509,6 +509,10 @@ window.CQ = window.CQ || {};
     const others = teamIds.filter(function (id) { return id !== p.clubId; });
     const field = [p.clubId].concat(U.shuffle(others, U.rngFor(g.seed, "copa", g.year)).slice(0, 15));
     S.comps.COPA = cupComp("COPA", D.LEAGUES[lg].cupName, field, ["R16", "QF", "SF", "F"], U.rngFor(g.seed, "copa2", g.year));
+    // logo real da copa doméstica (js/data.js COMP_LOGO_MAP) é por país — "COPA" sozinho
+    // não diz qual; logoKey é só um rótulo pra UI (não usado em fx.compKey/resolveSlot,
+    // que continuam com "COPA" genérico normalmente).
+    S.comps.COPA.logoKey = "COPA_" + lg;
 
     // europa: UCL/UEL/UECL — mesma cascata real da UEFA (quem passa perto da Europa
     // League mas não entra nela vai pra Conference League, "terceiro nível" continental)
