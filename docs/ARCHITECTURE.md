@@ -14,6 +14,11 @@ Desenvolvimento com arquivos separados; distribuição num arquivo único `CRAQU
 | `js/world.js` | `CQ.world` | Mundo persistente: identidade estável de NPCs nos 191 clubes, envelhecimento/aposentadoria ano a ano | util, DATA, (BIRTHDATES) |
 | `js/pitch.js` | `CQ.pitch` | Formação (11 posições), desenho do campo 2D (`buildPitchSVG`), escolha de cor de sprite por clube (`pickTeamSprites`/`rankedSpriteColors`) e tradução evento→pose visual (`poseFor`/`poseForKick`) — renderizador **e** consumido pela UI (voltou a ser o modo Ao Vivo padrão, ver nota abaixo) | util, DATA, PLAYER_SPRITES |
 | `js/vendor/player-sprites.js` | `CQ.PLAYER_SPRITES` | 4 cores de sprite de jogador (Kenney Sports Pack, CC0) + 1 bola, embutidos como data-URI base64 — refetch via `scripts/vendor-player-sprites.mjs` | — |
+| `js/vendor/howler.min.js` | `window.Howl`/`window.Howler` | **Howler.js** v2.2.4 (MIT) vendorizado — motor de áudio usado pro ambiente de torcida do modo Ao Vivo. Refetch via `scripts/vendor-howler.mjs` | — |
+| `js/vendor/stadium-crowd.js` | `window.CQ_STADIUM_CROWD` | Gravação real de torcida (Wikimedia Commons, CC0), recortada/convertida em MP3 mono 48kbps (~82 KB, 14s com loop), embutida como data-URI — refetch via `scripts/vendor-stadium-crowd.mjs` | — |
+| `js/vendor/sortable.min.js` | `window.Sortable` | **SortableJS** v1.15.7 (MIT) vendorizado — drag-and-drop da tela Tática (escalação). Refetch via `scripts/vendor-sortable.mjs` | — |
+| `js/vendor/chart.umd.js` | `window.Chart` | **Chart.js** v4.5.1 (MIT, UMD com auto-registro) vendorizado — gráficos de evolução/produção por temporada na Carreira. Refetch via `scripts/vendor-chartjs.mjs` | — |
+| `js/vendor/idb.umd.js` | `window.idb` | **idb** v8.0.3 (ISC) vendorizado — wrapper Promise sobre IndexedDB, usado pelos múltiplos slots de save. Refetch via `scripts/vendor-idb.mjs` | — |
 | `js/vendor/life-scenes.js` | `CQ.LIFE_IMGS` | 10 ilustrações reais (unDraw) dos modais de eventos de vida, embutidas como data-URI base64 — refetch via `scripts/vendor-life-scenes.mjs` | — |
 | `js/vendor/stadium-photo.js` | `CQ.STADIUM_PHOTO` | Foto real de estádio (Wikimedia Commons, CC BY-SA 3.0), embutida como data-URI base64 — pano de fundo do cabeçalho do modo Ao Vivo, refetch via `scripts/vendor-stadium-photo.mjs` | — |
 | `js/engine.js` | `CQ.engine` | Modelo, calendário, simulação, prêmios, mercado, técnico, traços, aposentadoria | util, DATA, world, (nar) |
@@ -21,10 +26,13 @@ Desenvolvimento com arquivos separados; distribuição num arquivo único `CRAQU
 | `js/narrative.js` | `CQ.nar` | Feed, entrevistas, eventos de vida, enquetes, rival | util, DATA, engine |
 | `js/vendor/footballsim.js` | `window.CQ_FOOTBALLSIM_SRC` | Bundle IIFE do motor real de simulação **eozgit/footballsim** (MIT), guardado como STRING (não executado no carregamento) — só roda dentro do Worker do modo Ao Vivo. Refetch via `scripts/vendor-footballsim.mjs` | — |
 | `js/vendor/football2d.js` | `CQ.CQ_FOOTBALL2D` | Bundle IIFE de `drawField`/dimensões da **cyntler/football2d** (MIT) — só o desenho do campo, sem jogador (a lib não desenha nenhum). Refetch via `scripts/vendor-football2d.mjs` | — |
+| `js/vendor/pixi.min.js` | `window.PIXI` | **PixiJS** v7.4.3 (MIT, última major com build UMD de arquivo único) vendorizado — motor 2D via WebGL, renderizador principal do campo Ao Vivo. Refetch via `scripts/vendor-pixi.mjs` | — |
+| `js/pitch-pixi.js` | `CQ.pitchPixi` | Cena PixiJS do campo Ao Vivo: desenha o gramado (proporção oficial 105×68m) e anima sprites reais dos 22 jogadores + bola com interpolação suave entre os frames do footballsim (`mount`/`playFrames`/`unmount`) | util, DATA, PLAYER_SPRITES, pitch, liveSim, PIXI |
 | `js/live-sim.js` | `CQ.liveSim` | Adaptador: monta `Team`/`Player` do footballsim a partir do elenco persistido (`buildTeams`), roda a simulação real num Web Worker (`runAsync`, nunca rejeita — `null` em qualquer falha), traduz o resultado pro mesmo formato de `resolveMatch` (`translate`) | util, DATA, pitch, vendor/footballsim |
 | `js/live.js` | `CQ.live` | Partidas ao vivo: cronologia, decisões, pênaltis lance a lance — tenta `CQ.liveSim` primeiro (só quando o jogador assiste ao vivo), fallback estatístico idêntico ao de sempre quando indisponível | util, engine, liveSim |
 | `js/ui.js` | `CQ.ui` | Todas as telas, overlays, render | util, DATA, engine, nar, live, save |
 | `js/save.js` | `CQ.save` | Persistência: esquema, migração, validação, localStorage, export/import | util, engine, ui |
+| `js/save-slots.js` | `CQ.saveSlots` | Múltiplos slots de save via IndexedDB (idb) — aditivo/opcional, nunca substitui o save automático único de sempre | util, engine, save, idb |
 | `js/main.js` | `CQ.main`, `CQ.state` | Bootstrap, estado global, tema (claro/escuro) | save, ui |
 
 `CQ.main` reexporta `CQ.save` (compatibilidade com todas as chamadas `CQ.main.*`).
@@ -932,3 +940,182 @@ sala de troféus com um título de logo real e um fictício na mesma tela, confi
 dois ramos do fallback lado a lado) + verificação visual manual de 20 dos 25 logos
 reais (comparação direta com a marca oficial de cada competição) + `node
 scripts/build.mjs` (bundle final 1936 KB).
+
+## Seis bibliotecas de terceiros no modo Ao Vivo/Carreira (feito)
+
+Pedido do usuário, depois de reagir mal ao renderizador do campo Ao Vivo (print
+mostrando os 22 jogadores como bolinhas vermelhas idênticas pros 2 times): trocar o
+motor visual da partida e usar mais 5 bibliotecas de terceiros em pontos específicos
+do jogo. O usuário escolheu explicitamente "tudo de uma vez, aceito o risco" em vez de
+entregas fatiadas — as 6 integrações abaixo foram feitas na mesma sessão.
+
+### 1. PixiJS — motor visual do campo Ao Vivo
+
+Substitui o `<canvas>` 2D cru que desenhava pixel a pixel a cada frame (sem
+interpolação, e cujo fallback pra círculo liso quando o sprite ainda não tinha
+carregado era exatamente o bug relatado — os 2 times aparecendo com a mesma cor).
+`js/pitch-pixi.js` monta uma cena real: campo desenhado via `PIXI.Graphics` com
+proporção oficial (105×68m — linhas, círculo central, grandes áreas, áreas pequenas,
+arcos de pênalti/escanteio, gols), sprites Kenney carregados via `PIXI.Texture.from`
+(carregamento assíncrono nativo do Pixi — o sprite só aparece quando a textura está
+pronta, nunca cai pro círculo por `.complete` ainda ser falso), e interpolação suave
+(lerp a cada tick do `app.ticker`) entre os frames reais do footballsim em vez de
+saltar de posição a cada 40ms.
+
+3 camadas de fallback, do melhor pro mais simples: PixiJS (sprites reais +
+interpolação) → `<canvas>` 2D cru (sem WebGL disponível) → SVG de poses discretas
+(sem simulação real, caminho estatístico) — nunca coexistem na mesma partida, e a
+escolha é 100% automática (`mountPitchCanvas`, `js/ui.js`).
+
+Achado de investigação real: o bug do print não era falta de fallback — era o
+`<canvas>` 2D caindo pro círculo de reserva na primeira renderização (textura ainda
+não carregada), e essa checagem não sendo reavaliada depois. Confirmado por teste
+real: `pickTeamSprites` sempre escolhe cores diferentes pros 2 times (testado no
+navegador, Vasco x Boavista, vermelho/azul) — o Pixi corrige o sintoma de raiz
+(textura sempre carrega antes de aparecer) mesmo sem mudar essa lógica.
+
+Limitação de ambiente conhecida: o harness de teste automatizado deste projeto
+(navegador headless, painel não composta frames de verdade) não dispara
+requestAnimationFrame sozinho — só percebido ao verificar e ver posições em (0,0)
+mesmo com o ticker "rodando". Não é um bug de produção (num navegador de verdade,
+visível e em foco, o rAF roda normalmente) — só uma particularidade do ambiente de
+verificação, contornada chamando `app.ticker.update()` manualmente pra simular quadros
+durante os testes.
+
+### 2. Howler.js — ambiente sonoro real do estádio
+
+`js/audio.js` ganhou `startCrowd`/`stopCrowd`/`crowdSwell`, usando uma gravação real de
+torcida (ver item 3 abaixo) tocada em loop (fade-in de 1.2s ao apito inicial, fade-out
+de 700ms ao fim da partida) via `Howl`. Gols dão um "swell" rápido de volume
+(0.32 a 0.7 e volta pra 0.32) através de `crowdSwell()`, chamado de `goalSplash`
+(`js/ui.js`) — a torcida reage ao gol sem precisar de lógica nova, só ajuste de
+volume. Respeita o mesmo toggle de som que os efeitos sintetizados já usavam
+(`setEnabled(false)` corta o ambiente na hora, não só os efeitos novos).
+
+### 3. Ambiente de torcida real (fonte + processamento)
+
+Fonte: Wikimedia Commons, arquivo de áudio de uma gravação real de multidão — licença
+CC0 (domínio público, sem exigência de atribuição), originalmente de freesound.org.
+Gravação real de cerca de mil pessoas conversando num espaço grande — a própria
+descrição do autor já cita "sports game" como uso adequado.
+
+Processamento (`scripts/vendor-stadium-crowd.mjs`, tudo em JS puro, sem ffmpeg,
+indisponível neste ambiente): recorta 14s do meio do áudio original de 57s (evita
+ruído de manuseio do microfone nas pontas), aplica fade in/out de 0.4s pra looping sem
+estalo, faz downmix estéreo para mono (corta o tamanho pela metade — ambiente de fundo
+não precisa de separação espacial), e codifica em MP3 48kbps via lamejs (encoder MP3
+puro-JS, sem binário nativo — usado só em tempo de build, não faz parte do bundle
+final). Resultado: cerca de 82 KB pra 14s de áudio de loop.
+
+### 4. SortableJS — tela de Tática (escalação com drag-and-drop)
+
+Nova aba "Tática" no Clube (`tacticsHTML`, `js/ui.js`): uma lista arrastável por
+posição (GOL/ZAG/LAT/VOL/MEI/PON/ATA), cada jogador do elenco (`squadOf`) numa linha
+com alça de arrasto; as primeiras N linhas (N = vagas daquela posição na escalação de
+11) viram "titular", o resto "banco" — reordenar muda quem começa jogando.
+
+Persistência: `g.lineupPrefs[pos]` (array de nomes na ordem escolhida, novo campo
+aditivo em `g`, migração em `js/save.js`). `probableLineup` (`js/ui.js`) ganhou
+`orderByPrefs`: quando existe preferência salva pra uma posição, reordena os jogadores
+daquela posição por ela antes de fatiar os N primeiros — sem preferência (todo save
+existente, ou qualquer posição nunca mexida), o comportamento é idêntico ao de sempre
+(top-N por overall). Nome de jogador que não existe mais no elenco (vendido/
+aposentado) é só ignorado, nunca quebra a tela nem inventa jogador.
+
+Por que isso afeta a partida de verdade, não só uma tela decorativa: `probableLineup`
+é a mesma função que `js/live-sim.js` `buildTeams` chama pra montar o time real da
+simulação footballsim — a escolha na tela Tática realmente decide quem joga ao lado do
+usuário no modo Ao Vivo, não é só um preview. O próprio jogador sempre ocupa sua vaga
+quando apto (substituição já existente, `probableLineup`) — a tela deixa isso
+explícito ("1 vaga já é sua") em vez de deixar o usuário tentar em vão substituir a si
+mesmo.
+
+### 5. Chart.js — gráficos reais de carreira
+
+`evoHTML` (evolução do overall) e `histHTML` (produção por temporada) ganharam
+`<canvas>` com gráficos Chart.js de verdade — linha (overall + linha pontilhada do
+potencial) e barras (gols/SG + assistências por ano), respectivamente. `chartSVG`
+(desenho SVG à mão que já existia) vira o fallback automático quando `window.Chart`
+não carregou — `evoHTML` escolhe um ou outro sozinho, `histHTML` simplesmente omite o
+bloco de gráfico (a tabela abaixo já tinha os mesmos números).
+
+`initCareerCharts()` (`js/ui.js`, chamado no fim de `render()`) sempre destrói as
+instâncias antigas antes de criar novas — `render()` recria o DOM inteiro a cada
+chamada, e Chart.js mantém referência ao `<canvas>` antigo já destacado se não for
+destruído explicitamente (vazamento de memória a cada troca de aba/tela).
+
+### 6. idb — múltiplos slots de save (IndexedDB)
+
+Nova seção "Slots de save" na aba Save & dados do Clube (`js/save-slots.js`,
+`CQ.saveSlots`) — aditiva e separada do save único automático de sempre
+(localStorage): "Salvar carreira atual como novo slot" grava uma cópia completa e
+independente (JSON round-trip, nunca compartilha referência com `CQ.state.game` vivo)
+num banco IndexedDB próprio (craque-slots), com metadados leves (jogador, clube, ano,
+overall, temporadas) pra listar sem carregar o objeto pesado inteiro. "Carregar" usa a
+mesma validação/migração do save normal (`CQ.save.validateAndMigrate`) — um slot salvo
+há muitas versões atrás nunca quebra a tela ao ser recarregado. Teto de 20 slots,
+remove o mais antigo quando cheio (mesmo padrão já usado pelo Hall da Fama).
+
+Sem `window.idb` (lib ausente ou IndexedDB bloqueado pelo navegador), a seção de slots
+simplesmente não aparece — nunca quebra a tela, e o save único de sempre continua
+funcionando normalmente.
+
+Limitação de teste honesta: `CQ.tests.run()` é 100% síncrono (nenhum teste existente
+usa Promise) e IndexedDB é inerentemente assíncrono — em vez de forçar um encaixe
+estranho no runner síncrono, o ciclo real de salvar/carregar/excluir/teto de 20 slots
+foi verificado manualmente e por completo no navegador (criar carreira, salvar de 3
+formas diferentes, listar, carregar, confirmar troca de estado, excluir, confirmar
+remoção, estresse de 22 saves confirmando que os 2 mais antigos são descartados
+corretamente) — só a parte síncrona (a tela nunca quebra com ou sem a lib) tem teste
+automatizado (`testSaveSlotsWiredSafely`).
+
+### 7. Workbox — instalar/jogar offline (service worker)
+
+Único ponto do projeto que quebra a regra de "tudo cabe num CRAQUE.html só" —
+decisão confirmada com o usuário antes de começar esta fatia, já que service worker é
+uma exigência técnica do navegador (precisa ser um arquivo buscável por URL própria,
+não dá pra inline num `<script>` comum). `scripts/build-sw.mjs` (rodado depois de
+`scripts/build.mjs`) gera `sw.js` via workbox-build (`generateSW()`):
+
+- `inlineWorkboxRuntime: true` — o runtime do Workbox fica embutido no próprio `sw.js`
+  gerado, sem `importScripts` de CDN em tempo de execução (mantém a mesma filosofia de
+  "zero rede em tempo de jogo" do resto do projeto).
+- Precache: `CRAQUE.html` + `manifest.json` + os 3 ícones PWA (`icons/*.png`, gerados
+  por `scripts/build-pwa-icons.mjs` a partir do mesmo "C" vetorial do favicon, via
+  sharp) — nada mais é necessário, o build final já é 100% autocontido.
+- Achado real durante a implementação: `CRAQUE.html` (2.8+ MB) passa do limite padrão
+  do Workbox de 2 MiB por arquivo — sem ajustar `maximumFileSizeToCacheInBytes`
+  (definido aqui em 16 MB, folga generosa pro crescimento natural do bundle), o
+  arquivo principal ficava de fora do precache silenciosamente (só um aviso no console
+  do build), e o offline não funcionaria de verdade apesar do `sw.js` parecer ter sido
+  gerado com sucesso.
+- Runtime caching (StaleWhileRevalidate/CacheFirst) pra Google Fonts — única
+  dependência de rede que o próprio `index.html`/`CRAQUE.html` ainda tem.
+- Registro (`index.html` e o template de `scripts/build.mjs`, ambos):
+  `navigator.serviceWorker.register("sw.js")` com `.catch(() => {})` — silencioso em
+  `file://` ou qualquer contexto sem `sw.js` ao lado, nunca trava o jogo.
+
+Limitação honesta, não escondida: service workers só funcionam servidos por http(s) —
+abrir `CRAQUE.html` direto do disco (`file://`, o jeito mais comum de distribuir/usar
+este projeto pessoalmente) não habilita offline nenhum (o navegador nem tenta
+registrar, ou a Promise rejeita silenciosamente). O recurso só faz diferença de
+verdade quando o jogo está hospedado num domínio real (ex.: GitHub Pages) —
+documentado aqui pra não gerar expectativa errada.
+
+Validado: registro/ativação do service worker, conteúdo do precache (5 arquivos, os
+esperados), e integridade do `CRAQUE.html` cacheado (2.8+ MB, HTML completo e válido)
+— tudo confirmado diretamente no navegador via a própria API `caches`/
+`navigator.serviceWorker`.
+
+### Validação do pacote inteiro
+
+Suíte completa 253/253 (mais os novos: `testCareerChartsRenderCorrectData`,
+`testSaveSlotsWiredSafely`, e a cobertura indireta de `orderByPrefs`/`probableLineup`
+pela tela Tática) + verificação manual completa no Browser pane de cada uma das 6
+bibliotecas (partida ao vivo real com Pixi e Howler tocando junto, 3 partidas
+consecutivas sem vazamento de contexto WebGL, drag-and-drop real na tela Tática via a
+mesma closure `onEnd` que um drag de verdade dispara, gráficos Chart.js com dados
+corretos e fallback SVG, ciclo completo de slots de save incluindo estresse de 22
+saves, service worker registrado/ativado com precache correto). `node
+scripts/build.mjs` + `node scripts/build-sw.mjs`: bundle final **2812 KB** (29
+arquivos JS), `sw.js` gerado (22 KB, precache de 2849 KB).

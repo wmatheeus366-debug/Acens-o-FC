@@ -1,4 +1,6 @@
-/* CRAQUE — som sintetizado (Web Audio API, sem arquivos de áudio).
+/* CRAQUE — som sintetizado (Web Audio API, sem arquivos de áudio) + ambiente real de
+   torcida (Howler.js + js/vendor/stadium-crowd.js, gravação real embutida, CC0 — ver
+   scripts/vendor-stadium-crowd.mjs pra créditos completos).
    Off por padrão; liga/desliga persistido. Iniciado só após gesto do usuário. */
 window.CQ = window.CQ || {};
 
@@ -8,6 +10,41 @@ window.CQ = window.CQ || {};
   let ctx = null;
   let enabled = false;
   try { enabled = localStorage.getItem(KEY) === "1"; } catch (e) { }
+
+  // ---------------- ambiente de torcida (Howler.js) ----------------
+  const CROWD_VOL = 0.32, SWELL_VOL = 0.7;
+  let howlCrowd = null;
+  function crowdHowl() {
+    if (!window.Howl || !window.CQ_STADIUM_CROWD) return null; // sem lib/áudio vendorizado — silencioso, nunca quebra a tela
+    if (!howlCrowd) { try { howlCrowd = new window.Howl({ src: [window.CQ_STADIUM_CROWD], loop: true, volume: 0 }); } catch (e) { return null; } }
+    return howlCrowd;
+  }
+  // toca em loop desde o apito inicial (ver js/ui.js renderLiveOverlay) até o fim da
+  // partida (finishLive) — fade suave de entrada pra não soar como um "liga/desliga" seco
+  function startCrowd() {
+    if (!enabled) return;
+    const h = crowdHowl(); if (!h) return;
+    try { if (!h.playing()) { h.play(); h.fade(0, CROWD_VOL, 1200); } } catch (e) { }
+  }
+  function stopCrowd() {
+    if (!howlCrowd) return;
+    try {
+      if (howlCrowd.playing()) {
+        howlCrowd.fade(howlCrowd.volume(), 0, 700);
+        setTimeout(function () { try { howlCrowd.stop(); } catch (e) { } }, 750);
+      }
+    } catch (e) { }
+  }
+  // reação rápida da torcida a um gol (qualquer lado) — sobe o volume um instante e
+  // volta pro nível de ambiente de sempre; chamado de goalSplash (js/ui.js)
+  function crowdSwell() {
+    if (!enabled || !howlCrowd) return;
+    try {
+      if (!howlCrowd.playing()) return;
+      howlCrowd.fade(CROWD_VOL, SWELL_VOL, 150);
+      setTimeout(function () { try { if (howlCrowd.playing()) howlCrowd.fade(SWELL_VOL, CROWD_VOL, 900); } catch (e) { } }, 350);
+    } catch (e) { }
+  }
 
   function ac() {
     if (!ctx) {
@@ -76,9 +113,12 @@ window.CQ = window.CQ || {};
   function setEnabled(v) {
     enabled = !!v;
     try { localStorage.setItem(KEY, enabled ? "1" : "0"); } catch (e) { }
-    if (enabled) { ac(); play("click"); }
+    if (enabled) { ac(); play("click"); } else { stopCrowd(); } // desligar o som corta o ambiente na hora, não só os efeitos novos
   }
   function isEnabled() { return enabled; }
 
-  CQ.audio = { play: play, setEnabled: setEnabled, isEnabled: isEnabled };
+  CQ.audio = {
+    play: play, setEnabled: setEnabled, isEnabled: isEnabled,
+    startCrowd: startCrowd, stopCrowd: stopCrowd, crowdSwell: crowdSwell
+  };
 })();

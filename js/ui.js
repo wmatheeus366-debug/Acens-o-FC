@@ -8,6 +8,9 @@ window.CQ = window.CQ || {};
   const $ = function (sel) { return document.querySelector(sel); };
   function esc(s) { return U.esc(s); }
   function g() { return CQ.state.game; }
+  // quantos titulares por posição numa escalação de 11 — usado por probableLineup
+  // (escolha automática) e tacticsHTML (tela de arrastar, js/ui.js)
+  const LINEUP_BUCKETS = { GOL: 1, ZAG: 2, LAT: 2, VOL: 2, MEI: 2, PON: 1, ATA: 1 };
 
   // ---------------- helpers visuais ----------------
   // "sou eu" tanto pro clube do jogador quanto pra seleção dele (ids "nat:"+nome)
@@ -61,7 +64,7 @@ window.CQ = window.CQ || {};
     div.className = "goal-splash" + (mine ? "" : " opp");
     div.innerHTML = `<div class="gs-word">${mine ? "GOL" : "gol"}</div>${sub ? `<div class="gs-sub">${esc(sub)}</div>` : ""}`;
     document.body.appendChild(div);
-    if (CQ.audio) CQ.audio.play(mine ? "goal" : "miss");
+    if (CQ.audio) { CQ.audio.play(mine ? "goal" : "miss"); CQ.audio.crowdSwell(); }
     setTimeout(function () { div.remove(); }, 1500);
   }
   // splash de cartão em tela cheia (modo ao vivo) — sempre sobre o próprio jogador
@@ -98,6 +101,83 @@ window.CQ = window.CQ || {};
     app.innerHTML = mastheadHTML() + `<main class="page">${body}</main>` + bottomNavHTML();
     runEntranceAnimations();
     sweepCrests();
+    initTacticsSortable();
+    initCareerCharts();
+  }
+
+  // gráficos reais de carreira (Chart.js, js/vendor/chart.umd.js) — evoHTML/histHTML já
+  // deixam o <canvas> certo no HTML quando window.Chart existe; aqui só liga os dados.
+  // render() recria o DOM inteiro a cada chamada, então SEMPRE destrói as instâncias
+  // antigas primeiro (Chart.js mantém referência ao <canvas> antigo já destacado do
+  // DOM — sem isso vaza memória a cada troca de tela).
+  let activeCharts = [];
+  function destroyCharts() {
+    activeCharts.forEach(function (c) { try { c.destroy(); } catch (e) { } });
+    activeCharts = [];
+  }
+  function initCareerCharts() {
+    destroyCharts();
+    if (!window.Chart) return;
+    const G = g(), p = G.player;
+    const evoCanvas = $("#chart-evo");
+    if (evoCanvas) {
+      const H = p.hist;
+      activeCharts.push(new window.Chart(evoCanvas, {
+        type: "line",
+        data: {
+          labels: H.map(function (h) { return h.y; }),
+          datasets: [
+            { label: "Overall", data: H.map(function (h) { return h.ov; }), borderColor: "#17563a", backgroundColor: "rgba(23,86,58,.15)", tension: 0.25, pointRadius: 3, fill: true },
+            { label: "Potencial", data: H.map(function () { return p.pot; }), borderColor: "#9c7c1e", borderDash: [5, 4], pointRadius: 0, fill: false }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { boxWidth: 12, font: { size: 11 } } } } }
+      }));
+    }
+    const histCanvas = $("#chart-hist");
+    if (histCanvas && p.career.length) {
+      const seasons = p.career; // ordem cronológica (a tabela ao lado é que inverte)
+      activeCharts.push(new window.Chart(histCanvas, {
+        type: "bar",
+        data: {
+          labels: seasons.map(function (s) { return s.year; }),
+          datasets: [
+            { label: p.pos === "GOL" ? "Jogos sem sofrer" : "Gols", data: seasons.map(function (s) { return p.pos === "GOL" ? s.cs : s.g; }), backgroundColor: "#bf3711" },
+            { label: "Assistências", data: seasons.map(function (s) { return s.a; }), backgroundColor: "#9c7c1e" }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { boxWidth: 12, font: { size: 11 } } } } }
+      }));
+    }
+  }
+
+  // liga o SortableJS (js/vendor/sortable.min.js) em cada lista de posição da tela
+  // Tática (tacticsHTML) — DOM sempre fresco aqui (render() acabou de recriar tudo),
+  // então não precisa checar se já foi inicializado antes. Sem a lib carregada,
+  // tacticsHTML já mostra um aviso e a lista fica só de leitura — nunca quebra a tela.
+  function initTacticsSortable() {
+    if (!window.Sortable) return;
+    document.querySelectorAll(".tactics-list").forEach(function (el) {
+      const pos = el.dataset.pos, n = +el.dataset.n;
+      window.Sortable.create(el, {
+        animation: 150, handle: ".tp-handle", ghostClass: "tp-ghost",
+        onEnd: function () {
+          const rows = Array.prototype.slice.call(el.children);
+          rows.forEach(function (row, i) {
+            const starter = i < n;
+            row.classList.toggle("starter", starter);
+            row.classList.toggle("bench", !starter);
+            const tag = row.querySelector(".tp-tag");
+            if (tag) tag.textContent = starter ? "titular" : "banco";
+          });
+          const names = rows.map(function (row) { return row.dataset.name; }).filter(Boolean);
+          const G = g();
+          G.lineupPrefs = G.lineupPrefs || {};
+          G.lineupPrefs[pos] = names;
+          CQ.main.save();
+        }
+      });
+    });
   }
 
   // conta números-chave de baixo pra cima e desliza barras de progresso — pinta o
@@ -448,12 +528,26 @@ window.CQ = window.CQ || {};
     return bits;
   }
 
+  // reordena `list` colocando os nomes de `prefNames` primeiro (na ordem escolhida na
+  // tela Tática), mantendo o resto na ordem original (por overall) — nunca inventa
+  // jogador: nome que não existir mais em `list` (vendido/aposentado) é ignorado.
+  function orderByPrefs(list, prefNames) {
+    if (!prefNames || !prefNames.length) return list;
+    const byName = {};
+    list.forEach(function (j) { byName[j.name] = j; });
+    const seen = {}, picked = [];
+    prefNames.forEach(function (n) {
+      if (byName[n] && !seen[n]) { picked.push(byName[n]); seen[n] = true; }
+    });
+    return picked.concat(list.filter(function (j) { return !seen[j.name]; }));
+  }
+
   // agrupa squadOf por posição e monta uma escalação provável (11 nomes), encaixando
   // o próprio jogador na sua posição quando ele está disponível pra jogar
   function probableLineup(G, fx) {
     const p = G.player;
     const isNat = !!(fx && fx.isNatMatch);
-    const buckets = { GOL: 1, ZAG: 2, LAT: 2, VOL: 2, MEI: 2, PON: 1, ATA: 1 };
+    const buckets = LINEUP_BUCKETS;
     let squad;
     if (isNat) {
       // jogo de Seleção: NUNCA usar o elenco do clube (bug antigo) — elenco real da
@@ -472,7 +566,12 @@ window.CQ = window.CQ || {};
     }
     const out = [];
     Object.keys(buckets).forEach(function (pos) {
-      out.push.apply(out, squad.filter(function (j) { return j.pos === pos; }).slice(0, buckets[pos]));
+      let atPos = squad.filter(function (j) { return j.pos === pos; });
+      // preferência manual (tela Tática, js/ui.js tacticsHTML) — reordena só quem já
+      // está na posição, sem inventar jogador nem mudar quem é o elenco; sem
+      // preferência salva (padrão de todo save), cai no top-N por overall de sempre
+      if (!isNat && G.lineupPrefs && G.lineupPrefs[pos] && G.lineupPrefs[pos].length) atPos = orderByPrefs(atPos, G.lineupPrefs[pos]);
+      out.push.apply(out, atPos.slice(0, buckets[pos]));
     });
     const dGrp = !isNat && fx && p.disc && p.disc[CQ.engine.discGroup(fx)];
     const suspHere = !!(dGrp && dGrp.susp > 0);
@@ -1071,11 +1170,18 @@ window.CQ = window.CQ || {};
   }
 
   // ---------------- partida ao vivo ----------------
-  // ---- campo em canvas (footballsim + football2d) — só quando a partida foi resolvida
-  // pelo motor real (live.res.simFrames existe, ver js/live-sim.js/js/live.js). Sem
-  // isso (caminho estatístico, Worker indisponível, ou qualquer falha), cai pro campo
-  // SVG de sempre (buildPitchSVG) — os dois nunca coexistem na mesma partida.
+  // ---- campo em canvas (footballsim) — só quando a partida foi resolvida pelo motor
+  // real (live.res.simFrames existe, ver js/live-sim.js/js/live.js). Sem isso (caminho
+  // estatístico, Worker indisponível, ou qualquer falha), cai pro campo SVG de sempre
+  // (buildPitchSVG) — os três nunca coexistem na mesma partida.
+  // 3 camadas de renderizador, do melhor pro mais simples: PixiJS (js/pitch-pixi.js,
+  // sprites de verdade com textura carregada nativamente + interpolação suave entre
+  // frames) → <canvas> 2D cru (desenho pixel a pixel, sem Pixi/WebGL disponível) → SVG
+  // de poses discretas (sem simFrames, caminho estatístico). `pitchRenderer` diz qual
+  // das 2 primeiras está ativa; `pitchCanvasState` fica truthy nas 2 (Pixi vira `true`,
+  // o <canvas> cru vira o objeto de estado de sempre) — nunca quebra a tela.
   let pitchCanvasState = null;
+  let pitchRenderer = null; // "pixi" | "2d" | null
   const spriteImgCache = {};
   function spriteImg(src) {
     if (!spriteImgCache[src]) { const im = new Image(); im.src = src; spriteImgCache[src] = im; }
@@ -1083,7 +1189,15 @@ window.CQ = window.CQ || {};
   }
   function mountPitchCanvas(fx, res, player) {
     const canvas = $(".pv-canvas");
-    if (!canvas || !window.CQ_FOOTBALL2D || !CQ.PLAYER_SPRITES || !CQ.liveSim) return false;
+    if (!canvas || !CQ.liveSim) return false;
+    if (window.PIXI && CQ.pitchPixi && CQ.pitchPixi.mount(canvas, fx, res, player)) {
+      pitchRenderer = "pixi";
+      pitchCanvasState = true;
+      return true;
+    }
+    // reserva: sem PixiJS/WebGL disponível — <canvas> 2D cru de sempre
+    if (!window.CQ_FOOTBALL2D || !CQ.PLAYER_SPRITES) return false;
+    pitchRenderer = "2d";
     const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
     canvas.width = Math.max(1, Math.round(rect.width * dpr));
@@ -1137,6 +1251,7 @@ window.CQ = window.CQ || {};
   // js/live.js buildLive). ~24 quadros/seg, mesmo espírito visual do pulso que o
   // campo SVG já fazia, só que com movimento de verdade em vez de um salto de pose.
   function canvasPlayFrames(frames, fromIter, toIter) {
+    if (pitchRenderer === "pixi") { if (CQ.pitchPixi) CQ.pitchPixi.playFrames(frames, fromIter, toIter); return; }
     const st = pitchCanvasState;
     if (!st || !frames || !frames.length) return;
     if (st.rafId) cancelAnimationFrame(st.rafId);
@@ -1156,8 +1271,10 @@ window.CQ = window.CQ || {};
     st.rafId = requestAnimationFrame(tick);
   }
   function unmountPitchCanvas() {
-    if (pitchCanvasState && pitchCanvasState.rafId) cancelAnimationFrame(pitchCanvasState.rafId);
+    if (pitchRenderer === "pixi") { if (CQ.pitchPixi) CQ.pitchPixi.unmount(); }
+    else if (pitchCanvasState && pitchCanvasState.rafId) cancelAnimationFrame(pitchCanvasState.rafId);
     pitchCanvasState = null;
+    pitchRenderer = null;
   }
 
   function renderLiveOverlay(fresh) {
@@ -1188,7 +1305,7 @@ window.CQ = window.CQ || {};
       : ((CQ.pitch && CQ.pitch.buildPitchSVG) ? CQ.pitch.buildPitchSVG(fx, live.res, g().player) : "");
     overlay(`<div class="live-sticky">${header}${pitchHtml}</div><div class="mm-feed" id="lv-feed"></div><div id="lv-foot" style="padding:12px 16px"></div>`, true);
     if (useCanvas) mountPitchCanvas(fx, live.res, g().player);
-    if (fresh) { if (CQ.audio) CQ.audio.play("whistle"); liveStep(); }
+    if (fresh) { if (CQ.audio) { CQ.audio.play("whistle"); CQ.audio.startCrowd(); } liveStep(); }
   }
 
   // ---------------- campo 2D animado: reação a cada evento revelado ----------------
@@ -1409,6 +1526,7 @@ window.CQ = window.CQ || {};
     const live = CQ.state.live;
     CQ.state.live = null;
     unmountPitchCanvas(); // nunca deixar um requestAnimationFrame pendente fora da partida
+    if (CQ.audio) CQ.audio.stopCrowd();
     closeOverlay();
     E().applyMatch(g(), live.res);
     CQ.main.save();
@@ -2007,13 +2125,19 @@ window.CQ = window.CQ || {};
     </div></div>`;
   }
 
+  // gráfico real (Chart.js, js/vendor/chart.umd.js) quando a lib carregou; cai no
+  // desenho SVG próprio (chartSVG, já existia antes do Chart.js) quando não — o canvas
+  // só ganha os dados de verdade em initCareerCharts(), chamado no fim de render()
+  // (precisa do elemento já no DOM). Nunca quebra a tela sem a lib.
   function evoHTML(p) {
     const H = p.hist;
+    const chart = window.Chart ? `<canvas id="chart-evo"></canvas>` : chartSVG(H, p);
+    const wrapCls = window.Chart ? "card-b chart-wrap cj-wrap" : "card-b chart-wrap";
     if (H.length < 2) {
-      return `<div class="card"><div class="card-b center muted">A curva de evolução aparece a partir da segunda temporada.<br><br>${chartSVG(H, p)}</div></div>`;
+      return `<div class="card"><div class="card-b center muted">A curva de evolução aparece a partir da segunda temporada.<br><br>${chart}</div></div>`;
     }
     return `<div class="card"><div class="card-h"><h3>Evolução do overall</h3><span class="kicker-side">${H[0].y}–${H[H.length - 1].y}</span></div>
-      <div class="card-b chart-wrap">${chartSVG(H, p)}</div></div>`;
+      <div class="${wrapCls}">${chart}</div></div>`;
   }
 
   function chartSVG(H, p) {
@@ -2042,7 +2166,13 @@ window.CQ = window.CQ || {};
         <td class="num">${p.pos === "GOL" ? s.cs : s.g}</td><td class="num">${s.a}</td><td class="num">${notaPill(s.avg)}</td><td class="num tnum">${s.ov}</td></tr>`;
     }).join("");
     if (!rows) return '<div class="card"><div class="card-b muted center">Sua primeira temporada ainda está em andamento.</div></div>';
-    return `<div class="card"><div class="card-h"><h3>Histórico temporada a temporada</h3></div>
+    // gráfico de barras real (Chart.js) — produção por temporada, em ordem cronológica
+    // (a tabela abaixo continua mais recente primeiro; o gráfico lê à esquerda pra
+    // direita, então usa a ordem natural de p.career, sem o .reverse() da tabela)
+    const chartBlock = window.Chart && p.career.length
+      ? `<div class="card mb12"><div class="card-h"><h3>Produção por temporada</h3></div><div class="card-b chart-wrap cj-wrap"><canvas id="chart-hist"></canvas></div></div>`
+      : "";
+    return `${chartBlock}<div class="card"><div class="card-h"><h3>Histórico temporada a temporada</h3></div>
       <div class="card-b tight" style="overflow-x:auto;max-height:480px;overflow-y:auto"><table class="tbl tbl-zebra">
       <thead><tr><th>Ano</th><th>Clube</th><th>Liga</th><th class="num">Pos</th><th class="num">J</th><th class="num">${p.pos === "GOL" ? "SG" : "G"}</th><th class="num">A</th><th class="num">Nota</th><th class="num">OVR</th></tr></thead>
       <tbody>${rows}</tbody></table></div></div>`;
@@ -2836,6 +2966,35 @@ window.CQ = window.CQ || {};
     }).sort(function (a, b) { return b.ov - a.ov; });
   }
 
+  // tela de escalação/tática — arrastar (SortableJS) reordena quem começa jogando em
+  // cada posição; a ordem final vira G.lineupPrefs[pos] (persistido), lido de volta
+  // por probableLineup (orderByPrefs) pra decidir o time real da próxima partida —
+  // inclusive a simulação de verdade do modo Ao Vivo (js/live-sim.js buildTeams chama
+  // CQ.ui.probableLineup). Sem SortableJS carregado, a lista aparece só de leitura
+  // (mesma ordem por overall de sempre) — nunca quebra a tela.
+  function tacticsHTML(G) {
+    const squad = squadOf(G), p = G.player;
+    const groups = Object.keys(LINEUP_BUCKETS).map(function (pos) {
+      const n = LINEUP_BUCKETS[pos];
+      let atPos = squad.filter(function (j) { return j.pos === pos; });
+      atPos = orderByPrefs(atPos, G.lineupPrefs && G.lineupPrefs[pos]);
+      const rows = atPos.map(function (j, i) {
+        const starter = i < n;
+        return `<div class="tactics-player ${starter ? "starter" : "bench"}" data-name="${esc(j.name)}">
+          <span class="tp-handle">⠿⠿</span><span class="tp-name">${esc(j.name)}</span>
+          <span class="tp-ov tnum">${j.ov}</span><span class="tp-tag">${starter ? "titular" : "banco"}</span></div>`;
+      }).join("");
+      const meNote = pos === p.pos
+        ? `<p class="small muted" style="padding:6px 14px 10px">Você sempre joga na sua posição quando está apto — 1 vaga de ${esc(D.POSITIONS[pos].name.toLowerCase())} já é sua. Arraste pra decidir quem entra ao seu lado nas demais.</p>`
+        : "";
+      return `<div class="card mb12"><div class="card-h"><h3>${esc(D.POSITIONS[pos].name)}</h3><span class="kicker-side">${n} ${U.plural(n, "titular", "titulares")} de ${atPos.length}</span></div>
+        <div class="card-b tight"><div class="tactics-list" data-pos="${pos}" data-n="${n}">${rows || '<p class="small muted" style="padding:10px 14px">Sem jogadores dessa posição no elenco.</p>'}</div></div>
+        ${meNote}</div>`;
+    }).join("");
+    const warn = window.Sortable ? "" : `<div class="notice warn mb12">A lista de tática só aparece arrastável com a biblioteca de drag-and-drop carregada — aqui ela está só pra leitura (ordem por overall).</div>`;
+    return `<div class="notice mb12">Arraste os jogadores (pelo ⠿⠿) pra escolher quem começa em cada posição — o topo da lista até a linha "titular" define quem joga; o resto fica no banco. A ordem fica salva e vale a partir do próximo jogo, inclusive no modo Ao Vivo.</div>${warn}${groups}`;
+  }
+
   function baseHTML(G) {
     const cl = E().myClub(G);
     const rows = squadOf(G)
@@ -2868,11 +3027,66 @@ window.CQ = window.CQ || {};
     return U.choice(MGR_LINES[tier], rng);
   }
 
+  // seção de slots de save (IndexedDB, js/save-slots.js) — aparece na aba "Save &
+  // dados" do Clube, embaixo do bloco de exportar/importar/apagar já existente.
+  // window.idb ausente (lib não carregada/IndexedDB bloqueado) → vazio, sem quebrar a
+  // tela. getCached() dispara a busca async na 1ª chamada e re-renderiza sozinho
+  // quando terminar (nunca trava o render síncrono esperando a Promise).
+  function saveSlotsHTML() {
+    if (!CQ.saveSlots || !CQ.saveSlots.hasIdb()) return "";
+    const slots = CQ.saveSlots.getCached();
+    if (slots === null) {
+      return `<div class="card mt12"><div class="card-h"><h3>Slots de save</h3></div><div class="card-b muted">Carregando slots salvos…</div></div>`;
+    }
+    const rows = slots.map(function (s) {
+      const m = s.meta;
+      return `<div class="flex-b" style="padding:8px 0;border-bottom:1px dashed var(--rule-soft)">
+        <span class="flex" style="flex-direction:column;align-items:flex-start;gap:1px">
+          <b>${esc(s.name)}</b>
+          <span class="condsmall">${esc(m.playerName)} (${D.POSITIONS[m.pos] ? D.POSITIONS[m.pos].name : m.pos}) · ${esc(m.clubName)} · ${m.year} · OVR ${m.overall} · ${m.seasons} ${U.plural(m.seasons, "temporada", "temporadas")}</span>
+        </span>
+        <span class="btnrow" style="gap:6px;flex-wrap:nowrap">
+          <button class="btn btn-sm" onclick="CQ.ui.loadSaveSlot(${s.id})">Carregar</button>
+          <button class="btn btn-sm btn-ghost" onclick="CQ.ui.deleteSaveSlot(${s.id})">Excluir</button>
+        </span></div>`;
+    }).join("") || '<p class="small muted">Nenhum slot salvo ainda — cada slot é uma carreira independente, separada do save automático de sempre.</p>';
+    return `<div class="card mt12"><div class="card-h"><h3>Slots de save</h3><span class="kicker-side">${slots.length}/20</span></div>
+      <div class="card-b tight" style="padding:4px 14px">${rows}</div>
+      <div class="card-b" style="padding-top:0"><p class="small muted mb8">Guarde várias carreiras ao mesmo tempo sem precisar exportar/importar arquivo — cada slot fica salvo neste navegador (IndexedDB), separado da carreira ativa.</p>
+      <button class="btn" onclick="CQ.ui.saveToNewSlot()">Salvar carreira atual como novo slot</button></div></div>`;
+  }
+  function saveToNewSlot() {
+    const G = g();
+    if (!G) return;
+    const name = prompt("Nome do slot (opcional):", G.player.name + " — " + G.year);
+    if (name === null) return; // cancelou
+    CQ.saveSlots.saveSlot(G, name || undefined).then(function () {
+      toast("Carreira salva num novo slot.");
+      CQ.saveSlots.refreshCache();
+    }).catch(function (e) { toast("Falha ao salvar slot: " + (e && e.message || e)); });
+  }
+  function loadSaveSlot(id) {
+    CQ.saveSlots.loadSlot(id).then(function (game) {
+      if (!game) { toast("Slot não encontrado."); return; }
+      CQ.state.game = game;
+      CQ.state.screen = game.retired ? "retro" : "home";
+      render();
+      toast("Carreira carregada do slot.");
+    }).catch(function (e) { toast("Falha ao carregar slot: " + (e && e.message || e)); });
+  }
+  function deleteSaveSlot(id) {
+    if (!confirm("Excluir este slot salvo? Essa ação não tem volta.")) return;
+    CQ.saveSlots.deleteSlot(id).then(function () {
+      toast("Slot excluído.");
+      CQ.saveSlots.refreshCache();
+    }).catch(function (e) { toast("Falha ao excluir slot: " + (e && e.message || e)); });
+  }
+
   function clubHTML() {
     const G = g(), p = G.player, cl = E().myClub(G);
     const lg = E().leagueOf(G, p.clubId);
     const tab = CQ.state.clubTab || "info";
-    const tabs = [["info", "Visão geral"], ["elenco", "Elenco"], ["base", "Base"], ["vida", "Estilo de vida"], ["fin", "Contrato & mercado"], ["save", "Save & dados"]];
+    const tabs = [["info", "Visão geral"], ["elenco", "Elenco"], ["base", "Base"], ["tatica", "Tática"], ["vida", "Estilo de vida"], ["fin", "Contrato & mercado"], ["save", "Save & dados"]];
     const subtabs = `<div class="subtabs">${tabs.map(function (t) {
       return `<button class="${tab === t[0] ? "on" : ""}" onclick="CQ.state.clubTab='${t[0]}';CQ.ui.render()">${t[1]}</button>`;
     }).join("")}</div>`;
@@ -2940,6 +3154,8 @@ window.CQ = window.CQ || {};
         <p class="small muted" style="padding:8px 14px">Se o seu overall ficar muito abaixo do nível do elenco, o técnico vai te deixar no banco — titularidade se conquista.</p></div>`;
     } else if (tab === "base") {
       body = baseHTML(G);
+    } else if (tab === "tatica") {
+      body = tacticsHTML(G);
     } else if (tab === "vida") {
       const inc = E().assetIncome(G);
       const items = E().LIFESTYLE.map(function (it) {
@@ -3006,7 +3222,7 @@ window.CQ = window.CQ || {};
           <button class="btn" onclick="CQ.main.importSave()">Importar save</button>
           <button class="btn btn-ghost" onclick="CQ.main.resetGame()">Apagar carreira</button>
         </div>
-      </div></div>`;
+      </div></div>${saveSlotsHTML()}`;
     }
     return subtabs + body;
   }
@@ -3141,6 +3357,7 @@ window.CQ = window.CQ || {};
     setFocus: setFocus, buyAsset: buyAsset, investPoint: investPoint, autoDistributePoints: autoDistributePoints,
     startClubPool: startClubPool, squadOf: squadOf, timelineHTML: timelineHTML, careerLegacy: careerLegacy,
     hallHTML: hallHTML, sidePanelHTML: sidePanelHTML, peersHTML: peersHTML,
-    probableLineup: probableLineup
+    probableLineup: probableLineup,
+    saveToNewSlot: saveToNewSlot, loadSaveSlot: loadSaveSlot, deleteSaveSlot: deleteSaveSlot
   };
 })();

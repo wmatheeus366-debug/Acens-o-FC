@@ -64,6 +64,7 @@ window.CQ = window.CQ || {};
     if (CQ.engine && CQ.engine.ensureManager) CQ.engine.ensureManager(g);
     if (!g.rivalHistory) g.rivalHistory = [];
     if (!g.clubRivalry) g.clubRivalry = {};
+    if (!g.lineupPrefs) g.lineupPrefs = {}; // aditivo, mesmo padrão de clubRivalry — tela de Tática (SortableJS)
     if (!g.trainingFocus) g.trainingFocus = "equil";
     if (!g.worldStars || !g.worldStars.length) {
       const rng = CQ.util.mulberry32((g.seed || 1) ^ 0x9e3779b9);

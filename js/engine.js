@@ -116,6 +116,7 @@ window.CQ = window.CQ || {};
       trainingFocus: "equil", manager: null,
       h2h: { v: 0, e: 0, d: 0 },
       clubRivalry: {},
+      lineupPrefs: {},
       pendingOffers: null, pendingSummary: null
     };
     // histórico real pré-carregado

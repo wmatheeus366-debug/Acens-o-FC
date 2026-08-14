@@ -40,6 +40,8 @@ const html = `<!DOCTYPE html>
 <title>CRAQUE — Modo Carreira</title>
 <meta name="description" content="Simulador de carreira de jogador de futebol brasileiro. Da base à Seleção, partida a partida.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 fill=%27%23f4efe2%27/%3E%3Ctext x=%2716%27 y=%2724%27 text-anchor=%27middle%27 font-family=%27Georgia%27 font-style=%27italic%27 font-weight=%27900%27 font-size=%2724%27 fill=%27%23bf3711%27%3EC%3C/text%3E%3C/svg%3E">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#bf3711">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,900;1,600;1,900&family=Barlow:wght@400;600;700&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet">
@@ -49,6 +51,17 @@ ${css}
 </head>
 <body>
 <div id="app"></div>
+<script>
+// Registro do service worker (Workbox, gerado por scripts/build-sw.mjs) — habilita
+// instalar/jogar offline. Só funciona quando servido por http(s) (ex.: GitHub Pages);
+// em file:// ou se sw.js não estiver ao lado deste HTML, o navegador nem tenta ou a
+// Promise rejeita — sempre silencioso, nunca deve travar o jogo.
+if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+  window.addEventListener("load", function () {
+    navigator.serviceWorker.register("sw.js").catch(function () { });
+  });
+}
+</script>
 <script>
 ${js}
 </script>

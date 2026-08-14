@@ -68,7 +68,7 @@
       const g = newCareer("MEI");
       const old = JSON.parse(JSON.stringify(g));
       ["traits", "compGoals", "idolClubs", "clubGoals", "ballon", "milestones", "assets", "records", "captain", "squadRole", "loan", "firstClassic", "genIdolYear", "momentIdol", "evoPoints"].forEach(function (k) { delete old.player[k]; });
-      delete old.manager; delete old.worldStars; delete old.schemaVersion; delete old.world; delete old.clubRivalry;
+      delete old.manager; delete old.worldStars; delete old.schemaVersion; delete old.world; delete old.clubRivalry; delete old.lineupPrefs;
       const raw = localStorage.getItem("craque-save-v1");
       localStorage.setItem("craque-save-v1", JSON.stringify(old));
       const loaded = CQ.main.load();
@@ -90,6 +90,7 @@
       assert("save: migra g.clubRivalry", loaded && loaded.clubRivalry && typeof loaded.clubRivalry === "object");
       assert("save: migra p.loan (empréstimo) pra null", loaded && loaded.player.loan === null, "loan=" + JSON.stringify(loaded && loaded.player.loan));
       assert("save: migra p.firstClassic pra null", loaded && loaded.player.firstClassic === null, "firstClassic=" + JSON.stringify(loaded && loaded.player.firstClassic));
+      assert("save: migra g.lineupPrefs (tática) pra objeto vazio", loaded && loaded.lineupPrefs && typeof loaded.lineupPrefs === "object", JSON.stringify(loaded && loaded.lineupPrefs));
     });
   }
 
@@ -866,6 +867,100 @@
     });
   }
 
+  // ---- Tática (SortableJS): preferência de escalação afeta probableLineup de verdade ----
+  function testLineupPrefsAffectSelection() {
+    withTempGame(function () {
+      const g = newCareer("ATA", "vas");
+      const fx = { compKey: "LIGA", label: "Teste", oppId: "fla", home: true, myTeam: E().myClub(g), opp: CQ.DATA.CLUBS.fla, isNatMatch: false };
+      const zagRoster = g.world.clubs[g.player.clubId].roster.filter(function (r) { return r.pos === "ZAG"; }).sort(function (a, b) { return b.ovr - a.ovr; }).map(function (r) { return r.name; });
+      if (zagRoster.length < 3) { assert("tática: elenco de teste tem ZAG suficiente pra testar", false, "n=" + zagRoster.length); return; }
+      const before = CQ.ui.probableLineup(g, fx).filter(function (j) { return j.pos === "ZAG"; }).map(function (j) { return j.name; });
+      assert("tática: sem preferência salva, escala os 2 ZAG de maior overall (padrão de sempre)", before[0] === zagRoster[0] && before[1] === zagRoster[1], JSON.stringify({ before: before, esperado: zagRoster.slice(0, 2) }));
+      const inverted = zagRoster.slice().reverse();
+      g.lineupPrefs.ZAG = inverted;
+      const after = CQ.ui.probableLineup(g, fx).filter(function (j) { return j.pos === "ZAG"; }).map(function (j) { return j.name; });
+      assert("tática: com preferência salva, respeita a ordem escolhida (não mais só overall)", after[0] === inverted[0] && after[1] === inverted[1], JSON.stringify({ after: after, esperado: inverted.slice(0, 2) }));
+      // nome de jogador que não existe mais no elenco (vendido/aposentado) nunca pode
+      // travar a tela nem "inventar" um jogador — só é ignorado
+      g.lineupPrefs.ZAG = ["Jogador Que Não Existe Mais"].concat(inverted);
+      let err = null, safe = null;
+      try { safe = CQ.ui.probableLineup(g, fx).filter(function (j) { return j.pos === "ZAG"; }).map(function (j) { return j.name; }); } catch (e) { err = e; }
+      assert("tática: nome inválido na preferência não lança exceção", !err, err && err.stack);
+      assert("tática: nome inválido é só ignorado, resto da preferência continua valendo", safe && safe[0] === inverted[0], JSON.stringify(safe));
+      // a posição do próprio jogador sempre é dele quando apto, não importa a preferência
+      g.lineupPrefs[g.player.pos] = ["Ninguém Vai Substituir Você"];
+      const myPos = CQ.ui.probableLineup(g, fx).find(function (j) { return j.pos === g.player.pos && j.isMe; });
+      assert("tática: preferência nunca tira o próprio jogador da escalação quando apto", !!myPos, "");
+    });
+  }
+
+  // ---- Gráficos de carreira (Chart.js): dados corretos + fallback SVG sem a lib ----
+  function testCareerChartsRenderCorrectData() {
+    withTempGame(function () {
+      const g = newCareer("ATA", "vas");
+      CQ.state.game = g;
+      for (let s = 0; s < 2; s++) {
+        let n = 0; while (E().currentFixture(g) && n++ < 700) E().applyMatch(g, E().resolveMatch(g, E().currentFixture(g), {}));
+        E().endSeason(g); E().nextSeason(g);
+      }
+      CQ.state.screen = "career"; CQ.state.ctab = "evo";
+      let err = null;
+      try { CQ.ui.render(); } catch (e) { err = e; }
+      assert("gráficos: render() da aba Evolução não lança exceção", !err, err && err.stack);
+      if (window.Chart) {
+        const evoCanvas = document.getElementById("chart-evo");
+        assert("gráficos: canvas de evolução aparece quando Chart.js está carregado", !!evoCanvas, "");
+        const chart = evoCanvas && window.Chart.getChart(evoCanvas);
+        assert("gráficos: dados de overall no gráfico batem com p.hist", chart && JSON.stringify(chart.data.datasets[0].data) === JSON.stringify(g.player.hist.map(function (h) { return h.ov; })), JSON.stringify(chart && chart.data.datasets[0].data));
+        CQ.state.ctab = "hist";
+        CQ.ui.render();
+        const histCanvas = document.getElementById("chart-hist");
+        assert("gráficos: canvas de produção por temporada aparece na aba Histórico", !!histCanvas, "");
+        const chart2 = histCanvas && window.Chart.getChart(histCanvas);
+        assert("gráficos: dados de gols no gráfico batem com p.career", chart2 && JSON.stringify(chart2.data.datasets[0].data) === JSON.stringify(g.player.career.map(function (s) { return s.g; })), JSON.stringify(chart2 && chart2.data.datasets[0].data));
+        assert("gráficos: trocar de aba destrói o gráfico antigo (sem vazar Chart.js instance)", !window.Chart.getChart(evoCanvas), "");
+        // sem Chart.js carregado, cai no SVG que já existia antes — nunca quebra a tela
+        const real = window.Chart;
+        delete window.Chart;
+        CQ.state.ctab = "evo";
+        let err2 = null;
+        try { CQ.ui.render(); } catch (e) { err2 = e; }
+        window.Chart = real;
+        assert("gráficos: sem window.Chart, render() cai no SVG sem lançar exceção", !err2, err2 && err2.stack);
+        assert("gráficos: sem window.Chart, o SVG antigo aparece no lugar do canvas", !document.getElementById("chart-evo") && !!document.querySelector(".chart-wrap svg"), "");
+      }
+    });
+  }
+
+  // ---- Slots de save (idb/IndexedDB): só a parte síncrona — suíte inteira é síncrona
+  // (CQ.tests.run() não é assíncrono), então o ciclo real de salvar/carregar/excluir
+  // (tudo Promise-based) foi verificado manualmente no navegador, não aqui — documentado
+  // em docs/CHANGELOG.md. Isso cobre o que É seguro testar de forma síncrona: a tela não
+  // quebra com ou sem a lib, e a API exposta tem o formato esperado.
+  function testSaveSlotsWiredSafely() {
+    withTempGame(function () {
+      const g = newCareer("ATA", "vas");
+      CQ.state.game = g;
+      CQ.state.screen = "club";
+      CQ.state.clubTab = "save";
+      let err = null;
+      try { CQ.ui.render(); } catch (e) { err = e; }
+      assert("slots de save: render() da aba Save & dados não lança exceção", !err, err && err.stack);
+      if (CQ.saveSlots && CQ.saveSlots.hasIdb()) {
+        const api = CQ.saveSlots;
+        assert("slots de save: CQ.saveSlots expõe a API esperada", typeof api.saveSlot === "function" && typeof api.loadSlot === "function" && typeof api.deleteSlot === "function" && typeof api.listSlots === "function" && typeof api.getCached === "function", "");
+        assert("slots de save: aba Save & dados mostra a seção de slots quando idb está disponível", document.body.textContent.indexOf("Slots de save") >= 0, "");
+      }
+      // sem window.idb, a seção de slots não pode aparecer nem quebrar a tela
+      const real = window.idb;
+      delete window.idb;
+      let err2 = null;
+      try { CQ.ui.render(); } catch (e) { err2 = e; }
+      window.idb = real;
+      assert("slots de save: sem window.idb, render() não lança exceção", !err2, err2 && err2.stack);
+    });
+  }
+
   // ---- Campeões: as 5 competições continentais entram no histórico todo ano (não só LIB/UCL) ----
   function testChampsCoversAllContis() {
     withTempGame(function () {
@@ -1620,6 +1715,9 @@
     testRealAgeAbsentNeverBreaks();
     testStartClubPoolExcludesBigClubs();
     testBenchRollPreviewMatchesReal();
+    testLineupPrefsAffectSelection();
+    testCareerChartsRenderCorrectData();
+    testSaveSlotsWiredSafely();
     testChampsCoversAllContis();
     testMundialRegistersChampionEvenLosing();
     testTituloOrdinalBanner();

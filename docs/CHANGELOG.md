@@ -1701,3 +1701,54 @@ Supermundial (torneio fictício deste jogo, sem equivalente real no mundo).
 
 Validado: suíte completa 238/238 (3 testes novos) + verificação visual manual dos
 logos + `node scripts/build.mjs` (bundle final **1936 KB**, 21 arquivos JS).
+
+---
+
+## Seis bibliotecas de terceiros — PixiJS, Howler.js, SortableJS, Chart.js, idb, Workbox
+
+Depois de reagir mal ao renderizador do campo Ao Vivo (print mostrando os 22
+jogadores como bolinhas vermelhas idênticas pros 2 times), o usuário pediu pra trocar
+o motor visual da partida e usar mais 5 bibliotecas de terceiros em pontos
+específicos do jogo — tudo numa entrega só ("tudo de uma vez, aceito o risco"), em
+vez de fatiado como o resto do projeto costuma ser.
+
+**PixiJS** substitui o `<canvas>` 2D cru do campo Ao Vivo: sprites reais dos 22
+jogadores carregados com textura assíncrona nativa (nunca mais cai pro círculo liso
+por a imagem ainda não ter carregado — a raiz real do bug do print), campo desenhado
+com proporção oficial (105×68m), e interpolação suave entre os frames reais do
+footballsim em vez de saltos de posição. Continua caindo pro `<canvas>` 2D cru sem
+WebGL, e pro SVG de sempre sem simulação real — nunca quebra a tela.
+
+**Howler.js** toca uma gravação real de torcida (Wikimedia Commons, CC0, recortada e
+convertida em MP3 48kbps via lamejs — sem ffmpeg, indisponível neste ambiente) em
+loop durante o Ao Vivo, com um "swell" de volume a cada gol.
+
+**SortableJS** virou uma nova aba "Tática" no Clube: arrastar jogadores decide quem
+começa em cada posição, salvo em `g.lineupPrefs` e lido de volta pela mesma função
+(`probableLineup`) que decide o time real da simulação footballsim — não é só uma
+tela decorativa, afeta a partida de verdade. Sem preferência salva, o comportamento é
+idêntico ao de sempre (top-N por overall).
+
+**Chart.js** trocou os gráficos desenhados à mão (SVG) da Carreira por gráficos de
+verdade — evolução do overall e produção (gols/assistências) por temporada — com o
+SVG antigo como fallback automático sem a lib.
+
+**idb** deu ao jogo múltiplos slots de save via IndexedDB — aditivo, separado do save
+único automático de sempre, com teto de 20 slots (descarta o mais antigo quando
+cheio).
+
+**Workbox** habilita instalar/jogar offline — único ponto do projeto que quebra a
+regra de "tudo cabe num CRAQUE.html só" (service worker precisa ser um arquivo
+buscável por URL própria, decisão já confirmada com o usuário). Achado real durante a
+implementação: o `CRAQUE.html` (2.8+ MB) passa do limite padrão do Workbox de 2 MiB
+por arquivo e ficava de fora do precache **silenciosamente** — corrigido ajustando
+`maximumFileSizeToCacheInBytes`. Limitação honesta: só funciona servido por http(s)
+(ex.: GitHub Pages) — abrir o arquivo direto do disco não habilita offline nenhum.
+
+Validado: suíte completa 253/253 (2 testes novos, mais a cobertura indireta da tela
+Tática) + verificação manual completa de cada uma das 6 bibliotecas no navegador
+(partida ao vivo real com Pixi+Howler, 3 partidas seguidas sem vazar contexto WebGL,
+drag-and-drop real disparando a mesma função que um drag de verdade usaria, gráficos
+com dados corretos, ciclo completo de slots de save com estresse de 22 saves,
+service worker registrado com precache correto). `node scripts/build.mjs` + `node
+scripts/build-sw.mjs`: bundle final **2812 KB** (29 arquivos JS), `sw.js` 22 KB.
