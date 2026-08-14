@@ -1150,3 +1150,14 @@ que nunca bate com `CQ.COMP_LOGOS` de propósito — novo `fxCompLogoKey(G, key)
 pro código real da competição daquele ano (`S.comps.LIGA.id`/`S.comps.COPA.logoKey`)
 antes de pedir o logo. Validado com `testLeadMatchupShowsCompLogo` (novo) + verificação
 manual avançando uma carreira até uma partida de liga real.
+
+## Ao vivo automático (feito)
+
+`liveStep()`/`shootReveal()` (`js/ui.js`) se reagendam sozinhos via `scheduleLiveAuto`/
+`clearLiveAuto` (novos, `setTimeout` guardado numa variável de módulo pra nunca deixar
+2 avanços agendados) sempre que a fase não exige escolha do jogador — 2,2-5,2 s por
+lance revelado (escala com quantos eventos chegaram juntos), 2,6 s por cobrança de
+pênalti. O botão vira só um atalho ("Adiantar ›") pra quem quer pular a espera; decisões
+continuam pausando de verdade. `finishLive()` e qualquer chamada manual de
+`liveStep()`/`shootReveal()` cancelam o timer pendente primeiro — nunca um avanço
+fantasma depois da partida encerrada.

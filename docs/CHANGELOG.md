@@ -1810,3 +1810,28 @@ Validado: suíte completa 266/266 (2 testes novos) + verificação manual no nav
 confirmando logo real numa partida de Brasileirão (confronto principal e nas 2 telas)
 e ícone vetorial de reserva numa partida de Estadual/eliminatória, sem estourar a
 largura dos 250px do painel lateral.
+
+---
+
+## Ao vivo automático (sem precisar clicar em "Continuar")
+
+Pedido do usuário: "quando o jogo é ao vivo ele pode seguir automaticamente sem
+precisar clicar em continuar e ser mais lento o Ao vivo com as cenas passando e os
+acontecimentos". `liveStep()`/`shootReveal()` (`js/ui.js`) agora se reagendam sozinhos
+via um `setTimeout` (`scheduleLiveAuto`/`clearLiveAuto`, novos) sempre que a partida
+está numa fase "corrida" (sem decisão/pênaltis pendentes) — pausa entre **2,2 e 5,2 s**
+por lance revelado (mais lances chegados juntos = pausa maior, dá tempo de ler o feed e
+ver os splashes de gol/cartão), e a disputa de pênaltis avança sozinha a cada **2,6 s**
+por cobrança.
+
+O botão continua existindo (agora rotulado "Adiantar ›") como atalho pra quem quer
+pular a espera — clicar cancela o timer pendente e adianta na hora, sem nunca deixar 2
+avanços agendados ao mesmo tempo. Decisões (pênalti a favor, falta perigosa, etc.)
+continuam pausando de verdade — não são adiantadas sozinhas, já que exigem escolha do
+jogador. `finishLive()`/troca de partida cancelam qualquer timer pendente, evitando um
+`liveStep()` fantasma disparar depois que a partida já foi encerrada.
+
+Validado: suíte completa 267/267 + verificação ponta a ponta no Browser pane —
+simulei uma partida decisiva inteira sem clicar em nada (só resolvendo as decisões que
+apareceram) e ela avançou sozinha do apito inicial até "Encerrar partida", pausando
+corretamente em cada decisão/pênalti no meio do caminho.

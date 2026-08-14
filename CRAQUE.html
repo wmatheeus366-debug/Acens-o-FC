@@ -10486,6 +10486,22 @@ window.CQ = window.CQ || {};
   // o <canvas> cru vira o objeto de estado de sempre) — nunca quebra a tela.
   let pitchCanvasState = null;
   let pitchRenderer = null; // "pixi" | "2d" | null
+  // partida ao vivo segue sozinha (sem precisar clicar "Continuar" a cada lance) —
+  // pedido do usuário: mais cinematográfico, "cenas passando". Guarda o timer pendente
+  // pra poder cancelar (partida encerrada/decisão aparece/usuário clica "Continuar" pra
+  // adiantar manualmente) — nunca deixa 2 avanços agendados ao mesmo tempo.
+  let liveAutoTimer = null;
+  function clearLiveAuto() {
+    if (liveAutoTimer) { clearTimeout(liveAutoTimer); liveAutoTimer = null; }
+  }
+  function scheduleLiveAuto(fn, ms) {
+    clearLiveAuto();
+    liveAutoTimer = setTimeout(function () {
+      liveAutoTimer = null;
+      if (!CQ.state.live) return; // partida já encerrada nesse meio-tempo
+      fn();
+    }, ms);
+  }
   const spriteImgCache = {};
   function spriteImg(src) {
     if (!spriteImgCache[src]) { const im = new Image(); im.src = src; spriteImgCache[src] = im; }
@@ -10703,6 +10719,7 @@ window.CQ = window.CQ || {};
   }
 
   function liveStep() {
+    clearLiveAuto(); // chamado tanto pelo timer quanto por clique manual — nunca 2x agendado
     const live = CQ.state.live;
     const revealed = CQ.live.step(live);
     const feedEl = $("#lv-feed");
@@ -10741,7 +10758,11 @@ window.CQ = window.CQ || {};
     } else if (live.phase === "done") {
       foot.innerHTML = `<button class="btn btn-pri btn-block btn-big" onclick="CQ.ui.finishLive()">Encerrar partida</button>`;
     } else {
-      foot.innerHTML = `<button class="btn btn-block" onclick="CQ.ui.liveStep()">Continuar &rsaquo;</button>`;
+      // a partida segue sozinha — botão fica só como atalho pra quem quer adiantar na
+      // hora. Pausa mais longa quando vários lances chegaram juntos, pra dar tempo de
+      // ler o feed/ver os splashes antes do próximo trecho.
+      foot.innerHTML = `<button class="btn btn-block" onclick="CQ.ui.liveStep()">Adiantar &rsaquo;</button>`;
+      scheduleLiveAuto(liveStep, Math.min(5200, 2200 + revealed.length * 900));
     }
     const box = $("#cq-overlay .overlay-box");
     if (box) box.scrollTop = box.scrollHeight;
@@ -10808,6 +10829,7 @@ window.CQ = window.CQ || {};
       <p class="shoot-comment ${last && last.ok ? "ok" : last ? "miss" : ""}">${esc(lastTxt)}</p>`;
     if (running) {
       footHTML += `<button class="btn btn-pri btn-block" onclick="CQ.ui.shootReveal()">Próxima cobrança &rsaquo;</button>`;
+      scheduleLiveAuto(shootReveal, 2600); // disputa também segue sozinha, um pouco mais devagar (mais tensão)
     } else {
       const win = live.res.shootoutWin;
       footHTML += `<div class="notice ${win ? "ok" : ""} mb8"><b>${win ? "CLASSIFICADO" : "ELIMINADO"} nos pênaltis: ${so.my} × ${so.opp}.</b></div>
@@ -10820,6 +10842,7 @@ window.CQ = window.CQ || {};
   }
 
   function shootReveal() {
+    clearLiveAuto(); // chamado tanto pelo timer quanto por clique manual
     const live = CQ.state.live;
     const l = CQ.live.shootStep(live);
     if (l && CQ.pitch && CQ.pitch.poseForKick) applyPitchPose(CQ.pitch.poseForKick(l));
@@ -10827,6 +10850,7 @@ window.CQ = window.CQ || {};
   }
 
   function finishLive() {
+    clearLiveAuto();
     const live = CQ.state.live;
     CQ.state.live = null;
     unmountPitchCanvas(); // nunca deixar um requestAnimationFrame pendente fora da partida
